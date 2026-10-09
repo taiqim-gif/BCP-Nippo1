@@ -27,10 +27,10 @@ const GAS_TABLE = [
   { code:1004, label:"Ar",       name:"アルゴン",     cap:7,  unit:"㎥", bg:AZURE_GRAY, fg:"#fff" },
   { code:1006, label:"CO2",      name:"炭酸",         cap:30, unit:"kg", bg:"#3F9A5E", fg:"#fff" },              // 緑
   { code:1007, label:"ArCo",     name:"アルコミック", cap:7,  unit:"㎥", fg:"#fff", shadow:true,                 // アズールグレーに緑縞
-    bg:"repeating-linear-gradient(135deg, " + AZURE_GRAY + " 0 9px, #3F9A5E 9px 14px)" },
+    bg:"linear-gradient(to bottom, " + AZURE_GRAY + " 0 38%, #3F9A5E 38% 62%, " + AZURE_GRAY + " 62% 100%)" },   // 横縞：グレー・緑(細め)・グレー
   { code:1008, label:"フロン",   name:"フロン",       cap:"", unit:"kg", bg:"#A3A9AF", fg:"#1f1f1f" },           // グレー
   { code:2001, label:"LP",       name:"プロパン",     cap:"", unit:"kg", bg:"#A3A9AF", fg:"#1f1f1f" },
-  { code:5001, label:"Me-O2",    name:"医療用酸素",   cap:"", unit:"㎥", bg:"#222222", fg:"#fff" }               // 黒
+  { code:5001, label:"医O2",    name:"医療用酸素",   cap:"", unit:"㎥", bg:"#222222", fg:"#fff" }               // 黒
 ];
 const OTHER_GAS_STYLE = { bg:"#2D87E3", fg:"#fff" };                  // 「その他」ボタン：アズールブルー
 const OTHER_GAS_UNIT = "㎥";                                           // 「その他」を選んだときの初期の単位
@@ -144,6 +144,8 @@ style.textContent = `
 
   .ct-status{ font-size:12px; color:var(--ink-soft); text-align:center; margin:10px 4px; line-height:1.6; }
   .ct-status:empty{ display:none; }
+  .ct-gas-selected{ margin-top:8px; font-size:15px; font-weight:700; color:var(--ink); }
+  .ct-gas-selected.none{ font-weight:400; color:var(--ink-soft); font-size:13px; }
   .ct-chip-row .chip.gas{ border:none; font-weight:700; padding:10px 14px; }
   .ct-chip-row .chip.gas.on{ box-shadow:0 0 0 2px #fff, 0 0 0 4px var(--ink); }
 
@@ -196,6 +198,7 @@ section.innerHTML = `
     <div class="field">
       <label>ガス種</label>
       <div class="ct-chip-row" id="ctGasChips"></div>
+      <div class="ct-gas-selected" id="ctGasSelected"></div>
       <input type="text" id="ctGasOther" placeholder="ガス種を入力" style="margin-top:8px;display:none;" autocomplete="off">
     </div>
 
@@ -309,7 +312,25 @@ function renderGasChips(){
   addChip("その他", OTHER_GAS_STYLE, ctGasSel === "other", () => pickGas("other"));
 
   $("ctGasOther").style.display = (ctGasSel === "other") ? "block" : "none";
+  renderGasSelected();
   renderAdj();
+}
+
+// 押したボタンのガス種を文字でも表示する（略称・色だけに頼らず、誤入力を防ぐ）
+function renderGasSelected(){
+  const el = $("ctGasSelected");
+  const g = curGas();
+  if(g){
+    el.className = "ct-gas-selected";
+    el.textContent = `選択中：${g.name}`;
+  }else if(ctGasSel === "other"){
+    const t = $("ctGasOther").value.trim();
+    el.className = "ct-gas-selected";
+    el.textContent = "選択中：その他" + (t ? `（${t}）` : "");
+  }else{
+    el.className = "ct-gas-selected none";
+    el.textContent = "ガス種を選んでください";
+  }
 }
 
 // ガス種を選ぶと、決めておいた容量と単位が自動で入る
@@ -986,6 +1007,7 @@ $("ctFilterClear").addEventListener("click", () => {
   renderList();
 });
 $("ctCapacity").addEventListener("input", renderAdj);
+$("ctGasOther").addEventListener("input", renderGasSelected);
 $("ctSaveButton").addEventListener("click", saveFromForm);
 $("ctCancelEdit").addEventListener("click", cancelEdit);
 
