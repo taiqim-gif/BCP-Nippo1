@@ -1,0 +1,2094 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>営業日報</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF6EF;
+    --card:#FFFFFF;
+    --ink:#4A4340;
+    --ink-soft:#9C948C;
+    --line:#EFE7DA;
+
+    --mint:#8FD9C4;      --mint-dark:#5FBFA5;      --mint-ink:#12503F;
+    --peach:#FFC9A6;     --peach-dark:#FF9F6B;     --peach-ink:#7A3E12;
+    --lavender:#D3C6F5;  --lavender-dark:#B4A0E8;  --lavender-ink:#3B2E63;
+    --sky:#AEDDF2;       --sky-dark:#7FC2E3;       --sky-ink:#0B4A66;
+    --pink:#FFC1D3;      --pink-dark:#FF97B3;      --pink-ink:#A6395E;
+    --butter:#FFE39B;    --butter-dark:#F5C542;    --butter-ink:#6B4E00;
+
+    --radius:16px;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0;
+    padding:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic Medium",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  body{ padding-bottom:40px; }
+
+  header{
+    position:sticky;
+    top:0;
+    z-index:10;
+    background:linear-gradient(90deg,#EADFFB 0%,#DCEFFB 55%,#DFF5EC 100%);
+    border-bottom:1px solid var(--line);
+    padding:12px 14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+  }
+
+  header .date{
+    font-size:14px;
+    font-weight:700;
+    color:var(--ink);
+    flex:0 0 auto;
+  }
+
+  .nav-btn{
+    border:1.5px solid #FFFFFF;
+    background:#FFFFFFB0;
+    color:var(--ink);
+    border-radius:999px;
+    padding:9px 16px;
+    font-size:13.5px;
+    font-weight:700;
+    font-family:inherit;
+    cursor:pointer;
+  }
+
+  .nav-btn.active-mint{ background:var(--mint); color:var(--mint-ink); border-color:var(--mint-dark); }
+  .nav-btn.active-peach{ background:var(--peach); color:var(--peach-ink); border-color:var(--peach-dark); }
+
+  main{ max-width:520px; margin:0 auto; padding:16px; }
+
+  .screen{ display:none; }
+  .screen.active{ display:block; }
+
+  h2{
+    font-size:15px;
+    font-weight:700;
+    margin:20px 0 10px;
+    color:var(--ink);
+    position:relative;
+    padding-left:14px;
+  }
+  h2::before{
+    content:"";
+    position:absolute;
+    left:0; top:5px;
+    width:7px; height:7px;
+    border-radius:50%;
+    background:var(--mint-dark);
+  }
+  h2:first-child{ margin-top:4px; }
+  h2.h2-flex{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .h2-note{ font-size:12px; font-weight:400; color:var(--ink-soft); white-space:nowrap; }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:16px;
+    margin-bottom:14px;
+    box-shadow:0 2px 10px rgba(80,60,30,0.05);
+  }
+
+  .field{ margin-bottom:14px; }
+  .field:last-child{ margin-bottom:0; }
+  .honorific-dropdown{
+    display:none;
+    position:absolute;
+    top:100%; left:0; right:0;
+    background:#fff;
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    margin-top:4px;
+    z-index:20;
+    box-shadow:0 4px 14px rgba(0,0,0,0.10);
+    overflow:hidden;
+  }
+  .honorific-dropdown.show{ display:block; }
+  .honorific-option{
+    display:block;
+    width:100%;
+    text-align:left;
+    padding:10px 12px;
+    border:none;
+    border-bottom:1px solid var(--line);
+    background:#fff;
+    font-family:inherit;
+    font-size:14px;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .honorific-option:last-child{ border-bottom:none; }
+  .honorific-option:active{ background:var(--butter); }
+
+  .field label{ display:block; font-size:12px; color:var(--ink-soft); margin-bottom:6px; }
+
+  input[type=text], input[type=number], input[type=time], select, textarea{
+    width:100%;
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    padding:11px 12px;
+    font-size:15px;
+    font-family:inherit;
+    background:#FFFDF9;
+    color:var(--ink);
+  }
+
+  input:disabled, select:disabled{ background:#F2EEE4; color:var(--ink-soft); }
+
+  textarea{ min-height:70px; resize:vertical; }
+
+  input:focus, select:focus, textarea:focus{
+    outline:none;
+    border-color:var(--lavender-dark);
+    background:#fff;
+  }
+
+  .btn{
+    display:block;
+    width:100%;
+    border:none;
+    border-radius:12px;
+    padding:14px;
+    font-size:15px;
+    font-weight:700;
+    font-family:inherit;
+    cursor:pointer;
+    text-align:center;
+  }
+
+  .btn-lavender{ background:var(--lavender); color:var(--lavender-ink); }
+  .btn-mint{ background:var(--mint); color:var(--mint-ink); }
+  .btn-peach{ background:var(--peach); color:var(--peach-ink); }
+  .btn-sky{ background:var(--sky); color:var(--sky-ink); }
+
+  .btn-outline-mint{ background:#fff; color:var(--mint-ink); border:1.5px solid var(--mint); }
+  .btn-outline-pink{ background:#fff; color:var(--pink-ink); border:1.5px solid var(--pink); }
+  .btn-pink{ background:var(--pink); color:var(--pink-ink); border:1.5px solid var(--pink); }
+  .delete-row .btn{ font-size:13.5px; padding:13px 6px; }
+
+  .master-bar{ display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; color:var(--ink-soft); margin-bottom:12px; }
+  .btn-mini{ border:1.5px solid var(--line); background:#fff; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700; font-family:inherit; color:var(--ink); cursor:pointer; }
+  .master-actions .btn{ font-size:13.5px; padding:12px 6px; }
+  .kana-grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-bottom:8px; }
+  .kana-btn{ padding:10px 0; border-radius:10px; border:1.5px solid var(--line); background:#fff; font-family:inherit; font-size:14px; font-weight:700; color:var(--ink-soft); cursor:pointer; }
+  .kana-btn.active{ background:var(--butter); border-color:var(--butter-dark); color:var(--butter-ink); }
+  .customer-list{ max-height:200px; overflow-y:auto; border:1.5px solid var(--line); border-radius:10px; background:#fff; margin-bottom:8px; }
+  .customer-item{ display:block; width:100%; text-align:left; padding:11px 12px; border:none; border-bottom:1px solid var(--line); background:#fff; font-family:inherit; font-size:14px; color:var(--ink); cursor:pointer; }
+  .customer-item:last-child{ border-bottom:none; }
+  .customer-item:active{ background:var(--butter); }
+  .customer-empty{ padding:12px; font-size:13px; color:var(--ink-soft); text-align:center; }
+  .btn-compact{ flex:1; padding:10px 4px; font-size:12.5px; }
+
+  .btn-text{
+    background:none; border:none;
+    color:var(--ink-soft);
+    font-size:13px;
+    font-family:inherit;
+    text-decoration:underline;
+    cursor:pointer;
+    padding:6px 0;
+  }
+
+  .btn:disabled{ opacity:.4; cursor:not-allowed; }
+
+  .row-gap{ display:flex; gap:10px; }
+  .row-gap > *{ flex:1; }
+
+  .distance-controls{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    margin-top:10px;
+  }
+
+  .dial{
+    width:96px; height:96px;
+    flex:0 0 auto;
+    border-radius:50%;
+    background:linear-gradient(150deg,#ffffff 0%, var(--sky) 130%);
+    border:2px solid var(--sky-dark);
+    position:relative;
+    touch-action:none;
+    cursor:grab;
+  }
+  .dial::before{
+    content:"↻";
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:22px;
+    color:var(--sky-ink);
+    opacity:.5;
+    pointer-events:none;
+  }
+  .dial-rotor{ position:absolute; inset:0; pointer-events:none; }
+  .dial-dot{
+    position:absolute;
+    top:5px; left:50%;
+    width:9px; height:9px;
+    margin-left:-4.5px;
+    border-radius:50%;
+    background:var(--sky-ink);
+  }
+  .dial.disabled{ opacity:.4; pointer-events:none; }
+  .dial-hint{
+    text-align:center;
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-top:4px;
+  }
+  .dial-row{ display:flex; align-items:center; gap:16px; margin-top:14px; }
+  .dial-actions{ flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+  .dial-actions .btn{ padding:18px 10px; }
+  .dial-actions .dial-hint{ margin-top:0; }
+
+  .status-pill{
+    display:inline-block;
+    font-size:12px;
+    font-weight:700;
+    padding:4px 12px;
+    border-radius:999px;
+    background:#F2EEE4;
+    color:var(--ink-soft);
+  }
+  .status-pill.on{ background:#E4F1EC; color:var(--mint-ink); }
+
+  .mode-switch{ display:flex; background:#F2EEE4; border-radius:999px; padding:4px; gap:4px; }
+  .mode-switch-btn{
+    flex:1;
+    border:none;
+    background:transparent;
+    padding:10px;
+    border-radius:999px;
+    font-family:inherit;
+    font-size:14px;
+    font-weight:700;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .mode-switch-btn.active{ background:#fff; color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+
+  .todo-item{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-left:5px solid var(--lavender);
+    border-radius:var(--radius);
+    padding:10px 12px;
+    margin-bottom:8px;
+  }
+  .todo-item{ display:flex; align-items:center; gap:4px; }
+  .todo-item label{ flex:1; min-width:0; display:flex; align-items:center; gap:10px; cursor:pointer; }
+  .todo-handle{
+    flex:0 0 auto; width:38px; height:38px; margin:-6px -6px -6px 0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px; line-height:1; color:var(--ink-soft);
+    cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none;
+    -webkit-touch-callout:none;
+  }
+  .todo-item.dragging{ background:#FFF9E6; border-color:var(--butter-dark); box-shadow:0 6px 18px rgba(80,60,30,0.18); position:relative; z-index:5; }
+  .todo-item.dragging .todo-handle{ cursor:grabbing; color:var(--ink); }
+  .todo-item input[type=checkbox]{ width:18px; height:18px; flex:0 0 auto; }
+  .todo-item .todo-line{
+    flex:1; min-width:0;
+    font-size:14px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .day-header{ display:flex; justify-content:space-between; font-size:13px; font-weight:700; color:var(--ink-soft); margin:16px 2px 8px; }
+  .day-header:first-child{ margin-top:0; }
+  .content-line{ display:flex; align-items:flex-start; gap:8px; margin-bottom:4px; }
+  .content-line input[type=checkbox]{ margin-top:3px; width:16px; height:16px; flex:0 0 auto; }
+  .content-line span{ font-size:13.5px; line-height:1.5; }
+  .content-line .line-done{ text-decoration:line-through; text-decoration-color:#D64545; text-decoration-thickness:1.5px; }
+  .content-line .done-suffix{ color:#D64545; margin-left:4px; }
+
+  .chip-group{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .chip{
+    padding:10px 2px;
+    text-align:center;
+    white-space:nowrap;
+    border-radius:999px;
+    border:1.5px solid var(--line);
+    background:#fff;
+    font-size:13px;
+    font-family:inherit;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .chip:active{
+    background:var(--butter);
+    border-color:var(--butter-dark);
+    color:var(--butter-ink);
+  }
+
+  .visit-card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-left:5px solid var(--mint);
+    border-radius:var(--radius);
+    padding:14px;
+    margin-bottom:10px;
+  }
+
+  .visit-card .top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+  .visit-card .target{ font-size:15px; font-weight:700; }
+  .visit-card .time{ font-size:12px; color:var(--ink-soft); }
+  .visit-card .meta{ font-size:13px; color:var(--ink-soft); margin-bottom:4px; }
+  .visit-card .content{ font-size:13.5px; line-height:1.5; white-space:pre-wrap; margin-bottom:8px; }
+
+  .card-action{
+    flex:1;
+    padding:9px;
+    border-radius:10px;
+    font-size:12.5px;
+    font-family:inherit;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .card-action.edit{ background:#EAF4FB; color:var(--sky-ink); border:1.5px solid var(--sky); }
+  .card-action.delete{ background:#FDECF1; color:var(--pink-ink); border:1.5px solid var(--pink); }
+
+  .empty{ text-align:center; color:var(--ink-soft); font-size:13.5px; padding:26px 10px; }
+
+  .summary-line{ display:flex; justify-content:space-between; font-size:13.5px; padding:6px 0; }
+
+  .footer-actions{ margin:14px 0 6px; display:flex; flex-direction:column; gap:10px; }
+
+  .toast{
+    position:fixed;
+    left:50%; bottom:24px;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--ink);
+    color:#fff;
+    padding:11px 18px;
+    border-radius:999px;
+    font-size:13.5px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease;
+    z-index:50;
+    white-space:nowrap;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="date" id="dateDisplay"></span>
+  <button class="nav-btn" id="navHomeButton">ホーム</button>
+  <button class="nav-btn" id="navVehicleButton">車両</button>
+</header>
+
+<main>
+
+  <!-- ============ ホーム（営業日報一覧）画面 ============ -->
+  <section id="reportScreen" class="screen active">
+
+    <div class="card">
+      <div class="master-bar">
+        <span id="masterStatus">客先名リスト：未取得</span>
+        <span style="display:flex;gap:6px;">
+          <button type="button" class="btn-mini" id="masterFetchButton">取得</button>
+          <button type="button" class="btn-mini" id="masterClearButton" style="display:none;">消す</button>
+        </span>
+      </div>
+
+      <div id="masterKeyBox" style="display:none;margin-bottom:14px;">
+        <label for="masterKeyInput" style="display:block;font-size:12px;color:var(--ink-soft);margin-bottom:6px;">営業所キー</label>
+        <input type="password" id="masterKeyInput" autocomplete="off" autocapitalize="characters" spellcheck="false" style="margin-bottom:8px;">
+        <div class="row-gap master-actions">
+          <button type="button" class="btn btn-mint" id="masterFileButton">ファイルから取り込む</button>
+          <button type="button" class="btn btn-outline-mint" id="masterGoButton">ネットから取得</button>
+        </div>
+        <input type="file" id="masterFile" style="display:none;">
+        <div id="masterMessage" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
+      </div>
+
+      <div class="field">
+        <label for="homeVisitTarget">訪問先</label>
+        <input type="text" id="homeVisitTarget" placeholder="例：〇〇商店" autocomplete="off">
+      </div>
+
+      <div id="kanaArea" style="display:none;">
+        <div class="kana-grid" id="kanaGrid"></div>
+        <div class="customer-list" id="customerList" style="display:none;"></div>
+      </div>
+
+      <button class="btn btn-lavender" id="homeStartButton">開始</button>
+    </div>
+
+    <div class="footer-actions">
+      <button class="btn btn-outline-mint" id="mailButton">日報をメール送信</button>
+      <div class="row-gap delete-row">
+        <button class="btn btn-pink" id="deleteAllButton">全データを削除</button>
+        <button class="btn btn-outline-pink" id="deleteKeepTodoButton">TODOを残して削除</button>
+      </div>
+    </div>
+
+    <div class="todo-list-target" data-hide-empty="1"></div>
+
+    <h2 class="h2-flex"><span>訪問履歴（<span id="visitCount">0</span>件）</span><span class="h2-note">✓ 　ToDoリストへ追加</span></h2>
+    <div id="visitList"></div>
+
+  </section>
+
+
+  <!-- ============ 訪問入力／編集画面 ============ -->
+  <section id="visitScreen" class="screen">
+
+    <h2 id="visitScreenTitle">訪問先</h2>
+
+    <div class="card">
+      <div class="field">
+        <label for="visitTarget">訪問先名</label>
+        <input type="text" id="visitTarget" placeholder="例：〇〇商店">
+      </div>
+
+      <div class="row-gap" id="editTimeRow" style="display:none;">
+        <div class="field">
+          <label for="editStartTime">開始時刻</label>
+          <input type="time" id="editStartTime">
+        </div>
+        <div class="field">
+          <label for="editEndTime">終了時刻</label>
+          <input type="time" id="editEndTime">
+        </div>
+      </div>
+
+      <div class="field" id="visitStatusField" style="display:none;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span class="status-pill on">訪問中</span>
+        </div>
+        <label for="visitStartTimeInput">開始時刻</label>
+        <input type="time" id="visitStartTimeInput">
+      </div>
+    </div>
+
+    <div class="card" id="meetingCard" style="display:none;">
+
+      <div class="row-gap">
+        <div class="field" style="flex:2;">
+          <label for="meetingPerson">面談者</label>
+          <input type="text" id="meetingPerson" placeholder="例：山田">
+        </div>
+        <div class="field" style="flex:1; position:relative;">
+          <label for="meetingPersonTitle">敬称</label>
+          <input type="text" id="meetingPersonTitle" placeholder="さん" autocomplete="off">
+          <div class="honorific-dropdown" id="honorificDropdown"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>内容区分</label>
+        <div class="chip-group" id="contentTypeButtons"></div>
+      </div>
+
+      <div class="field">
+        <label for="meetingContent">内容</label>
+        <textarea id="meetingContent" placeholder="打合せ内容を入力"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="meetingNotes">特記事項</label>
+        <textarea id="meetingNotes" placeholder="特になければ空欄でOK"></textarea>
+      </div>
+
+      <div class="row-gap">
+        <button class="btn btn-mint" id="endButton" style="flex:4;">記録終了</button>
+        <button class="btn btn-outline-pink btn-compact" id="deleteEditButton">削除</button>
+      </div>
+    </div>
+
+    <div class="todo-list-target" data-hide-empty="1"></div>
+
+  </section>
+
+
+  <!-- ============ 車両情報画面 ============ -->
+  <section id="vehicleScreen" class="screen">
+
+    <h2>車両情報</h2>
+
+    <div class="card">
+      <div class="mode-switch" id="vehicleModeSwitch">
+        <button type="button" class="mode-switch-btn" data-mode="departure">出発</button>
+        <button type="button" class="mode-switch-btn" data-mode="return">帰社</button>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 12px;">
+        <strong style="font-size:14px;" id="vehicleModeLabel">出発</strong>
+        <span class="status-pill" id="vehicleStatusPill">未出発</span>
+      </div>
+
+      <div class="row-gap" style="align-items:flex-end;">
+        <div class="field" style="margin-bottom:0;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+            <label for="vehicleDistance" style="margin-bottom:0;">走行距離</label>
+            <span style="font-size:12px;color:var(--ink-soft);" id="vehicleTimeText"></span>
+          </div>
+          <input type="number" inputmode="decimal" id="vehicleDistance" placeholder="例：12345">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="vehicleFuel">給油量（L）</label>
+          <input type="number" inputmode="decimal" id="vehicleFuel" placeholder="空欄Ok">
+        </div>
+      </div>
+
+      <div class="dial-row">
+        <div class="dial" id="vehicleDial" data-target="vehicleDistance">
+          <div class="dial-rotor"><span class="dial-dot"></span></div>
+        </div>
+        <div class="dial-actions">
+          <button class="btn btn-peach" id="vehicleSaveButton">出発</button>
+          <button class="btn btn-text" id="vehicleResetButton" style="display:none;">やり直す</button>
+          <div class="dial-hint">中心ほど細かく、外側ほど大きく変化</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="distanceSummaryCard" style="display:none;">
+      <div class="summary-line">
+        <span style="color:var(--ink-soft);">本日の走行距離</span>
+        <span style="font-weight:700;" id="distanceSummaryText"></span>
+      </div>
+    </div>
+
+    <h2 class="h2-flex"><span>TODOリスト</span><span class="h2-note">消す=コピー可</span></h2>
+
+    <div class="card">
+      <div class="field">
+        <label for="todoManualInput">やることを追加</label>
+        <input type="text" id="todoManualInput" placeholder="例：〇〇へ電話">
+      </div>
+      <button class="btn btn-lavender" id="todoAddButton">追加</button>
+    </div>
+
+    <div class="todo-list-target"></div>
+
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+/* =========================================================
+   保存データ
+========================================================= */
+
+const LOG_KEY = "meetingLogs";
+const VEHICLE_KEY = "dailyVehicleInfo";
+const LAST_OPEN_KEY = "appLastOpenDate";
+
+/* ===CRYPTO-BEGIN=== */
+const MASTER_SALT = "eigyo-nippo-master-v1";
+const MASTER_ITER = 600000;
+
+function normalizeKey(raw){
+  return String(raw || "").normalize("NFKC").toUpperCase().replace(/[\s\-\u30FC\u2010-\u2015\u2212]/g, "");
+}
+
+function toHex(buf){
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function deriveMaster(rawKey){
+  const enc = new TextEncoder();
+  const base = await crypto.subtle.importKey("raw", enc.encode(normalizeKey(rawKey)), "PBKDF2", false, ["deriveBits"]);
+  const master = await crypto.subtle.deriveBits(
+    { name:"PBKDF2", hash:"SHA-256", salt:enc.encode(MASTER_SALT), iterations:MASTER_ITER }, base, 256);
+  const hk = await crypto.subtle.importKey("raw", master, "HKDF", false, ["deriveBits"]);
+  const empty = new Uint8Array(0);
+  const aesBits = await crypto.subtle.deriveBits(
+    { name:"HKDF", hash:"SHA-256", salt:empty, info:enc.encode("aes-key") }, hk, 256);
+  const idBits = await crypto.subtle.deriveBits(
+    { name:"HKDF", hash:"SHA-256", salt:empty, info:enc.encode("file-id") }, hk, 128);
+  const aesKey = await crypto.subtle.importKey("raw", aesBits, "AES-GCM", false, ["encrypt", "decrypt"]);
+  return { aesKey, fileId: toHex(idBits) };
+}
+
+async function encryptMaster(aesKey, obj){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = new TextEncoder().encode(JSON.stringify(obj));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name:"AES-GCM", iv }, aesKey, data));
+  const out = new Uint8Array(iv.length + ct.length);
+  out.set(iv, 0);
+  out.set(ct, iv.length);
+  return out;
+}
+
+async function decryptMaster(aesKey, buffer){
+  const bytes = new Uint8Array(buffer);
+  if(bytes.length < 29) throw new Error("bad-format");
+  const iv = bytes.slice(0, 12);
+  const ct = bytes.slice(12);
+  const plain = await crypto.subtle.decrypt({ name:"AES-GCM", iv }, aesKey, ct);
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+/* ===CRYPTO-END=== */
+
+
+const CONTENT_TYPES = ["引取","配達","注文","営業","周知文書","集金","苦情","新規"];
+const HONORIFIC_OPTIONS = ["社長","工場長","専務","常務","部長","課長"];
+
+let meetingLogs = JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
+let dailyVehicleInfo = JSON.parse(localStorage.getItem(VEHICLE_KEY) || "{}");
+
+let currentVisit = null;
+
+
+/* =========================================================
+   共通関数
+========================================================= */
+
+function getToday(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+
+function getNowDateTimeLocal(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  const h = String(d.getHours()).padStart(2,"0");
+  const min = String(d.getMinutes()).padStart(2,"0");
+  return `${y}-${m}-${day}T${h}:${min}`;
+}
+
+function formatTimeOnly(value){
+  if(!value) return "";
+  const parts = value.split("T");
+  if(parts.length < 2) return value;
+  return parts[1].slice(0,5);
+}
+
+function saveLogs(){ localStorage.setItem(LOG_KEY, JSON.stringify(meetingLogs)); }
+function saveVehicle(){ localStorage.setItem(VEHICLE_KEY, JSON.stringify(dailyVehicleInfo)); }
+
+function showToast(message){
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => toast.classList.remove("show"), 1800);
+}
+
+function escapeHtml(str){
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+
+/* =========================================================
+   位置情報（裏側で取得しデータに記録するのみ。画面には表示しない）
+========================================================= */
+
+function getLocation(){
+  return new Promise(resolve => {
+    if(!navigator.geolocation){
+      resolve({ location:"", lat:"", lng:"" });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        resolve({ location:`${lat},${lng}`, lat, lng });
+      },
+      () => resolve({ location:"", lat:"", lng:"" }),
+      { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
+    );
+  });
+}
+
+
+/* =========================================================
+   日付表示
+========================================================= */
+
+function updateDate(){
+  const d = new Date();
+  const week = ["日","月","火","水","木","金","土"][d.getDay()];
+  document.getElementById("dateDisplay").textContent =
+    `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}（${week}）`;
+}
+
+
+/* =========================================================
+   走行距離：回転ダイヤル（ぐるぐる回して増減）
+   中心の近くを回すと細かく、外側を回すほど大きく変化する
+   （半径に応じて1度あたりの変化量が変わる）。
+========================================================= */
+
+function attachDial(dial){
+  const inputId = dial.getAttribute("data-target");
+  const rotor = dial.querySelector(".dial-rotor");
+  let dragging = false;
+  let lastAngle = 0;
+
+  function getVector(evt){
+    const rect = dial.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const point = evt.touches ? evt.touches[0] : evt;
+    return { dx: point.clientX - cx, dy: point.clientY - cy };
+  }
+
+  function start(evt){
+    if(dial.classList.contains("disabled")) return;
+    dragging = true;
+    const { dx, dy } = getVector(evt);
+    lastAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+    evt.preventDefault();
+  }
+
+  function move(evt){
+    if(!dragging) return;
+
+    const { dx, dy } = getVector(evt);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    let delta = angle - lastAngle;
+    if(delta > 180) delta -= 360;
+    if(delta < -180) delta += 360;
+    lastAngle = angle;
+
+    // 半径が大きいほど1度あたりのkm変化量を大きくする
+    const radius = Math.max(24, Math.hypot(dx, dy));
+    const kmPerDegree = Math.min(3, radius / 250);
+
+    const input = document.getElementById(inputId);
+    let val = parseFloat(input.value);
+    if(isNaN(val)) val = 0;
+
+    val = Math.max(0, Math.round(val + delta * kmPerDegree));
+    input.value = val;
+    input.dispatchEvent(new Event("input"));
+
+    rotor.style.transform = `rotate(${angle}deg)`;
+    evt.preventDefault();
+  }
+
+  function end(){
+    if(dragging){
+      dragging = false;
+      document.getElementById(inputId).dispatchEvent(new Event("change"));
+    }
+  }
+
+  dial.addEventListener("mousedown", start);
+  dial.addEventListener("touchstart", start, { passive:false });
+  window.addEventListener("mousemove", move, { passive:false });
+  window.addEventListener("touchmove", move, { passive:false });
+  window.addEventListener("mouseup", end);
+  window.addEventListener("touchend", end);
+}
+
+document.querySelectorAll(".dial").forEach(attachDial);
+
+
+/* =========================================================
+   画面切替（ヘッダーのナビが常に切替の入口）
+========================================================= */
+
+function showScreen(name){
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(name + "Screen").classList.add("active");
+  window.scrollTo({ top:0, behavior:"auto" });
+}
+
+function updateNav(screenName){
+  const isHome = (screenName === "report" || screenName === "visit");
+  document.getElementById("navHomeButton").classList.toggle("active-mint", isHome);
+  document.getElementById("navVehicleButton").classList.toggle("active-peach", !isHome);
+}
+
+function goToReport(){
+  vehicleViewMode = null;
+  renderReportScreen();
+  showScreen("report");
+  updateNav("report");
+}
+
+function goToVehicle(){
+  renderVehicleScreen();
+  showScreen("vehicle");
+  updateNav("vehicle");
+}
+
+function goToVisit(){
+  vehicleViewMode = null;
+  renderTodoList();
+  showScreen("visit");
+  updateNav("visit");
+}
+
+function confirmLeaveVisitIfNeeded(){
+  if(currentVisit && !currentVisit.isEdit){
+    return window.confirm("訪問中のデータは保存されません。移動しますか？");
+  }
+  return true;
+}
+
+document.getElementById("navHomeButton").addEventListener("click", () => {
+  if(!confirmLeaveVisitIfNeeded()) return;
+  currentVisit = null;
+  goToReport();
+});
+
+document.getElementById("navVehicleButton").addEventListener("click", () => {
+  if(!confirmLeaveVisitIfNeeded()) return;
+  currentVisit = null;
+  goToVehicle();
+});
+
+
+/* =========================================================
+   ホーム（営業日報一覧）画面の描画
+========================================================= */
+
+// 対応日を「(9/30)」の形に。端末の現地時間で月日を求める
+function formatCompletedDay(iso){
+  if(!iso) return "";
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return "";
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+// 「(10/1 済)」の形。対応日が不明な場合は「(済)」
+function formatDoneSuffix(iso){
+  const day = formatCompletedDay(iso);
+  return day ? `(${day} 済)` : "(済)";
+}
+
+function toLocalDateKey(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+
+// 日付の見出し：10/2（金）・本日
+function formatDayLabel(dateStr, today){
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(dateStr || "");
+  if(!m) return dateStr || "日付なし";
+  const d = new Date(parseInt(m[1],10), parseInt(m[2],10) - 1, parseInt(m[3],10));
+  const week = ["日","月","火","水","木","金","土"][d.getDay()];
+  return `${parseInt(m[2],10)}/${parseInt(m[3],10)}（${week}）` + (dateStr === today ? "・本日" : "");
+}
+
+function buildContentLinesHtml(log){
+  const lines = (log.content || "").split("\n").map(l => l.trim()).filter(l => l.length > 0);
+  if(lines.length === 0) return "";
+
+  const rows = lines.map((line, idx) => {
+    const sourceId = `${log.createdAt}::${idx}`;
+    const todo = todoItems.find(t => t.sourceId === sourceId);
+    const checked = !!todo;
+    const done = !!(todo && todo.done);
+    const text = done
+      ? `<span class="line-done">${escapeHtml(line)}</span><span class="done-suffix">${formatDoneSuffix(todo.completedAt)}</span>`
+      : escapeHtml(line);
+    return `<div class="content-line"><input type="checkbox" class="content-line-checkbox" data-source="${sourceId}"${checked ? " checked" : ""}><span>${text}</span></div>`;
+  }).join("");
+
+  return `<div style="margin-top:6px;">${rows}</div>`;
+}
+
+function renderReportScreen(){
+  renderTodoList();
+  const today = getToday();
+  // 全データを削除するまで、毎日のデータを残して表示する（日付の新しい順 → 同じ日は新しい訪問が上）
+  const logs = [...meetingLogs].sort((a,b) =>
+    (b.date || "").localeCompare(a.date || "") || (b.startTime || "").localeCompare(a.startTime || ""));
+  const countByDate = {};
+  logs.forEach(l => { countByDate[l.date] = (countByDate[l.date] || 0) + 1; });
+
+  document.getElementById("visitCount").textContent = logs.length;
+
+  const list = document.getElementById("visitList");
+  list.innerHTML = "";
+
+  if(logs.length === 0){
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "訪問記録はまだありません";
+    list.appendChild(empty);
+    return;
+  }
+
+  let lastDate = null;
+  logs.forEach(log => {
+    if(log.date !== lastDate){
+      lastDate = log.date;
+      const head = document.createElement("div");
+      head.className = "day-header";
+      head.innerHTML = `<span>${escapeHtml(formatDayLabel(log.date, today))}</span><span>${countByDate[log.date]}件</span>`;
+      list.appendChild(head);
+    }
+
+    const card = document.createElement("div");
+    card.className = "visit-card";
+
+    const timeRange = `${formatTimeOnly(log.startTime)} ～ ${formatTimeOnly(log.endTime)}`;
+    const person = [log.attendee, log.attendeeTitle].filter(Boolean).join("");
+
+    card.innerHTML = `
+      <div class="top">
+        <span class="target">No.${log.number || "-"}　${escapeHtml(log.target || "（訪問先未入力）")}</span>
+        <span class="time">${timeRange}</span>
+      </div>
+      ${person ? `<div class="meta">${escapeHtml(person)}</div>` : ""}
+      ${buildContentLinesHtml(log)}
+      ${log.notes ? `<div class="content"><strong>特記事項：</strong>${escapeHtml(log.notes)}</div>` : ""}
+      <div class="row-gap">
+        <button class="card-action edit" data-id="${log.createdAt}">編集</button>
+        <button class="card-action delete" data-id="${log.createdAt}">削除</button>
+      </div>
+    `;
+
+    list.appendChild(card);
+  });
+
+  list.querySelectorAll(".edit").forEach(btn => {
+    btn.addEventListener("click", () => openEditVisit(btn.getAttribute("data-id")));
+  });
+
+  list.querySelectorAll(".delete").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-id");
+      if(!window.confirm("この訪問記録を削除しますか？")) return;
+      meetingLogs = meetingLogs.filter(x => x.createdAt !== id);
+      saveLogs();
+      renderReportScreen();
+      showToast("削除しました");
+    });
+  });
+
+  list.querySelectorAll(".content-line-checkbox").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const sourceId = cb.getAttribute("data-source");
+      const sepIndex = sourceId.lastIndexOf("::");
+      const createdAt = sourceId.slice(0, sepIndex);
+      const idx = parseInt(sourceId.slice(sepIndex + 2), 10);
+
+      const log = meetingLogs.find(x => x.createdAt === createdAt);
+      if(!log) return;
+
+      const lines = (log.content || "").split("\n").map(l => l.trim()).filter(l => l.length > 0);
+      const lineText = lines[idx];
+      if(!lineText) return;
+
+      if(cb.checked){
+        if(!todoItems.some(t => t.sourceId === sourceId)){
+          todoItems.push({
+            id: makeId(),
+            date: log.date,
+            target: log.target || "",
+            content: lineText,
+            done: false,
+            source: "line",
+            sourceId: sourceId,
+            order: nextTodoOrder(),
+            createdAt: new Date().toISOString()
+          });
+          saveTodos();
+          renderTodoList();
+          showToast("TODOに追加しました");
+        }
+      }else{
+        todoItems = todoItems.filter(t => t.sourceId !== sourceId);
+        saveTodos();
+        renderTodoList();
+      }
+    });
+  });
+}
+
+
+/* =========================================================
+   内容区分ボタン
+   ※選択式ではなく、押すたびに「内容」欄へ転記するだけの入力支援ボタン
+========================================================= */
+
+function insertContentType(type){
+  const textarea = document.getElementById("meetingContent");
+  const text = textarea.value;
+
+  const start = textarea.selectionStart != null ? textarea.selectionStart : text.length;
+  const end = textarea.selectionEnd != null ? textarea.selectionEnd : text.length;
+
+  const before = text.slice(0, start);
+  const after = text.slice(end);
+
+  let insertion = type + "：";
+  if(before.length > 0 && !before.endsWith("\n")){
+    insertion = "\n" + insertion;
+  }
+
+  textarea.value = before + insertion + after;
+
+  const cursorPos = (before + insertion).length;
+  textarea.focus();
+  textarea.setSelectionRange(cursorPos, cursorPos);
+}
+
+function renderContentTypeButtons(){
+  const container = document.getElementById("contentTypeButtons");
+  container.innerHTML = "";
+  CONTENT_TYPES.forEach(type => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip";
+    btn.textContent = type;
+    btn.addEventListener("click", () => insertContentType(type));
+    container.appendChild(btn);
+  });
+}
+
+
+/* =========================================================
+   敬称：タップで選べるドロップダウン（自由入力も可）
+========================================================= */
+
+function initHonorificDropdown(){
+  const input = document.getElementById("meetingPersonTitle");
+  const dropdown = document.getElementById("honorificDropdown");
+
+  HONORIFIC_OPTIONS.forEach(opt => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "honorific-option";
+    btn.textContent = opt;
+    // mousedown/touchstartでpreventDefaultし、inputのblurより先に選択を確定させる
+    btn.addEventListener("mousedown", (e) => e.preventDefault());
+    btn.addEventListener("click", () => {
+      input.value = opt;
+      dropdown.classList.remove("show");
+    });
+    dropdown.appendChild(btn);
+  });
+
+  input.addEventListener("focus", () => dropdown.classList.add("show"));
+  input.addEventListener("click", () => dropdown.classList.add("show"));
+  input.addEventListener("blur", () => {
+    setTimeout(() => dropdown.classList.remove("show"), 150);
+  });
+}
+
+initHonorificDropdown();
+
+
+/* =========================================================
+   訪問の開始（ホーム画面のカードから直接開始）
+========================================================= */
+
+function getNextVisitNumber(){
+  const today = getToday();
+  return meetingLogs.filter(x => x.date === today).length + 1;
+}
+
+document.getElementById("homeStartButton").addEventListener("click", async () => {
+  const target = document.getElementById("homeVisitTarget").value.trim();
+  if(!target){
+    document.getElementById("homeVisitTarget").focus();
+    return;
+  }
+
+  const number = getNextVisitNumber();
+  const startTime = getNowDateTimeLocal();
+  const location = await getLocation();
+
+  currentVisit = {
+    isEdit:false,
+    number,
+    target,
+    customerCode: resolveCustomerCode(target),
+    startTime,
+    startLocation: location.location,
+    startLat: location.lat,
+    startLng: location.lng,
+    endTime:"", endLocation:"", endLat:"", endLng:"",
+    person:"", personTitle:"", content:"", notes:""
+  };
+
+  document.getElementById("homeVisitTarget").value = "";
+  selectedCustomer = null;
+  activeKana = null;
+  renderKanaGrid();
+  renderCustomerList();
+
+  document.getElementById("visitScreenTitle").innerHTML =
+    `訪問先 <span>${number}</span>`;
+
+  document.getElementById("visitTarget").value = target;
+  document.getElementById("visitTarget").disabled = true;
+  document.getElementById("visitStatusField").style.display = "block";
+  document.getElementById("editTimeRow").style.display = "none";
+  document.getElementById("visitStartTimeInput").value = formatTimeOnly(startTime);
+  document.getElementById("meetingCard").style.display = "block";
+
+  document.getElementById("meetingPerson").value = "";
+  document.getElementById("meetingPersonTitle").value = "さん";
+  document.getElementById("meetingContent").value = "";
+  document.getElementById("meetingNotes").value = "";
+  document.getElementById("endButton").textContent = "記録終了";
+  renderContentTypeButtons();
+
+  goToVisit();
+  showToast("訪問を開始しました");
+});
+
+document.getElementById("visitStartTimeInput").addEventListener("change", () => {
+  if(!currentVisit || currentVisit.isEdit) return;
+  const val = document.getElementById("visitStartTimeInput").value;
+  if(!val) return;
+  const datePart = (currentVisit.startTime || "").split("T")[0] || getToday();
+  currentVisit.startTime = `${datePart}T${val}`;
+});
+
+
+/* =========================================================
+   訪問記録の編集
+========================================================= */
+
+function openEditVisit(id){
+  const log = meetingLogs.find(x => x.createdAt === id);
+  if(!log) return;
+
+  currentVisit = { isEdit:true, editId:id };
+
+  document.getElementById("visitScreenTitle").textContent =
+    log.number ? `訪問先 ${log.number}（編集）` : "訪問記録を編集";
+
+  document.getElementById("visitTarget").value = log.target || "";
+  document.getElementById("visitTarget").disabled = false;
+  document.getElementById("visitStatusField").style.display = "none";
+  document.getElementById("editTimeRow").style.display = "flex";
+  document.getElementById("editStartTime").value = formatTimeOnly(log.startTime);
+  document.getElementById("editEndTime").value = formatTimeOnly(log.endTime);
+  document.getElementById("meetingCard").style.display = "block";
+
+  document.getElementById("meetingPerson").value = log.attendee || "";
+  document.getElementById("meetingPersonTitle").value = log.attendeeTitle || "さん";
+  document.getElementById("meetingContent").value = log.content || "";
+  document.getElementById("meetingNotes").value = log.notes || "";
+  document.getElementById("endButton").textContent = "保存";
+  renderContentTypeButtons();
+
+  goToVisit();
+}
+
+document.getElementById("deleteEditButton").addEventListener("click", () => {
+  if(!currentVisit) return;
+
+  if(currentVisit.isEdit){
+    if(!window.confirm("この訪問記録を削除しますか？")) return;
+    meetingLogs = meetingLogs.filter(x => x.createdAt !== currentVisit.editId);
+    saveLogs();
+  }else{
+    if(!window.confirm("入力中の訪問を削除します。よろしいですか？")) return;
+    // 新規入力中はまだ保存されていないため、そのまま破棄する
+  }
+
+  currentVisit = null;
+  goToReport();
+  showToast("削除しました");
+});
+
+
+/* =========================================================
+   訪問終了／保存
+========================================================= */
+
+document.getElementById("endButton").addEventListener("click", async () => {
+
+  if(currentVisit.isEdit){
+    const log = meetingLogs.find(x => x.createdAt === currentVisit.editId);
+    if(log){
+      const newTarget = document.getElementById("visitTarget").value.trim();
+      if(newTarget !== log.target){
+        log.customerCode = resolveCustomerCode(newTarget);
+      }
+      log.target = newTarget;
+      log.attendee = document.getElementById("meetingPerson").value.trim();
+      log.attendeeTitle = document.getElementById("meetingPersonTitle").value.trim();
+      log.content = document.getElementById("meetingContent").value;
+      log.notes = document.getElementById("meetingNotes").value;
+
+      // 時刻の編集（日付部分は元の記録のものを維持）
+      const st = document.getElementById("editStartTime").value;
+      const et = document.getElementById("editEndTime").value;
+      const datePart = (log.startTime || "").split("T")[0] || log.date;
+      if(st) log.startTime = `${datePart}T${st}`;
+      if(et) log.endTime = `${datePart}T${et}`;
+
+      saveLogs();
+    }
+    currentVisit = null;
+    goToReport();
+    showToast("更新しました");
+    return;
+  }
+
+  currentVisit.person = document.getElementById("meetingPerson").value.trim();
+  currentVisit.personTitle = document.getElementById("meetingPersonTitle").value.trim();
+  currentVisit.content = document.getElementById("meetingContent").value;
+  currentVisit.notes = document.getElementById("meetingNotes").value;
+  currentVisit.endTime = getNowDateTimeLocal();
+
+  const location = await getLocation();
+  currentVisit.endLocation = location.location;
+  currentVisit.endLat = location.lat;
+  currentVisit.endLng = location.lng;
+
+  const log = {
+    date: getToday(),
+    number: currentVisit.number,
+    target: currentVisit.target,
+    customerCode: currentVisit.customerCode || "",
+    startTime: currentVisit.startTime,
+    startLocation: currentVisit.startLocation,
+    startLat: currentVisit.startLat,
+    startLng: currentVisit.startLng,
+    endTime: currentVisit.endTime,
+    endLocation: currentVisit.endLocation,
+    endLat: currentVisit.endLat,
+    endLng: currentVisit.endLng,
+    attendee: currentVisit.person,
+    attendeeTitle: currentVisit.personTitle,
+    content: currentVisit.content,
+    notes: currentVisit.notes,
+    createdAt: new Date().toISOString()
+  };
+
+  meetingLogs.push(log);
+  saveLogs();
+
+  currentVisit = null;
+  goToReport();
+  showToast("訪問を記録しました");
+});
+
+
+/* =========================================================
+   車両情報
+========================================================= */
+
+function getTodayVehicle(){
+  const today = getToday();
+  if(!dailyVehicleInfo[today]){
+    dailyVehicleInfo[today] = {
+      departure:{ time:"", location:"", lat:"", lng:"", distance:"" },
+      return:{ time:"", location:"", lat:"", lng:"", distance:"", fuel:"" },
+      status:"before"
+    };
+  }
+  return dailyVehicleInfo[today];
+}
+
+function getLatestPastReturnDistance(excludeDate){
+  const dates = Object.keys(dailyVehicleInfo)
+    .filter(d => d !== excludeDate && dailyVehicleInfo[d].return && dailyVehicleInfo[d].return.distance !== "" && dailyVehicleInfo[d].return.distance != null)
+    .sort((a,b) => b.localeCompare(a));
+  if(dates.length === 0) return "";
+  return dailyVehicleInfo[dates[0]].return.distance;
+}
+
+// 出発／帰社どちらを表示中か（画面を離れるとリセットされ、次回は状態から自動判定）
+let vehicleViewMode = null;
+
+function getDefaultVehicleMode(vehicle){
+  if(!vehicle.departure.time) return "departure";
+  if(!vehicle.return.time) return "return";
+  return "return";
+}
+
+function renderVehicleScreen(){
+  const vehicle = getTodayVehicle();
+  const today = getToday();
+
+  if(vehicleViewMode === null){
+    vehicleViewMode = getDefaultVehicleMode(vehicle);
+  }
+
+  if(!vehicle.departure.time && !vehicle.departure.distance){
+    const prefill = getLatestPastReturnDistance(today);
+    if(prefill !== ""){
+      vehicle.departure.distance = prefill;
+    }
+  }
+  if(!vehicle.return.time && !vehicle.return.distance && vehicle.departure.distance){
+    vehicle.return.distance = vehicle.departure.distance;
+  }
+
+  document.querySelectorAll(".mode-switch-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-mode") === vehicleViewMode);
+  });
+
+  const leg = vehicle[vehicleViewMode]; // departure か return のどちらか
+  const done = !!leg.time;
+
+  document.getElementById("vehicleModeLabel").textContent = vehicleViewMode === "departure" ? "出発" : "帰社";
+  document.getElementById("vehicleStatusPill").textContent =
+    vehicleViewMode === "departure" ? (done ? "出発済み" : "未出発") : (done ? "帰社済み" : "未帰社");
+  document.getElementById("vehicleStatusPill").classList.toggle("on", done);
+  document.getElementById("vehicleTimeText").textContent = formatTimeOnly(leg.time);
+
+  document.getElementById("vehicleDistance").value = leg.distance || "";
+  document.getElementById("vehicleDistance").disabled = done;
+  document.getElementById("vehicleDial").classList.toggle("disabled", done);
+
+  document.getElementById("vehicleFuel").value = vehicle.return.fuel || "";
+
+  const saveBtn = document.getElementById("vehicleSaveButton");
+  const resetBtn = document.getElementById("vehicleResetButton");
+
+  if(vehicleViewMode === "departure"){
+    saveBtn.textContent = "出発";
+    saveBtn.className = "btn btn-peach";
+    saveBtn.disabled = false;
+    saveBtn.style.display = done ? "none" : "block";
+  }else{
+    saveBtn.textContent = "帰社";
+    saveBtn.className = "btn btn-sky";
+    saveBtn.disabled = !vehicle.departure.time;
+    saveBtn.style.display = done ? "none" : "block";
+  }
+  resetBtn.style.display = done ? "block" : "none";
+
+  const summaryCard = document.getElementById("distanceSummaryCard");
+  const dDist = parseFloat(vehicle.departure.distance);
+  const rDist = parseFloat(vehicle.return.distance);
+
+  if(!isNaN(dDist) && !isNaN(rDist) && rDist >= dDist){
+    summaryCard.style.display = "block";
+    document.getElementById("distanceSummaryText").textContent = `${(rDist - dDist).toLocaleString()} km`;
+  }else{
+    summaryCard.style.display = "none";
+  }
+
+  saveVehicle();
+  renderTodoList();
+}
+
+document.querySelectorAll(".mode-switch-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    vehicleViewMode = btn.getAttribute("data-mode");
+    renderVehicleScreen();
+  });
+});
+
+document.getElementById("vehicleDistance").addEventListener("change", () => {
+  const vehicle = getTodayVehicle();
+  vehicle[vehicleViewMode].distance = document.getElementById("vehicleDistance").value;
+  saveVehicle();
+});
+
+document.getElementById("vehicleFuel").addEventListener("change", () => {
+  const vehicle = getTodayVehicle();
+  vehicle.return.fuel = document.getElementById("vehicleFuel").value;
+  saveVehicle();
+});
+
+document.getElementById("vehicleSaveButton").addEventListener("click", async () => {
+  const vehicle = getTodayVehicle();
+  const leg = vehicle[vehicleViewMode];
+
+  leg.distance = document.getElementById("vehicleDistance").value;
+  if(vehicleViewMode === "return"){
+    vehicle.return.fuel = document.getElementById("vehicleFuel").value;
+  }
+  leg.time = getNowDateTimeLocal();
+
+  const location = await getLocation();
+  leg.location = location.location;
+  leg.lat = location.lat;
+  leg.lng = location.lng;
+
+  vehicle.status = vehicleViewMode === "departure" ? "departed" : "returned";
+  saveVehicle();
+
+  if(vehicleViewMode === "departure"){
+    vehicleViewMode = "return"; // 出発を記録したら自動で帰社側に切り替え
+    renderVehicleScreen();
+    showToast("出発を記録しました");
+  }else{
+    goToReport();
+    showToast("帰社を記録しました");
+  }
+});
+
+document.getElementById("vehicleResetButton").addEventListener("click", () => {
+  const label = vehicleViewMode === "departure" ? "出発" : "帰社";
+  if(!window.confirm(`${label}の記録をやり直しますか？`)) return;
+
+  const vehicle = getTodayVehicle();
+  const leg = vehicle[vehicleViewMode];
+  leg.time = "";
+  leg.location = "";
+  leg.lat = "";
+  leg.lng = "";
+
+  vehicle.status = vehicle.departure.time && vehicleViewMode === "return" ? "departed" : "before";
+  saveVehicle();
+  renderVehicleScreen();
+});
+
+
+/* =========================================================
+   TODOリスト
+   ・訪問記録の「内容」を1行ずつチェックすると追加される
+   ・手入力でも追加できる
+   ・完了マークを付けるまでずっと表示され続ける
+========================================================= */
+
+/* =========================================================
+   客先名リスト（営業所キーで暗号化ファイルを取得→端末内で復号）
+   ・営業所キーは端末に保存しない（取得・更新のたびに入力）
+   ・復号した客先名リストだけを端末内に保存し、オフラインでも使える
+   ・画面には客先名だけ表示し、顧客コードは裏で記録してメールに入れる
+========================================================= */
+
+const MASTER_STORE_KEY = "customerMaster";
+let customerMaster = null;
+try{ customerMaster = JSON.parse(localStorage.getItem(MASTER_STORE_KEY) || "null"); }catch(e){ customerMaster = null; }
+
+let selectedCustomer = null; // { code, name }
+let activeKana = null;
+
+const KANA_ROWS = [
+  ["あ","あいうえおぁぃぅぇぉゔ"], ["か","かきくけこがぎぐげご"], ["さ","さしすせそざじずぜぞ"],
+  ["た","たちつてとだぢづでどっ"], ["な","なにぬねの"], ["は","はひふへほばびぶべぼぱぴぷぺぽ"],
+  ["ま","まみむめも"], ["や","やゆよゃゅょ"], ["ら","らりるれろ"], ["わ","わをんゎ"]
+];
+
+function toHiragana(str){
+  return String(str || "").normalize("NFKC").replace(/[\u30A1-\u30F6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+}
+
+function kanaRowOf(reading){
+  const s = toHiragana(reading).trim();
+  if(!s) return "他";
+  const ch = s[0];
+  for(const [row, chars] of KANA_ROWS){
+    if(chars.includes(ch)) return row;
+  }
+  return "他";
+}
+
+function resolveCustomerCode(name){
+  if(!name) return "";
+  if(selectedCustomer && selectedCustomer.name === name) return selectedCustomer.code || "";
+  if(!customerMaster || !Array.isArray(customerMaster.items)) return "";
+  const hits = customerMaster.items.filter(i => i.n === name);
+  const codes = [...new Set(hits.map(i => i.c))];
+  return codes.length === 1 ? (codes[0] || "") : "";
+}
+
+function renderMasterUI(){
+  const has = !!(customerMaster && Array.isArray(customerMaster.items));
+  document.getElementById("masterStatus").textContent = has
+    ? `客先名リスト：${customerMaster.office || ""} ${customerMaster.items.length.toLocaleString()}件${customerMaster.updated ? "（" + customerMaster.updated + "更新）" : ""}`
+    : "客先名リスト：未取得";
+  document.getElementById("masterFetchButton").textContent = has ? "更新" : "取り込む";
+  document.getElementById("masterClearButton").style.display = has ? "inline-block" : "none";
+  document.getElementById("kanaArea").style.display = has ? "block" : "none";
+  if(has) renderKanaGrid();
+}
+
+function renderKanaGrid(){
+  const grid = document.getElementById("kanaGrid");
+  grid.innerHTML = "";
+  [...KANA_ROWS.map(r => r[0]), "他"].forEach(row => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "kana-btn" + (row === activeKana ? " active" : "");
+    btn.textContent = row;
+    btn.addEventListener("click", () => {
+      activeKana = (activeKana === row) ? null : row;
+      renderKanaGrid();
+      renderCustomerList();
+    });
+    grid.appendChild(btn);
+  });
+}
+
+function renderCustomerList(){
+  const box = document.getElementById("customerList");
+  box.innerHTML = "";
+  if(!activeKana || !customerMaster){ box.style.display = "none"; return; }
+
+  const items = customerMaster.items
+    .filter(i => kanaRowOf(i.k) === activeKana)
+    .sort((a, b) => toHiragana(a.k).localeCompare(toHiragana(b.k), "ja"));
+
+  if(items.length === 0){
+    const empty = document.createElement("div");
+    empty.className = "customer-empty";
+    empty.textContent = "該当する客先はありません";
+    box.appendChild(empty);
+  }else{
+    items.forEach(item => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "customer-item";
+      btn.textContent = item.n;
+      btn.addEventListener("click", () => {
+        document.getElementById("homeVisitTarget").value = item.n;
+        selectedCustomer = { code: item.c || "", name: item.n };
+        box.style.display = "none";
+      });
+      box.appendChild(btn);
+    });
+  }
+  box.style.display = "block";
+  box.scrollTop = 0;
+}
+
+document.getElementById("homeVisitTarget").addEventListener("input", () => {
+  const v = document.getElementById("homeVisitTarget").value.trim();
+  if(selectedCustomer && selectedCustomer.name !== v) selectedCustomer = null;
+});
+
+document.getElementById("masterFetchButton").addEventListener("click", () => {
+  const box = document.getElementById("masterKeyBox");
+  const show = box.style.display === "none";
+  box.style.display = show ? "block" : "none";
+  document.getElementById("masterMessage").textContent = "";
+  if(show) document.getElementById("masterKeyInput").focus();
+});
+
+// 取得・取り込み共通：メッセージ表示と保存
+function setMasterMessage(text, isError){
+  const msg = document.getElementById("masterMessage");
+  msg.style.color = isError ? "var(--pink-ink)" : "var(--ink-soft)";
+  msg.textContent = text;
+}
+
+function setMasterBusy(busy){
+  document.getElementById("masterFileButton").disabled = busy;
+  document.getElementById("masterGoButton").disabled = busy;
+}
+
+function saveMasterData(data){
+  customerMaster = { office: data.office || "", updated: data.updated || "", items: data.items };
+  localStorage.setItem(MASTER_STORE_KEY, JSON.stringify(customerMaster));
+  document.getElementById("masterKeyInput").value = "";
+  setMasterMessage("", false);
+  document.getElementById("masterKeyBox").style.display = "none";
+  activeKana = null;
+  renderMasterUI();
+  renderCustomerList();
+  showToast(`客先名リストを取り込みました（${customerMaster.items.length.toLocaleString()}件）`);
+}
+
+function hasCryptoSupport(){
+  if(window.crypto && window.crypto.subtle) return true;
+  setMasterMessage("この画面では暗号化機能を使えません。https:// で始まるアドレスで開いてください。", true);
+  return false;
+}
+
+// 方法1：受け取ったファイル（OneDrive・メールなど）を選んで取り込む
+document.getElementById("masterFileButton").addEventListener("click", () => {
+  const input = document.getElementById("masterKeyInput");
+  if(!normalizeKey(input.value)){
+    setMasterMessage("先に営業所キーを入力してください。", true);
+    input.focus();
+    return;
+  }
+  document.getElementById("masterFile").click();
+});
+
+document.getElementById("masterFile").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if(!file) return;
+
+  const input = document.getElementById("masterKeyInput");
+  setMasterBusy(true);
+  setMasterMessage("確認中です…（数秒かかることがあります）", false);
+
+  try{
+    if(!hasCryptoSupport()) return;
+    if(file.size > 20 * 1024 * 1024){
+      setMasterMessage("ファイルが大きすぎます。客先名リストのファイルを選んでください。", true);
+      return;
+    }
+
+    const { aesKey } = await deriveMaster(input.value);
+    let data;
+    try{
+      data = await decryptMaster(aesKey, await file.arrayBuffer());
+    }catch(decErr){
+      setMasterMessage("キーが違うか、選んだファイルが違います。キーとファイルを確認してください。", true);
+      return;
+    }
+    if(!data || !Array.isArray(data.items)){
+      setMasterMessage("リストの形式が正しくありません。", true);
+      return;
+    }
+    saveMasterData(data);
+  }catch(err){
+    setMasterMessage("取り込みに失敗しました。", true);
+  }finally{
+    setMasterBusy(false);
+  }
+});
+
+// 方法2：サーバー（GitHubなど）の master フォルダから自動で取得する
+document.getElementById("masterGoButton").addEventListener("click", async () => {
+  const input = document.getElementById("masterKeyInput");
+  if(!normalizeKey(input.value)){
+    setMasterMessage("先に営業所キーを入力してください。", true);
+    input.focus();
+    return;
+  }
+
+  setMasterBusy(true);
+  setMasterMessage("確認中です…（数秒かかることがあります）", false);
+
+  try{
+    if(!hasCryptoSupport()) return;
+
+    const { aesKey, fileId } = await deriveMaster(input.value);
+
+    let res;
+    try{
+      res = await fetch(`master/${fileId}.enc`, { cache: "no-store" });
+    }catch(netErr){
+      setMasterMessage("通信できませんでした。電波の状況を確認してください。", true);
+      return;
+    }
+
+    if(!res.ok){
+      setMasterMessage(res.status === 404
+        ? "キーが違うか、この営業所のリストが登録されていません。"
+        : `取得できませんでした（エラー ${res.status}）。`, true);
+      return;
+    }
+
+    let data;
+    try{
+      data = await decryptMaster(aesKey, await res.arrayBuffer());
+    }catch(decErr){
+      setMasterMessage("キーが違うか、ファイルが壊れています。キーをもう一度確認してください。", true);
+      return;
+    }
+    if(!data || !Array.isArray(data.items)){
+      setMasterMessage("リストの形式が正しくありません。", true);
+      return;
+    }
+    saveMasterData(data);
+  }catch(err){
+    setMasterMessage("取得に失敗しました。", true);
+  }finally{
+    setMasterBusy(false);
+  }
+});
+
+document.getElementById("masterClearButton").addEventListener("click", () => {
+  if(!window.confirm("このスマホから客先名リストを消します。\n再び使うには、営業所キーでもう一度取得します。\n\n消しますか？")) return;
+  localStorage.removeItem(MASTER_STORE_KEY);
+  customerMaster = null;
+  selectedCustomer = null;
+  activeKana = null;
+  renderMasterUI();
+  renderCustomerList();
+  showToast("客先名リストを消しました");
+});
+
+
+const TODO_KEY = "todoItems";
+let todoItems = JSON.parse(localStorage.getItem(TODO_KEY) || "[]");
+
+function saveTodos(){ localStorage.setItem(TODO_KEY, JSON.stringify(todoItems)); }
+
+// 並び順：orderの小さい順（手動で並べ替えた順）。orderがない古いTODOは作成順に番号を付ける
+function nextTodoOrder(){
+  return todoItems.reduce((m, t) => Math.max(m, Number(t.order) || 0), 0) + 1000;
+}
+
+function ensureTodoOrder(){
+  const missing = todoItems
+    .filter(t => !Number.isFinite(Number(t.order)) || t.order === null || t.order === "" || t.order === undefined)
+    .sort((a,b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+  if(missing.length === 0) return;
+  let n = nextTodoOrder();
+  missing.forEach(t => { t.order = n; n += 1000; });
+  saveTodos();
+}
+ensureTodoOrder();
+
+function sortByTodoOrder(a, b){
+  return (Number(a.order) || 0) - (Number(b.order) || 0) || (a.createdAt || "").localeCompare(b.createdAt || "");
+}
+
+function makeId(){ return `${Date.now()}-${Math.random().toString(36).slice(2,8)}`; }
+
+/* =========================================================
+   TODOの並べ替え：右端の「≡」を押したままドラッグ
+   （リスト本体を直接ドラッグするとスクロールと区別できないため、ハンドル方式）
+========================================================= */
+
+function attachTodoDrag(handle, container){
+  const item = handle.closest(".todo-item");
+  let dragging = false;
+  let lastY = 0;
+  let timer = null;
+
+  function reposition(y){
+    const siblings = [...container.querySelectorAll(".todo-item")].filter(el => el !== item);
+    let before = null;
+    for(const sib of siblings){
+      const r = sib.getBoundingClientRect();
+      if(y < r.top + r.height / 2){ before = sib; break; }
+    }
+    if(before){
+      if(item.nextElementSibling !== before) container.insertBefore(item, before);
+    }else if(container.lastElementChild !== item){
+      container.appendChild(item);
+    }
+  }
+
+  function onMove(e){
+    if(!dragging) return;
+    lastY = e.clientY;
+    reposition(lastY);
+    e.preventDefault();
+  }
+
+  function finish(){
+    if(!dragging) return;
+    dragging = false;
+    clearInterval(timer);
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", finish);
+    window.removeEventListener("pointercancel", finish);
+    item.classList.remove("dragging");
+
+    // 画面の並び順をそのまま保存する
+    const ids = [...container.querySelectorAll(".todo-item")].map(el => el.getAttribute("data-id"));
+    ids.forEach((id, i) => {
+      const t = todoItems.find(x => x.id === id);
+      if(t) t.order = (i + 1) * 1000;
+    });
+    saveTodos();
+    renderTodoList(); // 他の画面のリストにも反映
+  }
+
+  handle.addEventListener("pointerdown", e => {
+    if(e.button !== undefined && e.button > 0) return;
+    dragging = true;
+    lastY = e.clientY;
+    item.classList.add("dragging");
+    try{ handle.setPointerCapture(e.pointerId); }catch(err){ /* 未対応の環境では無視 */ }
+    window.addEventListener("pointermove", onMove, { passive:false });
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+
+    // 画面の端にいるときは自動でスクロールする
+    timer = setInterval(() => {
+      const edge = 70;
+      if(lastY < edge) window.scrollBy(0, -14);
+      else if(lastY > window.innerHeight - edge) window.scrollBy(0, 14);
+      else return;
+      reposition(lastY);
+    }, 30);
+
+    e.preventDefault();
+  });
+}
+
+function formatMonthDay(dateStr){
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(dateStr || "");
+  return m ? `${parseInt(m[2],10)}/${parseInt(m[3],10)}` : "";
+}
+
+function fallbackCopy(text){
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try{ document.execCommand("copy"); }catch(e){}
+  ta.remove();
+}
+
+function copyToClipboard(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+  }else{
+    fallbackCopy(text);
+  }
+}
+
+function renderTodoList(){
+  const active = todoItems
+    .filter(t => !t.done)
+    .sort(sortByTodoOrder);
+
+  document.querySelectorAll(".todo-list-target").forEach(container => {
+    container.innerHTML = "";
+    const hideEmpty = container.getAttribute("data-hide-empty") === "1";
+
+    if(active.length === 0){
+      if(!hideEmpty){
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "TODOはありません";
+        container.appendChild(empty);
+      }
+      return;
+    }
+
+    // 車両画面以外(ホーム・訪問入力)では見出しを付ける
+    if(hideEmpty){
+      const h = document.createElement("h2");
+      h.className = "h2-flex";
+      h.innerHTML = '<span>TODOリスト</span><span class="h2-note">消す=コピー可</span>';
+      container.appendChild(h);
+    }
+
+    active.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "todo-item";
+      div.setAttribute("data-id", item.id);
+      div.innerHTML = `
+        <label>
+          <input type="checkbox" class="todo-complete" data-id="${item.id}">
+          <span class="todo-line">${escapeHtml(formatMonthDay(item.date))}　${item.target ? escapeHtml(item.target) + "　" : ""}${escapeHtml(item.content)}</span>
+        </label>
+        <span class="todo-handle" title="ドラッグで並べ替え" aria-label="ドラッグで並べ替え">≡</span>
+      `;
+      container.appendChild(div);
+    });
+
+    container.querySelectorAll(".todo-handle").forEach(handle => attachTodoDrag(handle, container));
+
+    container.querySelectorAll(".todo-complete").forEach(cb => {
+      cb.addEventListener("change", () => {
+        const id = cb.getAttribute("data-id");
+        const item = todoItems.find(t => t.id === id);
+        if(item){
+          const md = formatMonthDay(item.date);
+          copyToClipboard([item.target, item.content].filter(Boolean).join("　") + (md ? `(${md}分)` : ""));
+          showToast("コピーしました");
+          item.done = true;
+          item.completedAt = new Date().toISOString();
+          saveTodos();
+        }
+        if(document.getElementById("reportScreen").classList.contains("active")){
+          renderReportScreen(); // 訪問カードの「対応済」表示も更新（TODO一覧も再描画される）
+        }else{
+          renderTodoList();
+        }
+      });
+    });
+  });
+}
+
+document.getElementById("todoAddButton").addEventListener("click", () => {
+  const input = document.getElementById("todoManualInput");
+  const text = input.value.trim();
+  if(!text) return;
+
+  todoItems.push({
+    id: makeId(),
+    date: getToday(),
+    target: "",
+    content: text,
+    done: false,
+    source: "manual",
+    sourceId: null,
+    order: nextTodoOrder(),
+    createdAt: new Date().toISOString()
+  });
+  saveTodos();
+  input.value = "";
+  renderTodoList();
+});
+
+
+/* =========================================================
+   メール送信
+========================================================= */
+
+// 車両情報に実際の記録（出発・帰社の時刻、給油量）があるか
+function vehicleHasData(v){
+  return !!(v && ((v.departure && v.departure.time) || (v.return && (v.return.time || v.return.fuel))));
+}
+
+// 日報メールの内容：全データを削除するまでの全期間（古い日から順）。
+// TODOリストは現在の状態なので、今日の分の車両情報の後に1回だけ入れる。
+function buildReportMail(){
+  const today = getToday();
+
+  // 対象の日：訪問記録のある日・車両の記録がある日・今日
+  const dateSet = new Set([today]);
+  meetingLogs.forEach(l => { if(l.date) dateSet.add(l.date); });
+  Object.keys(dailyVehicleInfo).forEach(d => { if(vehicleHasData(dailyVehicleInfo[d])) dateSet.add(d); });
+  const dates = [...dateSet].sort();
+
+  // TODOリスト：未対応と対応済（これまでの分すべて）
+  const pendingTodos = todoItems
+    .filter(t => !t.done)
+    .sort(sortByTodoOrder);
+  const doneTodos = todoItems
+    .filter(t => t.done)
+    .sort((a,b) => (a.completedAt || a.createdAt || "").localeCompare(b.completedAt || b.createdAt || ""));
+  const todoSendList = [...pendingTodos, ...doneTodos];
+
+  let body = `営業日報\n\n`;
+
+  dates.forEach(date => {
+    const vehicle = date === today
+      ? getTodayVehicle()
+      : (dailyVehicleInfo[date] || { departure:{}, return:{} });
+    // 過去の日で出発・帰社の記録がない場合、自動で入った前回の走行距離は載せない
+    const recorded = date === today || vehicleHasData(vehicle);
+    const dep = recorded ? (vehicle.departure || {}) : {};
+    const ret = recorded ? (vehicle.return || {}) : {};
+
+    body += `日付：${date}\n\n`;
+
+    body += `【車両情報】\n`;
+    body += `出発時 走行距離：${dep.distance || ""}\n`;
+    body += `出発時刻：${formatTimeOnly(dep.time)}\n`;
+    body += `帰社時 走行距離：${ret.distance || ""}\n`;
+    body += `帰社時刻：${formatTimeOnly(ret.time)}\n`;
+    body += `給油量：${ret.fuel || ""}\n\n`;
+
+    if(date === today && todoSendList.length > 0){
+      body += `【TODOリスト】\n`;
+      todoSendList.forEach((t, i) => {
+        const status = t.done ? formatDoneSuffix(t.completedAt) : "(未対応)";
+        body += `${i + 1}. ${formatMonthDay(t.date)}　${t.target ? t.target + "　" : ""}${t.content || ""}${status}\n`;
+      });
+      body += `\n`;
+    }
+
+    meetingLogs
+      .filter(x => x.date === date)
+      .sort((a,b) => (a.startTime || "").localeCompare(b.startTime || ""))
+      .forEach((log, i) => {
+        body += `【訪問先 ${log.number || (i + 1)}】\n`;
+        body += `訪問先：${log.target || ""}\n`;
+        body += `顧客コード：${log.customerCode || ""}\n`;
+        body += `時間：${formatTimeOnly(log.startTime)} ～ ${formatTimeOnly(log.endTime)}\n`;
+        body += `面談者：${log.attendee || ""}${log.attendeeTitle || ""}\n`;
+        body += `内容：${log.content || ""}\n`;
+        body += `特記事項：${log.notes || ""}\n\n`;
+      });
+  });
+
+  return { subject: `営業日報 ${today}`, body };
+}
+
+// mailto: のアドレスが長すぎるとメールアプリが開かないことがあるため、
+// 長すぎる場合は本文をコピーして、貼り付ける形にする（目安：5万文字）
+const MAILTO_LIMIT = 50000;
+
+function sendReportMail(){
+  const { subject, body } = buildReportMail();
+  const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  if(mailto.length > MAILTO_LIMIT){
+    copyToClipboard(body);
+    const note = "（本文が長いため、コピーしました。ここに貼り付けてください）";
+    showToast("本文が長いためコピーしました。メールに貼り付けてください");
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(note)}`;
+    return;
+  }
+
+  window.location.href = mailto;
+}
+
+document.getElementById("mailButton").addEventListener("click", sendReportMail);
+
+
+// ブラウザによる自動削除を受けにくくするよう保存領域の永続化を要求
+if(navigator.storage && navigator.storage.persist){
+  navigator.storage.persist().catch(() => {});
+}
+
+
+/* =========================================================
+   全データ削除
+========================================================= */
+
+function deleteData(keepTodos){
+  const message = keepTodos
+    ? "営業日報と車両情報を削除します。TODOリストは残します。\n\nこの操作は元に戻せません。\n\n削除しますか？"
+    : "保存されている営業日報・車両情報・TODOリストをすべて削除します。\n\nこの操作は元に戻せません。\n\n削除しますか？";
+  if(!window.confirm(message)) return;
+
+  localStorage.removeItem(LOG_KEY);
+  localStorage.removeItem(VEHICLE_KEY);
+  meetingLogs = [];
+  dailyVehicleInfo = {};
+
+  if(!keepTodos){
+    localStorage.removeItem(TODO_KEY);
+    todoItems = [];
+  }
+  currentVisit = null;
+
+  goToReport();
+  showToast(keepTodos ? "TODO以外を削除しました" : "全データを削除しました");
+}
+
+document.getElementById("deleteAllButton").addEventListener("click", () => deleteData(false));
+document.getElementById("deleteKeepTodoButton").addEventListener("click", () => deleteData(true));
+
+
+/* =========================================================
+   初期化
+   1日で最初に開いたときは「車両」、2回目以降は「ホーム」を表示
+========================================================= */
+
+updateDate();
+renderMasterUI();
+
+const today = getToday();
+const lastOpen = localStorage.getItem(LAST_OPEN_KEY);
+
+if(lastOpen !== today){
+  localStorage.setItem(LAST_OPEN_KEY, today);
+  goToVehicle();
+}else{
+  goToReport();
+}
+
+</script>
+</body>
+</html>
