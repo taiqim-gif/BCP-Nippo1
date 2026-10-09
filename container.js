@@ -32,6 +32,8 @@ const GAS_TABLE = [
   { code:2001, label:"LP",       name:"プロパン",     cap:"", unit:"kg", bg:"#A3A9AF", fg:"#1f1f1f" },
   { code:5001, label:"医O2",    name:"医療用酸素",   cap:"", unit:"㎥", bg:"#222222", fg:"#fff" }               // 黒
 ];
+// ボタンの並び順（2行に左から右へ並べる）。上段：Ace O2 N2 フロン LP ／ 下段：CO2 Ar ArCo 医O2 その他
+const GAS_CHIP_ORDER = [1001, 1002, 1003, 1008, 2001, 1006, 1004, 1007, 5001];
 const OTHER_GAS_STYLE = { bg:"#2D87E3", fg:"#fff" };                  // 「その他」ボタン：アズールブルー
 const OTHER_GAS_UNIT = "㎥";                                           // 「その他」を選んだときの初期の単位
 const ADJ_STEPS = [-0.2, -0.1, 0, 0.1, 0.2];   // ｱｾﾁﾚﾝの容量の増減ボタン（0.0＝基準に戻す）
@@ -135,7 +137,7 @@ style.textContent = `
   .ct-chip-row .chip{ padding:9px 14px; }
   .ct-chip-row .chip.on{ background:var(--butter); border-color:var(--butter-dark); color:var(--butter-ink); font-weight:700; }
 
-  .ct-badge{ display:inline-block; font-size:12px; font-weight:700; padding:2px 10px; border-radius:999px; margin-right:8px; }
+  .ct-badge{ display:inline-block; font-size:14px; font-weight:700; padding:2px 10px; border-radius:999px; margin-right:8px; }
   .ct-badge.out{ background:var(--sky); color:var(--sky-ink); }
   .ct-badge.in{ background:var(--peach); color:var(--peach-ink); }
   .ct-badge.oth{ background:var(--lavender); color:var(--lavender-ink); }
@@ -164,15 +166,15 @@ style.textContent = `
   .ct-cust-right{ display:flex; align-items:center; gap:8px; flex:none; }
   .ct-add{
     border:1.5px solid var(--mint); background:#fff; color:var(--mint-ink); border-radius:999px;
-    padding:4px 11px; font-size:12px; font-weight:700; font-family:inherit; cursor:pointer;
+    padding:4px 11px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;
   }
   .ct-chip-row .chip.gas{ border:none; font-weight:700; padding:10px 14px; }
   .ct-chip-row .chip.gas.on{ box-shadow:0 0 0 2px #fff, 0 0 0 4px var(--ink); }
 
   .ct-cust{ background:var(--card); border:1px solid var(--line); border-left:5px solid var(--mint); border-radius:var(--radius); padding:12px 14px 4px; margin-bottom:10px; }
   .ct-cust-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:4px; }
-  .ct-cust-name{ font-size:18px; font-weight:700; min-width:0; overflow-wrap:anywhere; }
-  .ct-cust-sum{ font-size:12px; color:var(--ink-soft); white-space:nowrap; }
+  .ct-cust-name{ font-size:20px; font-weight:700; min-width:0; overflow-wrap:anywhere; }
+  .ct-cust-sum{ font-size:14px; color:var(--ink-soft); white-space:nowrap; }
   .ct-row{ display:flex; align-items:center; gap:8px; padding:9px 0; border-top:1px solid var(--line); }
   .ct-row-main{ flex:1; min-width:0; }
   .ct-row-line1{ font-size:14px; font-weight:700; }
@@ -183,13 +185,13 @@ style.textContent = `
   .ct-dph{ position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:15px; color:var(--ink-soft); pointer-events:none; }
   #containerScreen input[type=date].empty{ color:transparent; }
 
-  .ct-sum-line{ display:flex; align-items:center; flex-wrap:wrap; gap:2px 12px; font-size:14px; padding:3px 0; }
+  .ct-sum-line{ display:flex; align-items:center; flex-wrap:wrap; gap:2px 12px; font-size:16px; padding:3px 0; }
   .ct-sum-line .ct-badge{ margin-right:0; }
   .ct-sum-gas{ white-space:nowrap; }
   .ct-actions{ display:flex; justify-content:flex-end; gap:8px; padding:8px 0 10px; margin-top:6px; border-top:1px solid var(--line); }
   .ct-tog{
     border:1.5px solid var(--lavender-dark); background:#fff; color:var(--lavender-ink); border-radius:999px;
-    padding:4px 14px; font-size:12px; font-weight:700; font-family:inherit; cursor:pointer;
+    padding:4px 14px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;
   }
   .ct-tog.open{ background:var(--lavender); }
 
@@ -208,14 +210,14 @@ style.textContent = `
 
   .ct-swrap{ position:relative; overflow:hidden; border-top:1px solid var(--line); }
   .ct-swrap > .ct-row{ border-top:0; position:relative; background:var(--card); touch-action:pan-y; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
-  .ct-swbg{ position:absolute; inset:0; display:flex; font-size:13px; font-weight:700; }
+  .ct-swbg{ position:absolute; inset:0; display:flex; font-size:15px; font-weight:700; }
   .ct-sw-edit, .ct-sw-del{ flex:1; display:flex; align-items:center; padding:0 18px; }
   .ct-sw-edit{ background:var(--sky); color:var(--sky-ink); justify-content:flex-start; }
   .ct-sw-del{ background:var(--pink); color:var(--pink-ink); justify-content:flex-end; }
-  .ct-swipe-hint{ font-size:11px; color:var(--ink-soft); text-align:center; padding:4px 0 6px; }
+  .ct-swipe-hint{ font-size:13px; color:var(--ink-soft); text-align:center; padding:4px 0 6px; }
   .ct-sw-edit{ background:var(--mint); color:var(--mint-ink); }
 
-  .ct-swrap > .ct-row.ct-drow{ display:grid; column-gap:10px; align-items:center; font-size:13px; padding:9px 0 9px 1em; }
+  .ct-swrap > .ct-row.ct-drow{ display:grid; column-gap:10px; align-items:center; font-size:15px; padding:9px 0 9px 1em; }
   .ct-d1 .ct-badge{ margin-right:0; }
   .ct-d2{ font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight:700; white-space:nowrap; }
   .ct-d3{ min-width:0; overflow-wrap:anywhere; }
@@ -238,8 +240,8 @@ style.textContent = `
   .ct-filter-info:empty{ display:none; }
 
   .ct-gas-area{ align-items:center; }
-  .ct-gasbar-wrap{ position:relative; flex:1; min-width:0; }
-  .ct-gasbar{ position:relative; display:grid; grid-auto-flow:row; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:4px 2px; }
+  .ct-gasbar-wrap{ position:relative; flex:1; min-width:0; background:#FBF1D8; border:1px solid #EEDDB4; border-radius:12px; overflow:hidden; }
+  .ct-gasbar{ position:relative; display:grid; grid-auto-flow:row; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:8px; }
   .ct-gasbar::-webkit-scrollbar{ display:none; }
   .ct-gasbar .chip{ flex:none; white-space:nowrap; }
   .ct-gasbar-wrap::before, .ct-gasbar-wrap::after{ content:""; position:absolute; top:0; bottom:0; width:20px; pointer-events:none; z-index:2; opacity:0; transition:opacity .15s; }
@@ -413,7 +415,9 @@ function renderGasChips(){
     b.addEventListener("click", onClick);
     box.appendChild(b);
   };
-  GAS_TABLE.forEach(g => addChip(g.label || g.name, g, ctGasSel === g.code, () => pickGas(g.code)));
+  const chipGases = GAS_CHIP_ORDER.map(code => GAS_TABLE.find(g => g.code === code)).filter(Boolean)
+    .concat(GAS_TABLE.filter(g => !GAS_CHIP_ORDER.includes(g.code)));   // 並びに書き忘れたガス種は最後に足す
+  chipGases.forEach(g => addChip(g.label || g.name, g, ctGasSel === g.code, () => pickGas(g.code)));
   addChip("その他", OTHER_GAS_STYLE, ctGasSel === "other", () => pickGas("other"));
 
   // 上段・下段の2行（左から右へ読む順に並べる）。2行いっしょに横へ滑らせる
@@ -1005,7 +1009,7 @@ function renderList(){
         }, 0);
         const capStr = l => noCap(l) ? "" : `${l.capacity}${l.unit || ""}`;
         const c2 = Math.max(...detail.map(l => String(l.symbol).length + 1 + String(l.number).length));
-        const c4 = Math.ceil(Math.max(...detail.map(l => emW(capStr(l)))) * 13 + 4);
+        const c4 = Math.ceil(Math.max(...detail.map(l => emW(capStr(l)))) * 15 + 4);
         const cols = `${c2}ch minmax(0,1fr) ${c4}px`;
 
         html += `<div class="ct-swipe-hint">← 削除　　変更 →</div>`;
