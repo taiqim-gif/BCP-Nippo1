@@ -40,7 +40,7 @@ const ADJ_STEPS = [-0.2, -0.1, 0, 0.1, 0.2];   // ｱｾﾁﾚﾝの容量の増
 const UNITS = ["㎥","kg"];
 
 const CT_KEY = "containerLogs";
-const BACKUP_KEYS = ["meetingLogs","dailyVehicleInfo","todoItems","containerLogs"];
+const BACKUP_KEYS = ["meetingLogs","dailyVehicleInfo","todoItems","containerLogs","customerHidden","customerExtra"];
 const MAILTO_LIMIT = 50000;
 
 /* ---------- データ ---------- */
@@ -250,9 +250,7 @@ style.textContent = `
   .dt-chips{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 2px 14px; }
   .dt-chips-label{ font-size:14px; font-weight:700; color:var(--ink); }
   .dt-chip{ font-size:14px; font-weight:700; padding:4px 12px; border-radius:999px; }
-  .dt-chip.v{ background:var(--mint); color:var(--mint-ink); }
-  .dt-chip.d{ background:var(--peach); color:var(--peach-ink); }
-  .dt-chip.c{ background:var(--sky); color:var(--sky-ink); }
+  .dt-chip.v, .dt-chip.d, .dt-chip.c{ background:var(--butter); color:var(--butter-ink); }
   .dt-frame{ border:2px solid var(--line); border-radius:16px; margin-bottom:16px; overflow:hidden; }
   .dt-head{ display:block; width:100%; text-align:left; border:none; padding:10px 14px; font-family:inherit; font-size:17px; font-weight:700; }
   .dt-toggle{ display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
@@ -290,6 +288,55 @@ style.textContent = `
   .ct-filter-info:empty{ display:none; }
 
   .ct-gas-area{ align-items:center; }
+
+  /* 一画面に収める：訪問入力・車両情報・容器ログの余白を詰める */
+  #visitScreen h2{ margin:8px 0 6px; font-size:14px; }
+  #visitScreen .card{ padding:10px 12px; margin-bottom:8px; }
+  #visitScreen .field{ margin-bottom:8px; }
+  #visitScreen .field > label{ margin-bottom:4px; }
+  #visitScreen input[type=text], #visitScreen input[type=time], #visitScreen textarea{ padding:8px 10px; }
+  #visitScreen .chip-group{ gap:6px; }
+  #visitScreen .chip{ padding:7px 2px; font-size:12.5px; }
+  #visitScreen #meetingNotes{ height:46px; min-height:46px; }
+  #visitScreen #meetingContent{ min-height:56px; }
+  #visitScreen .btn{ padding:11px; }
+  #visitStatusField > div{ display:inline-block !important; margin:0 10px 0 0 !important; vertical-align:middle; }
+  #visitStatusField .ct-inwrap{ display:inline-block; width:11em; vertical-align:middle; }
+  #visitStartTimeInput{ width:100%; padding-top:6px; padding-bottom:6px; font-size:14px; }
+
+  #vehicleScreen h2{ margin:10px 0 8px; }
+  .ct-h2-inline{ display:flex !important; justify-content:flex-start !important; align-items:center; gap:10px; }
+  #vehicleScreen .card{ padding:12px; margin-bottom:10px; }
+  #vehicleScreen .field{ margin-bottom:8px; }
+  #vehicleScreen .dial{ width:84px; height:84px; }
+  #vehicleScreen .dial-row{ margin-top:10px; }
+  #vehicleScreen .mode-switch-btn{ padding:8px; }
+  #vehicleScreen .dial-actions .btn{ padding:14px 10px; }
+
+  #containerScreen h2{ margin:8px 0 8px; }
+  #containerScreen .card{ padding:12px; margin-bottom:10px; }
+  #containerScreen .field{ margin-bottom:8px; }
+  #containerScreen .kana-grid{ gap:4px; margin-bottom:6px; }
+  #containerScreen .kana-btn{ padding:6px 0; }
+  .ct-lbrow{ display:flex; justify-content:space-between; align-items:center; height:26px; margin-bottom:4px; }
+  .ct-lbrow label{ margin:0; }
+  .ct-lbrow .btn-mini{ padding:2px 10px; line-height:1.2; }
+
+  .ct-flash{ position:fixed; left:50%; top:40%; transform:translate(-50%,-50%) scale(.9); font-size:64px; font-weight:700; color:var(--mint-ink); background:rgba(255,255,255,0.95); border:3px solid var(--mint-dark); border-radius:24px; padding:14px 44px; z-index:200; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; }
+  .ct-flash.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+
+  /* 顧客の管理 */
+  .cm-top{ display:flex; align-items:center; gap:10px; margin:6px 0 10px; }
+  .cm-top h2{ margin:0; }
+  .cm-row{ display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line); font-size:15px; }
+  .cm-row input[type=checkbox]{ width:20px; height:20px; flex:none; }
+  .cm-name{ flex:1; min-width:0; overflow-wrap:anywhere; }
+  .cm-code{ font-size:12px; color:var(--ink-soft); white-space:nowrap; }
+  .cm-tag{ font-size:11px; border:1px solid var(--lavender-dark); color:var(--lavender-ink); border-radius:4px; padding:0 4px; white-space:nowrap; }
+  .cm-mini{ border:1.5px solid var(--line); background:#fff; border-radius:8px; padding:4px 9px; font-size:12px; font-weight:700; font-family:inherit; color:var(--ink); cursor:pointer; }
+  .cm-bar{ position:sticky; bottom:0; background:linear-gradient(to top, var(--bg) 70%, rgba(250,246,239,0)); padding:10px 0 12px; z-index:5; }
+  .cm-tools{ display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; align-items:center; }
+  .cm-count{ font-size:12px; color:var(--ink-soft); margin-left:auto; }
   .ct-gasbar-wrap{ position:relative; flex:1; min-width:0; background:#FBF1D8; border:1px solid #EEDDB4; border-radius:12px; overflow:hidden; }
   .ct-gasbar{ position:relative; display:grid; grid-auto-flow:row; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:8px; }
   .ct-gasbar::-webkit-scrollbar{ display:none; }
@@ -315,9 +362,9 @@ section.innerHTML = `
       <div class="ct-seg" id="ctStatusSeg" style="flex:2;"></div>
       <select id="ctStatusSel" style="flex:1.2;min-width:0;padding:8px 6px;" aria-label="その他の区分"></select>
     </div>
-    <div style="height:14px;"></div>
+    <div style="height:8px;"></div>
 
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
       <div class="ct-datefield">
         <span class="ct-inlab">日付</span>
         <span class="ct-datetext" id="ctDateText"></span>
@@ -350,14 +397,11 @@ section.innerHTML = `
 
     <div class="row-gap" style="margin-top:6px;">
       <div class="field" style="flex:1;">
-        <label for="ctSymbol">記号(英数字)</label>
+        <div class="ct-lbrow"><label for="ctSymbol">記号(英数字)</label></div>
         <input type="text" id="ctSymbol" inputmode="email" lang="en" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="例：AB1">
       </div>
       <div class="field" style="flex:2;">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <label for="ctNumber">番号(数字)</label>
-          <button type="button" class="btn-mini" id="ctNumKb" style="padding:2px 10px;margin-bottom:6px;" aria-label="キーボードの切り替え">ABC</button>
-        </div>
+        <div class="ct-lbrow"><label for="ctNumber">番号(数字)</label><button type="button" class="btn-mini" id="ctNumKb" aria-label="キーボードの切り替え">ABC</button></div>
         <input type="text" id="ctNumber" inputmode="numeric" autocomplete="off" placeholder="例：12345">
       </div>
     </div>
@@ -398,6 +442,19 @@ section.innerHTML = `
   <div class="ct-status ct-offline-status"></div>
 `;
 document.querySelector("main").appendChild(section);
+
+// 記録したとき、大きな文字で一瞬だけ「登録」と出す
+const flashEl = document.createElement("div");
+flashEl.className = "ct-flash";
+flashEl.id = "ctFlash";
+document.body.appendChild(flashEl);
+let flashTimer = null;
+function flashText(t){
+  flashEl.textContent = t;
+  flashEl.classList.add("show");
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => flashEl.classList.remove("show"), 800);
+}
 
 /* ---------- 部品の描画 ---------- */
 function renderStatus(){
@@ -589,17 +646,16 @@ function normQ(x){ return nfkc(x).toUpperCase().replace(/\s+/g, ""); }
 function hira(x){ return (typeof toHiragana === "function" ? toHiragana(x) : nfkc(x)).replace(/\s+/g, ""); }
 
 // 客名リスト(取り込み済みなら)から、記録の客の読み仮名を調べる(古い記録の分も補う)
-let _mc = null, _byCode = null, _byName = null;
+let _mv = -1, _byCode = null, _byName = null, masterVer = 0;
 function masterMaps(){
-  if(!hasMaster()) return null;
-  if(_mc !== customerMaster){
-    _mc = customerMaster; _byCode = new Map(); _byName = new Map();
-    customerMaster.items.forEach(i => {
+  if(_mv !== masterVer){
+    _mv = masterVer; _byCode = new Map(); _byName = new Map();
+    allCustomers().forEach(i => {
       if(i.c && !_byCode.has(i.c)) _byCode.set(i.c, i);
       if(i.n && !_byName.has(i.n)) _byName.set(i.n, i);
     });
   }
-  return { byCode:_byCode, byName:_byName };
+  return (_byCode.size || _byName.size) ? { byCode:_byCode, byName:_byName } : null;
 }
 function readingFor(l){
   if(l.customerKana) return l.customerKana;
@@ -835,6 +891,7 @@ function saveFromForm(){
     showToast(`${statusName(f.status)}を記録しました`);
   }
   ctSave();
+  flashText(wasEditing ? "更新" : "登録");
 
   // 記号・番号は、記録のたびに空白(初期状態)へ戻す。区分・顧客・ガス種・容量は残す
   $("ctSymbol").value = "";
@@ -1337,15 +1394,15 @@ dataSection.innerHTML = `
     <div class="dt-head">送る</div>
     <div class="dt-body">
       <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtMailReport">日報メール送信(日報・車両・容器ログ)</button>
+        <button class="btn btn-outline-mint" id="dtMailReport">日報メール送信<br>(日報・車両・容器ログ)</button>
         <div class="dt-desc">未送信分を送る</div>
       </div>
       <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtMailCsv">容器ログをメール送信<br>(CSV添付)</button>
+        <button class="btn btn-outline-mint" id="dtMailCsv">容器ログだけメール送信<br>(CSV添付)</button>
         <div class="dt-desc" id="dtMailCsvDesc"></div>
       </div>
       <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtCsv">CSVで書き出す(容器ログ全件)</button>
+        <button class="btn btn-outline-mint" id="dtCsv">CSVで書き出す<br>(容器ログだけ全件)</button>
         <div class="dt-desc" id="dtCsvDesc"></div>
       </div>
       <div class="dt-item">
@@ -1371,9 +1428,12 @@ dataSection.innerHTML = `
   </section>
 
   <section class="dt-frame master">
-    <div class="dt-head">客先名リスト</div>
+    <div class="dt-head">顧客リスト(ダウンロード)</div>
     <div class="dt-body" id="dtMaster">
-      <div class="dt-desc" style="margin:0 0 10px;">訪問先・顧客名の候補</div>
+      <div class="dt-item">
+        <button class="btn btn-outline-mint" id="dtCustManage">顧客の管理</button>
+        <div class="dt-desc">表示・非表示、顧客の追加</div>
+      </div>
     </div>
   </section>
 
@@ -1394,7 +1454,7 @@ dataSection.innerHTML = `
         <div class="dt-desc" id="dtDelContainerDesc"></div>
       </div>
       <div class="dt-item">
-        <button class="btn btn-outline-pink" id="dtDelTodo">TODOを削除</button>
+        <button class="btn btn-outline-pink" id="dtDelTodo">ToDoリストを削除</button>
         <div class="dt-desc" id="dtDelTodoDesc"></div>
       </div>
     </div>
@@ -1410,6 +1470,302 @@ document.querySelector("main").appendChild(dataSection);
   if(bar) host.appendChild(bar);
   if(keyBox) host.appendChild(keyBox);
 })();
+
+/* =========================================================
+   顧客リスト：非表示にした顧客と、追加した顧客
+   ・ダウンロードしたリスト(customerMaster)とは別に保存する。新しくダウンロードしても残る
+   ・顧客コードを目印にする(コードがない顧客は名前)
+   ・ホームと容器の顧客選択には、非表示を除き、追加分を足した「見える分」だけを渡す
+========================================================= */
+const CH_KEY = "customerHidden", CE_KEY = "customerExtra";
+function loadJson(k, def){ try{ const v = JSON.parse(localStorage.getItem(k) || "null"); return v == null ? def : v; }catch(e){ return def; } }
+let custHidden = new Set(loadJson(CH_KEY, []));
+let custExtra = loadJson(CE_KEY, []);
+if(!Array.isArray(custExtra)) custExtra = [];
+function custKey(i){ return i.c ? "c:" + i.c : "n:" + i.n; }
+function saveCust(){
+  localStorage.setItem(CH_KEY, JSON.stringify([...custHidden]));
+  localStorage.setItem(CE_KEY, JSON.stringify(custExtra));
+}
+function rawMaster(){ try{ return JSON.parse(localStorage.getItem("customerMaster") || "null"); }catch(e){ return null; } }
+
+// 非表示も含めた全件(ダウンロード + 追加)。追加分のコードがダウンロード側にもあるときは、ダウンロード側を使う
+function allCustomers(){
+  const raw = rawMaster();
+  const base = (raw && Array.isArray(raw.items)) ? raw.items : [];
+  const codes = new Set(base.map(i => i.c).filter(Boolean));
+  const extras = custExtra.filter(e => !(e.c && codes.has(e.c))).map(e => ({ n:e.n, k:e.k || "", c:e.c || "", x:true, id:e.id }));
+  return base.map(i => ({ n:i.n, k:i.k || "", c:i.c || "", x:false })).concat(extras);
+}
+function applyMasterOverlay(){
+  const raw = rawMaster();
+  const vis = allCustomers().filter(i => !custHidden.has(custKey(i)));
+  masterVer++;
+  if(!raw && custExtra.length === 0){ customerMaster = null; return; }
+  customerMaster = { office: raw ? (raw.office || "") : "", updated: raw ? (raw.updated || "") : "", items: vis.map(i => ({ n:i.n, k:i.k, c:i.c })) };
+}
+
+const origRenderMasterUI = window.renderMasterUI;
+if(typeof origRenderMasterUI === "function"){
+  window.renderMasterUI = function(){
+    applyMasterOverlay();
+    origRenderMasterUI();
+    const st = $("masterStatus");
+    if(st){
+      let t = st.textContent.replace("客先名リスト", "顧客リスト");
+      const hid = allCustomers().filter(i => custHidden.has(custKey(i))).length;
+      if(hid > 0) t += `(非表示 ${hid})`;
+      st.textContent = t;
+    }
+  };
+}
+// 表示の言葉をそろえる：「客先名リスト」→「顧客リスト」、「TODO」→「ToDo」
+const origShowToast = window.showToast;
+if(typeof origShowToast === "function"){
+  window.showToast = function(m){ origShowToast(String(m).replace(/TODO/g, "ToDo").replace(/客先名リスト/g, "顧客リスト")); };
+}
+const nativeConfirm = window.confirm.bind(window);
+window.confirm = function(m){ return nativeConfirm(String(m).replace(/客先名リスト/g, "顧客リスト")); };
+const origRenderTodoList = window.renderTodoList;
+function normalizeTodoHeads(){
+  document.querySelectorAll(".todo-list-target h2 span:first-child").forEach(sp => {
+    if(sp.textContent === "TODOリスト") sp.textContent = "ToDoリスト";
+  });
+}
+if(typeof origRenderTodoList === "function"){
+  window.renderTodoList = function(){ origRenderTodoList(); normalizeTodoHeads(); };
+}
+normalizeTodoHeads();
+
+/* ---------- 顧客の管理の画面 ---------- */
+const custSection = document.createElement("section");
+custSection.id = "custScreen";
+custSection.className = "screen";
+custSection.innerHTML = `
+  <div class="cm-top"><button type="button" class="btn-mini" id="cmBack">← データ</button><h2>顧客の管理</h2></div>
+  <div class="ct-seg" id="cmTabs">
+    <button type="button" data-tab="show"></button>
+    <button type="button" data-tab="hide"></button>
+  </div>
+  <div class="card" style="margin-top:10px;">
+    <input type="text" id="cmSearch" placeholder="顧客名・読み仮名・コードで検索" autocomplete="off">
+    <div class="kana-grid" id="cmKana" style="margin-top:8px;"></div>
+    <div class="cm-tools">
+      <button type="button" class="cm-mini" id="cmAll">絞り込み全部を選ぶ</button>
+      <button type="button" class="cm-mini" id="cmNone">選択を解除</button>
+      <span class="cm-count" id="cmCount"></span>
+    </div>
+    <div id="cmList"></div>
+    <button type="button" class="btn btn-outline-mint" id="cmMore" style="margin-top:10px;" hidden>さらに表示</button>
+  </div>
+  <div class="cm-bar"><button type="button" class="btn btn-peach" id="cmApply">非表示にする(0)</button></div>
+  <div class="card" id="cmAddCard">
+    <div class="dt-title" id="cmAddTitle" style="font-size:15px;font-weight:700;margin-bottom:8px;">顧客を追加</div>
+    <div class="cm-tools" style="display:block;">
+      <input type="text" id="cmAddName" placeholder="顧客名" autocomplete="off" style="margin-bottom:8px;">
+      <input type="text" id="cmAddKana" placeholder="読み仮名(省略可)" autocomplete="off" style="margin-bottom:8px;">
+      <input type="text" id="cmAddCode" placeholder="顧客コード(省略可)" autocomplete="off" style="margin-bottom:8px;">
+    </div>
+    <button type="button" class="btn btn-mint" id="cmAddBtn">追加</button>
+    <button type="button" class="btn btn-outline-mint" id="cmAddCancel" style="margin-top:8px;" hidden>やめる</button>
+  </div>
+`;
+document.querySelector("main").appendChild(custSection);
+
+let cmTab = "show", cmKana = null, cmLimit = 100, cmEditId = null;
+const cmSel = new Set();
+
+function cmItems(){
+  const wantHidden = cmTab === "hide";
+  let items = allCustomers().filter(i => custHidden.has(custKey(i)) === wantHidden);
+  const q = $("cmSearch").value;
+  if(q.trim()){
+    const nq = normQ(q), hq = hira(q);
+    items = items.filter(i => normQ(i.n).includes(nq) || (i.k && hira(i.k).includes(hq)) || (i.c && normQ(i.c).includes(nq)));
+  }
+  if(cmKana) items = items.filter(i => kanaRowOf(i.k) === cmKana);
+  items.sort((a, b) => hira(a.k || a.n).localeCompare(hira(b.k || b.n), "ja") || a.n.localeCompare(b.n, "ja"));
+  return items;
+}
+
+function renderCust(){
+  const all = allCustomers();
+  const hid = all.filter(i => custHidden.has(custKey(i))).length;
+  const tabs = $("cmTabs").querySelectorAll("button");
+  tabs[0].textContent = `表示中 ${all.length - hid}`;
+  tabs[1].textContent = `非表示 ${hid}`;
+  tabs.forEach(b => { b.className = (b.getAttribute("data-tab") === cmTab) ? "on" : ""; });
+
+  const grid = $("cmKana");
+  grid.innerHTML = "";
+  [...KANA_ROWS.map(r => r[0]), "他"].forEach(row => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "kana-btn" + (row === cmKana ? " active" : "");
+    b.textContent = row;
+    b.addEventListener("click", () => { cmKana = (cmKana === row) ? null : row; cmLimit = 100; renderCust(); });
+    grid.appendChild(b);
+  });
+
+  const items = cmItems();
+  $("cmCount").textContent = `${items.length}件`;
+  const list = $("cmList");
+  list.innerHTML = "";
+  if(items.length === 0){
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = cmTab === "hide" ? "非表示の顧客はありません" : "該当する顧客はありません";
+    list.appendChild(e);
+  }
+  items.slice(0, cmLimit).forEach(i => {
+    const key = custKey(i);
+    const row = document.createElement("label");
+    row.className = "cm-row";
+    row.innerHTML = `<input type="checkbox" data-key="${encodeURIComponent(key)}"${cmSel.has(key) ? " checked" : ""}>` +
+      `<span class="cm-name">${escapeHtml(i.n)}</span>` +
+      (i.x ? '<span class="cm-tag">追加</span>' : "") +
+      (i.c ? `<span class="cm-code">${escapeHtml(i.c)}</span>` : "") +
+      (i.x ? `<button type="button" class="cm-mini" data-act="edit" data-id="${escapeHtml(i.id)}">直す</button><button type="button" class="cm-mini" data-act="del" data-id="${escapeHtml(i.id)}">消す</button>` : "");
+    list.appendChild(row);
+  });
+  $("cmMore").hidden = items.length <= cmLimit;
+  $("cmMore").textContent = `さらに表示(残り ${Math.max(0, items.length - cmLimit)}件)`;
+
+  const apply = $("cmApply");
+  apply.textContent = (cmTab === "show" ? "非表示にする" : "表示に戻す") + `(${cmSel.size})`;
+  apply.disabled = cmSel.size === 0;
+}
+
+function cmResetAddForm(){
+  cmEditId = null;
+  $("cmAddName").value = ""; $("cmAddKana").value = ""; $("cmAddCode").value = "";
+  $("cmAddTitle").textContent = "顧客を追加";
+  $("cmAddBtn").textContent = "追加";
+  $("cmAddCancel").hidden = true;
+}
+
+function refreshCustomers(){
+  saveCust();
+  if(typeof window.renderMasterUI === "function") window.renderMasterUI(); else applyMasterOverlay();
+  renderCust();
+}
+
+function goToCust(){
+  cmSel.clear(); cmLimit = 100;
+  renderCust();
+  showScreen("cust");
+  updateNav("data");
+}
+
+$("cmTabs").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if(!b) return;
+  cmTab = b.getAttribute("data-tab");
+  cmSel.clear(); cmLimit = 100;
+  renderCust();
+});
+$("cmSearch").addEventListener("input", () => { cmLimit = 100; renderCust(); });
+$("cmMore").addEventListener("click", () => { cmLimit += 100; renderCust(); });
+$("cmAll").addEventListener("click", () => { cmItems().forEach(i => cmSel.add(custKey(i))); renderCust(); });
+$("cmNone").addEventListener("click", () => { cmSel.clear(); renderCust(); });
+$("cmList").addEventListener("change", e => {
+  const cb = e.target.closest('input[type="checkbox"]');
+  if(!cb) return;
+  const key = decodeURIComponent(cb.getAttribute("data-key"));
+  if(cb.checked) cmSel.add(key); else cmSel.delete(key);
+  const apply = $("cmApply");
+  apply.textContent = (cmTab === "show" ? "非表示にする" : "表示に戻す") + `(${cmSel.size})`;
+  apply.disabled = cmSel.size === 0;
+});
+$("cmList").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-act]");
+  if(!btn) return;
+  e.preventDefault();
+  const id = btn.getAttribute("data-id");
+  const ex = custExtra.find(x => x.id === id);
+  if(!ex) return;
+  if(btn.getAttribute("data-act") === "edit"){
+    cmEditId = id;
+    $("cmAddName").value = ex.n; $("cmAddKana").value = ex.k || ""; $("cmAddCode").value = ex.c || "";
+    $("cmAddTitle").textContent = "追加した顧客を直す";
+    $("cmAddBtn").textContent = "更新";
+    $("cmAddCancel").hidden = false;
+    const card = $("cmAddCard");
+    if(card.scrollIntoView) card.scrollIntoView({ block:"center" });
+  }else{
+    if(!window.confirm(`「${ex.n}」を削除します。\n\n戻せません。削除しますか?`)) return;
+    custHidden.delete(custKey(ex));
+    custExtra = custExtra.filter(x => x.id !== id);
+    cmSel.delete(custKey(ex));
+    if(cmEditId === id) cmResetAddForm();
+    refreshCustomers();
+    showToast("削除しました");
+  }
+});
+$("cmApply").addEventListener("click", () => {
+  if(cmSel.size === 0) return;
+  const hide = cmTab === "show";
+  const n = cmSel.size;
+  cmSel.forEach(k => { if(hide) custHidden.add(k); else custHidden.delete(k); });
+  cmSel.clear();
+  refreshCustomers();
+  showToast(`${n}件を${hide ? "非表示にしました" : "表示に戻しました"}`);
+});
+$("cmAddBtn").addEventListener("click", () => {
+  const n = $("cmAddName").value.trim();
+  const k = $("cmAddKana").value.trim();
+  const c = nfkc($("cmAddCode").value).trim();
+  if(!n){ showToast("顧客名を入力してください"); $("cmAddName").focus(); return; }
+  if(c && allCustomers().some(i => i.c === c && !(cmEditId && i.id === cmEditId))){ showToast("この顧客コードは登録済みです"); $("cmAddCode").focus(); return; }
+  if(cmEditId){
+    const ex = custExtra.find(x => x.id === cmEditId);
+    if(ex){
+      const oldKey = custKey(ex);
+      ex.n = n; ex.k = k; ex.c = c;
+      if(custHidden.has(oldKey) && oldKey !== custKey(ex)){ custHidden.delete(oldKey); custHidden.add(custKey(ex)); }
+    }
+    showToast("更新しました");
+  }else{
+    custExtra.push({ id:newId(), n, k, c });
+    showToast("追加しました");
+  }
+  cmResetAddForm();
+  refreshCustomers();
+});
+$("cmAddCancel").addEventListener("click", cmResetAddForm);
+$("cmBack").addEventListener("click", () => goToData());
+$("dtCustManage").addEventListener("click", goToCust);
+
+// 起動時：非表示・追加を反映した「見える分」の顧客リストにする
+applyMasterOverlay();
+if(typeof window.renderMasterUI === "function") window.renderMasterUI();
+
+/* ---------- 訪問入力・車両情報：一画面に収める ---------- */
+(function layoutHostScreens(){
+  const vs = $("vehicleScreen");
+  if(vs){
+    const h2 = [...vs.children].find(e => e.tagName === "H2");
+    const pill = $("vehicleStatusPill");
+    if(h2 && pill){ h2.classList.add("ct-h2-inline"); h2.appendChild(pill); }      // 「帰社」「帰社済み」を、見出しの右横へ
+    const lab = $("vehicleModeLabel");
+    if(lab && lab.parentNode) lab.parentNode.style.display = "none";
+  }
+})();
+
+function fitVisitScreen(){
+  const ta = $("meetingContent"), card = $("meetingCard"), end = $("endButton"), vs = $("visitScreen");
+  if(!ta || !card || !end || !vs || !vs.classList.contains("active") || card.style.display === "none") return;
+  ta.style.height = "56px";
+  const bottom = end.getBoundingClientRect().bottom;
+  const free = window.innerHeight - bottom - 14;
+  ta.style.height = Math.max(56, Math.min(260, 56 + free)) + "px";   // 「内容」を、画面の残りの高さまで広げる
+}
+const origGoToVisit = window.goToVisit;
+if(typeof origGoToVisit === "function"){
+  window.goToVisit = function(){ origGoToVisit(); fitVisitScreen(); setTimeout(fitVisitScreen, 60); };
+}
+window.addEventListener("resize", fitVisitScreen);
+window.addEventListener("orientationchange", () => setTimeout(fitVisitScreen, 200));
 
 // 「送信済み」の印と件数
 function vehDays(){
@@ -1531,11 +1887,11 @@ function delContainer(){
 
 function delTodo(){
   const c = dataCounts();
-  if(c.todoPending + c.todoDone === 0){ showToast("TODOはありません"); return; }
-  if(!window.confirm(`TODO(未完了 ${c.todoPending}・完了 ${c.todoDone})を削除します。\n\n戻せません。削除しますか?`)) return;
+  if(c.todoPending + c.todoDone === 0){ showToast("ToDoリストはありません"); return; }
+  if(!window.confirm(`ToDoリスト(未完了 ${c.todoPending}・完了 ${c.todoDone})を削除します。\n\n戻せません。削除しますか?`)) return;
   localStorage.removeItem("todoItems");
   todoItems = [];
-  afterDelete("TODOを削除しました");
+  afterDelete("ToDoリストを削除しました");
 }
 
 $("dtMailReport").addEventListener("click", () => { const b = $("mailButton"); if(b) b.click(); });
@@ -1728,7 +2084,13 @@ convertHostLabels();
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while(walker.nextNode()) nodes.push(walker.currentNode);
-    nodes.forEach(n => { if(!skip(n.parentElement) && /[（）]/.test(n.nodeValue)) n.nodeValue = halfParens(n.nodeValue); });
+    nodes.forEach(n => {
+      if(skip(n.parentElement)) return;
+      let v = n.nodeValue;
+      if(/[（）]/.test(v)) v = halfParens(v);
+      if(/TODOリスト/.test(v)) v = v.replace(/TODOリスト/g, "ToDoリスト");
+      if(v !== n.nodeValue) n.nodeValue = v;
+    });
     root.querySelectorAll("[placeholder]").forEach(e => { e.placeholder = halfParens(e.placeholder); });
   });
 })();
