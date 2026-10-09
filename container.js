@@ -213,8 +213,23 @@ style.textContent = `
   .ct-sw-edit{ background:var(--sky); color:var(--sky-ink); justify-content:flex-start; }
   .ct-sw-del{ background:var(--pink); color:var(--pink-ink); justify-content:flex-end; }
   .ct-swipe-hint{ font-size:11px; color:var(--ink-soft); text-align:center; padding:4px 0 6px; }
-  .ct-row-line1{ white-space:nowrap; }
-  .ct-row-line2{ padding-left:1em; }
+  .ct-sw-edit{ background:var(--mint); color:var(--mint-ink); }
+
+  .ct-swrap > .ct-row.ct-drow{ display:grid; column-gap:10px; align-items:center; font-size:13px; padding:9px 0 9px 1em; }
+  .ct-d1 .ct-badge{ margin-right:0; }
+  .ct-d2{ font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight:700; white-space:nowrap; }
+  .ct-d3{ min-width:0; overflow-wrap:anywhere; }
+  .ct-d4{ text-align:right; white-space:nowrap; }
+
+  .ct-gas-area{ align-items:center; }
+  .ct-gasbar-wrap{ position:relative; flex:1; min-width:0; }
+  .ct-gasbar{ position:relative; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:4px 2px; align-items:center; }
+  .ct-gasbar::-webkit-scrollbar{ display:none; }
+  .ct-gasbar .chip{ flex:none; white-space:nowrap; }
+  .ct-gasbar-wrap::before, .ct-gasbar-wrap::after{ content:""; position:absolute; top:0; bottom:0; width:20px; pointer-events:none; z-index:2; opacity:0; transition:opacity .15s; }
+  .ct-gasbar-wrap::before{ left:0; background:linear-gradient(to right, rgba(0,0,0,0.22), rgba(0,0,0,0)); }
+  .ct-gasbar-wrap::after{ right:0; background:linear-gradient(to left, rgba(0,0,0,0.22), rgba(0,0,0,0)); }
+  .ct-gasbar-wrap.has-left::before, .ct-gasbar-wrap.has-right::after{ opacity:1; }
 `;
 document.head.appendChild(style);
 
@@ -259,7 +274,7 @@ section.innerHTML = `
     <div class="field">
       <label>ガス種</label>
       <div class="ct-gas-area">
-        <div class="ct-chip-row" id="ctGasChips"></div>
+        <div class="ct-gasbar-wrap" id="ctGasWrap"><div class="ct-chip-row ct-gasbar" id="ctGasChips"></div></div>
         <div class="ct-gas-vert" id="ctGasVert"><span></span></div>
       </div>
       <input type="text" id="ctGasOther" placeholder="ガス種を入力" style="margin-top:8px;display:none;" autocomplete="off">
@@ -267,13 +282,15 @@ section.innerHTML = `
 
     <div class="row-gap" style="margin-top:6px;">
       <div class="field" style="flex:1;">
-        <input type="text" id="ctSymbol" inputmode="email" lang="en" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="記号" aria-label="記号">
+        <label for="ctSymbol">記号（英数字）</label>
+        <input type="text" id="ctSymbol" inputmode="email" lang="en" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="例：AB1">
       </div>
       <div class="field" style="flex:2;">
-        <div class="ct-numwrap">
-          <input type="text" id="ctNumber" inputmode="numeric" autocomplete="off" placeholder="番号" aria-label="番号">
-          <button type="button" class="btn-mini ct-numkb" id="ctNumKb" aria-label="キーボードの切り替え">ABC</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <label for="ctNumber">番号（数字）</label>
+          <button type="button" class="btn-mini" id="ctNumKb" style="padding:2px 10px;margin-bottom:6px;" aria-label="キーボードの切り替え">ABC</button>
         </div>
+        <input type="text" id="ctNumber" inputmode="numeric" autocomplete="off" placeholder="例：12345">
       </div>
     </div>
 
@@ -363,6 +380,7 @@ function renderModeAndUnit(){
 
 function renderGasChips(){
   const box = $("ctGasChips");
+  const prevScroll = box.scrollLeft;          // 作り直しても、滑らせた位置を保つ
   box.innerHTML = "";
   const addChip = (text, st, selected, onClick) => {
     const b = document.createElement("button");
@@ -378,9 +396,26 @@ function renderGasChips(){
   GAS_TABLE.forEach(g => addChip(g.label || g.name, g, ctGasSel === g.code, () => pickGas(g.code)));
   addChip("その他", OTHER_GAS_STYLE, ctGasSel === "other", () => pickGas("other"));
 
+  box.scrollLeft = prevScroll;
+  const on = box.querySelector(".chip.on");   // 選んだボタンは、見える位置へ寄せる
+  if(on){
+    const L = on.offsetLeft, R = L + on.offsetWidth;
+    if(L < box.scrollLeft + 8) box.scrollLeft = Math.max(0, L - 8);
+    else if(R > box.scrollLeft + box.clientWidth - 8) box.scrollLeft = R - box.clientWidth + 8;
+  }
+  updateGasShadows();
+
   $("ctGasOther").style.display = (ctGasSel === "other") ? "block" : "none";
   renderGasSelected();
   renderAdj();
+}
+
+// バーの左右に、続きがあることを示す薄い影を出す
+function updateGasShadows(){
+  const box = $("ctGasChips"), wrap = $("ctGasWrap");
+  if(!box || !wrap) return;
+  wrap.classList.toggle("has-left", box.scrollLeft > 2);
+  wrap.classList.toggle("has-right", box.scrollLeft + box.clientWidth < box.scrollWidth - 2);
 }
 
 // 選んだガス種を、ボタン群の右端に縦書きの文字で表示する（背景色はボタンと同じ。誤入力を防ぐ）
@@ -854,20 +889,42 @@ function renderList(){
         html += `<div class="ct-sum-line"><span class="ct-badge ${cls}">${escapeHtml(statusName(sc))}</span>${parts}</div>`;
       });
 
-      // 「明細」を押したときだけ、記号・番号を1本ずつ表示する（行を右へスワイプ＝変更、左へスワイプ＝削除）
+      // 「明細」を押したときだけ、1本ずつ表示する（行を右へスワイプ＝変更、左へスワイプ＝削除）
+      // 並び順：区分 → ガス種 → 記号・番号。区分は、同じ区分のグループの先頭の行にだけ出す。時刻は出さない
       if(open){
+        const numCmp = (p, q) => (/^\d+$/.test(p) && /^\d+$/.test(q))
+          ? (Number(p) - Number(q)) || p.localeCompare(q)
+          : String(p).localeCompare(String(q));
+        const detail = [...rows].sort((p, q) =>
+          order(p.status) - order(q.status) || gasOrd(p) - gasOrd(q) ||
+          String(p.gas || "").localeCompare(String(q.gas || ""), "ja") ||
+          String(p.symbol).localeCompare(String(q.symbol)) || numCmp(p.number, q.number));
+
+        // 列の幅をそろえる（区分・記号番号・容量は固定幅、ガス種は残り）
+        const emW = t => [...String(t)].reduce((w, ch) => {
+          const cc = ch.codePointAt(0);
+          return w + (cc >= 0xFF61 && cc <= 0xFF9F ? 0.55 : (cc <= 0x7F ? 0.62 : 1.05));
+        }, 0);
+        const capStr = l => noCap(l) ? "" : `${l.capacity}${l.unit || ""}`;
+        const c1 = Math.ceil(Math.max(...detail.map(l => emW(statusName(l.status)))) * 12 + 24);
+        const c2 = Math.max(...detail.map(l => String(l.symbol).length + 1 + String(l.number).length));
+        const c4 = Math.ceil(Math.max(...detail.map(l => emW(capStr(l)))) * 13 + 4);
+        const cols = `${c1}px ${c2}ch minmax(0,1fr) ${c4}px`;
+
         html += `<div class="ct-swipe-hint">← 削除　　変更 →</div>`;
-        rows.forEach(l => {
+        let prevStatus = null;
+        detail.forEach(l => {
           const cls = l.status === 2 ? "out" : (l.status === 3 ? "in" : "oth");
-          const capText = (l.capacity !== "" && l.capacity != null) ? `　${escapeHtml(l.capacity)}${escapeHtml(l.unit || "")}` : "";
+          const first = l.status !== prevStatus;
+          prevStatus = l.status;
           html += `
             <div class="ct-swrap" data-id="${escapeHtml(l.id)}">
               <div class="ct-swbg"><span class="ct-sw-edit">変更</span><span class="ct-sw-del">削除</span></div>
-              <div class="ct-row">
-                <div class="ct-row-main">
-                  <div class="ct-row-line1">${escapeHtml(l.symbol)}-${escapeHtml(l.number)}</div>
-                  <div class="ct-row-line2"><span class="ct-badge ${cls}">${escapeHtml(statusName(l.status))}</span>${escapeHtml(l.time || "")}　${escapeHtml(l.gas || "")}${capText}</div>
-                </div>
+              <div class="ct-row ct-drow" style="grid-template-columns:${cols}">
+                <span class="ct-d1">${first ? `<span class="ct-badge ${cls}">${escapeHtml(statusName(l.status))}</span>` : ""}</span>
+                <span class="ct-d2">${escapeHtml(l.symbol)}-${escapeHtml(l.number)}</span>
+                <span class="ct-d3">${escapeHtml(l.gas || "")}</span>
+                <span class="ct-d4">${escapeHtml(capStr(l))}</span>
               </div>
             </div>`;
         });
@@ -1285,6 +1342,8 @@ $("ctFilterSeg").addEventListener("click", e => {
 
 $("ctDate").addEventListener("change", () => { ctDateTouched = true; syncDateText(); });
 $("ctDate").addEventListener("input", syncDateText);
+$("ctGasChips").addEventListener("scroll", updateGasShadows, { passive:true });
+window.addEventListener("resize", updateGasShadows);
 syncDateText();
 
 /* 検索・日付での絞り込み（過去の記録を後から探す） */
