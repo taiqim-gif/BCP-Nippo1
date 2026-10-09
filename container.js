@@ -17,18 +17,18 @@ const STATUS_TABLE = [
 ];
 const STATUS_BUTTONS = [2, 3];   // 画面に並べるボタン（出庫・空受）。それ以外は右端の選択欄から選ぶ
 
-/* ガス種（画面には名前だけ表示。保存・送信するのは数値コード）
-   cap＝選んだときに自動で入る容量（空文字なら空欄）、unit＝単位、adj＝容量の増減ボタンを出す */
+/* ガス種（保存・送信するのは数値コードと名前。ボタンには label を表示する）
+   label＝ボタンに表示する略称、cap＝選んだときに自動で入る容量（空文字なら空欄）、unit＝単位、adj＝容量の増減ボタンを出す */
 const GAS_TABLE = [
-  { code:1001, name:"ｱｾﾁﾚﾝ",       cap:7,  unit:"kg", adj:true },
-  { code:1002, name:"酸素",         cap:7,  unit:"㎥" },
-  { code:1003, name:"窒素",         cap:7,  unit:"㎥" },
-  { code:1004, name:"アルゴン",     cap:7,  unit:"㎥" },
-  { code:1006, name:"炭酸",         cap:30, unit:"kg" },
-  { code:1007, name:"アルコミック", cap:7,  unit:"㎥" },
-  { code:1008, name:"フロン",       cap:"", unit:"kg" },
-  { code:2001, name:"プロパン",     cap:"", unit:"kg" },
-  { code:5001, name:"医療用酸素",   cap:"", unit:"㎥" }
+  { code:1001, label:"Ace", name:"ｱｾﾁﾚﾝ",       cap:7,  unit:"kg", adj:true },
+  { code:1002, label:"O2", name:"酸素",         cap:7,  unit:"㎥" },
+  { code:1003, label:"N2", name:"窒素",         cap:7,  unit:"㎥" },
+  { code:1004, label:"Ar", name:"アルゴン",     cap:7,  unit:"㎥" },
+  { code:1006, label:"CO2", name:"炭酸",         cap:30, unit:"kg" },
+  { code:1007, label:"ArCo", name:"アルコミック", cap:7,  unit:"㎥" },
+  { code:1008, label:"FRN", name:"フロン",       cap:"", unit:"kg" },
+  { code:2001, label:"LP", name:"プロパン",     cap:"", unit:"kg" },
+  { code:5001, label:"Me-O2", name:"医療用酸素",   cap:"", unit:"㎥" }
 ];
 const ADJ_STEPS = [-2, -1, 0, 1, 2];
 const UNITS = ["㎥","kg"];
@@ -135,6 +135,8 @@ style.textContent = `
   #ctStatusSel.sel-on{ border-color:var(--lavender-dark); background:var(--butter); font-weight:700; }
 
   .ct-status{ font-size:12px; color:var(--ink-soft); text-align:center; margin:10px 4px; line-height:1.6; }
+  .ct-status:empty{ display:none; }
+  .ct-bcp{ text-align:center; font-size:11px; color:var(--ink-soft); padding:6px 14px 0; letter-spacing:.02em; }
 `;
 document.head.appendChild(style);
 
@@ -157,6 +159,10 @@ section.innerHTML = `
     <div class="field">
       <label for="ctDate">日付</label>
       <input type="date" id="ctDate">
+    </div>
+    <div class="field" id="ctTimeField" style="display:none;">
+      <label for="ctTime">時刻（編集時のみ）</label>
+      <input type="time" id="ctTime">
     </div>
 
     <div class="field" style="margin-bottom:8px;">
@@ -203,7 +209,12 @@ section.innerHTML = `
   </div>
 
   <h2 class="h2-flex"><span>容器ログ（<span id="ctCount">0</span>本）</span></h2>
-  <div class="ct-seg" id="ctFilterSeg" style="margin-bottom:12px;"></div>
+  <div class="ct-seg" id="ctFilterSeg" style="margin-bottom:10px;"></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+    <input type="text" id="ctSearch" placeholder="記号・番号・顧客名で検索" autocomplete="off" style="flex:2;min-width:0;">
+    <input type="date" id="ctFilterDate" aria-label="日付で絞る" style="flex:1.3;min-width:0;">
+    <button type="button" class="btn-mini" id="ctFilterClear">解除</button>
+  </div>
   <div id="ctList"></div>
 
   <div class="footer-actions">
@@ -268,7 +279,7 @@ function renderGasChips(){
     const b = document.createElement("button");
     b.type = "button";
     b.className = "chip" + (ctGasSel === g.code ? " on" : "");
-    b.textContent = g.name;
+    b.textContent = g.label || g.name;
     b.addEventListener("click", () => pickGas(g.code));
     box.appendChild(b);
   });
@@ -341,9 +352,22 @@ function renderFilter(){
 }
 
 function passFilter(l){
-  if(ctFilter === "all") return true;
-  if(ctFilter === "oth") return l.status !== 2 && l.status !== 3;
-  return String(l.status) === ctFilter;
+  if(ctFilter === "oth" && (l.status === 2 || l.status === 3)) return false;
+  if(ctFilter !== "all" && ctFilter !== "oth" && String(l.status) !== ctFilter) return false;
+
+  const d = $("ctFilterDate").value;
+  if(d && l.date !== d) return false;
+
+  const q = nfkc($("ctSearch").value).toUpperCase().replace(/\s+/g, "");
+  if(q){
+    const g = GAS_TABLE.find(x => x.code === l.gasCode);
+    const hay = nfkc([
+      `${l.symbol}-${l.number}`, `${l.symbol}${l.number}`, l.customer, l.gas,
+      g ? g.label : "", statusName(l.status)
+    ].join(" ")).toUpperCase().replace(/\s+/g, "");
+    if(!hay.includes(q)) return false;
+  }
+  return true;
 }
 
 /* ---------- 顧客名の選択（日報アプリの客先名リストを共用） ---------- */
@@ -427,6 +451,7 @@ function setFormEditing(editing){
   $("ctSaveButton").textContent = editing ? "更新する" : "記録する";
   $("ctCancelEdit").style.display = editing ? "inline-block" : "none";
   $("ctTitle").textContent = editing ? "容器ログ（編集中）" : "容器ログ";
+  $("ctTimeField").style.display = editing ? "block" : "none";
 }
 
 function readForm(){
@@ -465,7 +490,11 @@ function saveFromForm(){
 
   if(ctEditId){
     const log = ctLogs.find(x => x.id === ctEditId);
-    if(log) Object.assign(log, f, { customerCode: code });
+    if(log){
+      Object.assign(log, f, { customerCode: code });
+      const t = $("ctTime").value;
+      if(t) log.time = t;
+    }
     ctEditId = null;
     showToast("更新しました");
   }else{
@@ -489,6 +518,7 @@ function startEdit(id){
   ctUnit = l.unit || UNITS[0];
   ctDateTouched = true;
   $("ctDate").value = l.date;
+  $("ctTime").value = l.time || "";
   $("ctCustomer").value = l.customer || "";
   ctPicked = l.customerCode ? { code:l.customerCode, name:l.customer } : null;
   $("ctSymbol").value = l.symbol || "";
@@ -548,8 +578,11 @@ function renderList(){
     m[l.date] = (m[l.date] || 0) + 1;
   });
 
+  const MAX_SHOW = 200;
+  const shown = logs.slice(0, MAX_SHOW);
+
   let lastDate = null;
-  logs.forEach(l => {
+  shown.forEach(l => {
     if(l.date !== lastDate){
       lastDate = l.date;
       const head = document.createElement("div");
@@ -761,21 +794,20 @@ if(footerActions){
 /* =========================================================
    オフライン保存の状態表示と Service Worker の登録
 ========================================================= */
+// 正常なときは何も表示しない。保存できていないときだけ、小さく注意を出す
 async function updateOfflineStatus(){
   const els = document.querySelectorAll(".ct-offline-status");
   if(els.length === 0) return;
 
-  let text;
-  if(location.protocol === "file:"){
-    text = "📁 ファイルを直接開いています（PCでの利用です。オフライン保存の設定は不要です）";
-  }else if(!("serviceWorker" in navigator) || !window.caches){
-    text = "⚠ この環境ではオフライン保存を使えません";
-  }else{
-    let ok = false;
-    try{ ok = !!(await caches.match("index.html")) || !!(await caches.match("./")); }catch(e){ ok = false; }
-    text = ok
-      ? "✅ オフライン保存済み（電波がなくても起動できます）"
-      : "⚠ オフライン保存が未完了です。電波のある場所で、このアプリをもう一度開いてください";
+  let text = "";
+  if(location.protocol !== "file:"){
+    if(!("serviceWorker" in navigator) || !window.caches){
+      text = "⚠ この環境ではオフライン保存を使えません";
+    }else{
+      let ok = false;
+      try{ ok = !!(await caches.match("index.html")) || !!(await caches.match("./")); }catch(e){ ok = false; }
+      if(!ok) text = "⚠ オフライン保存が未完了です。電波のある場所で、このアプリをもう一度開いてください";
+    }
   }
   els.forEach(el => { el.textContent = text; });
 }
@@ -811,6 +843,11 @@ if(!document.querySelector('link[rel="apple-touch-icon"]')){
 /* =========================================================
    ナビゲーション（ヘッダーに「容器」ボタンを追加）
 ========================================================= */
+const bcp = document.createElement("div");
+bcp.className = "ct-bcp";
+bcp.textContent = "BCP対応（オフライン使用可能）";
+document.querySelector("header").insertAdjacentElement("afterend", bcp);
+
 const navBtn = document.createElement("button");
 navBtn.className = "nav-btn";
 navBtn.id = "navContainerButton";
@@ -835,7 +872,6 @@ function renderContainer(){
   renderKana();
   renderFilter();
   renderList();
-  updateOfflineStatus();
 }
 
 function goToContainer(){
@@ -875,10 +911,17 @@ $("ctFilterSeg").addEventListener("click", e => {
 });
 
 $("ctDate").addEventListener("change", () => { ctDateTouched = true; });
+
+/* 検索・日付での絞り込み（過去の記録を後から探す） */
+$("ctSearch").addEventListener("input", renderList);
+$("ctFilterDate").addEventListener("change", renderList);
+$("ctFilterClear").addEventListener("click", () => {
+  $("ctSearch").value = "";
+  $("ctFilterDate").value = "";
+  renderList();
+});
 $("ctCapacity").addEventListener("input", renderAdj);
 $("ctSaveButton").addEventListener("click", saveFromForm);
 $("ctCancelEdit").addEventListener("click", cancelEdit);
-
-updateOfflineStatus();
 
 })();
