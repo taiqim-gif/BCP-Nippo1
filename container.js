@@ -83,10 +83,27 @@ let ctEditId = null;
 let ctAdding = false;       // 「この顧客に追加」「新しい記録として追加」で、続けて追加入力している状態
 let ctKana = null;
 let ctPicked = null;        // 一覧から選んだ客先 { code, name }
+const FS = {   // 顧客カードの文字サイズ（小・標準・大）。単位は画面上の文字の大きさ
+  s:{ name:18, sum:12, line:14, badge:12, btn:12, row:15, hint:11, swipe:13 },
+  m:{ name:20, sum:14, line:16, badge:14, btn:14, row:17, hint:13, swipe:15 },
+  l:{ name:24, sum:17, line:19, badge:17, btn:16, row:20, hint:15, swipe:18 }
+};
+let ctFs = "m";
+try{ const v = localStorage.getItem("ctFontSize"); if(FS[v]) ctFs = v; }catch(e){ /* 保存できない環境では標準 */ }
 const ctOpen = new Set();   // 「編集」で開いている顧客カード（日付|顧客名）
 let ctDateTouched = false;  // 日付を手で変えたか（変えていなければ開くたびに今日にする）
 
 const $ = id => document.getElementById(id);
+
+// 文字の幅の見積もり（em）：全角は1、半角カナは約0.55、半角は約0.62
+function emW(t){
+  return [...String(t)].reduce((w, ch) => {
+    const cc = ch.codePointAt(0);
+    return w + (cc >= 0xFF61 && cc <= 0xFF9F ? 0.55 : (cc <= 0x7F ? 0.62 : 1.05));
+  }, 0);
+}
+// 一覧と明細での表示だけ短くする（データはそのまま：1001 ｱｾﾁﾚﾝ）
+function shortGas(name){ return nfkc(name) === "アセチレン" ? "アセチ" : name; }
 
 function nowHM(){
   const d = new Date();
@@ -111,7 +128,8 @@ function ctSorted(logs){
 const style = document.createElement("style");
 style.textContent = `
   header{ gap:6px; }
-  header .nav-btn{ padding:8px 10px; font-size:13px; white-space:nowrap; flex:0 0 auto; }
+  header .nav-btn{ padding:8px 9px; font-size:12.5px; white-space:nowrap; flex:0 0 auto; }
+  .nav-btn.active-lav{ background:var(--lavender); color:var(--lavender-ink); border-color:var(--lavender-dark); }
   .ct-datebox{ display:flex; flex-direction:column; align-items:flex-start; gap:1px; min-width:0; flex:1 1 auto; }
   .ct-datebox #dateDisplay{ display:block; white-space:nowrap; line-height:1.25; }
   .ct-bcpsub{ font-size:10px; font-weight:400; color:var(--ink-soft); white-space:nowrap; line-height:1.2; }
@@ -137,7 +155,7 @@ style.textContent = `
   .ct-chip-row .chip{ padding:9px 14px; }
   .ct-chip-row .chip.on{ background:var(--butter); border-color:var(--butter-dark); color:var(--butter-ink); font-weight:700; }
 
-  .ct-badge{ display:inline-block; font-size:14px; font-weight:700; padding:2px 10px; border-radius:999px; margin-right:8px; }
+  .ct-badge{ display:inline-block; font-size:var(--fs-badge,14px); font-weight:700; padding:2px 10px; border-radius:999px; margin-right:8px; }
   .ct-badge.out{ background:var(--sky); color:var(--sky-ink); }
   .ct-badge.in{ background:var(--peach); color:var(--peach-ink); }
   .ct-badge.oth{ background:var(--lavender); color:var(--lavender-ink); }
@@ -166,15 +184,15 @@ style.textContent = `
   .ct-cust-right{ display:flex; align-items:center; gap:8px; flex:none; }
   .ct-add{
     border:1.5px solid var(--mint); background:#fff; color:var(--mint-ink); border-radius:999px;
-    padding:4px 11px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;
+    padding:4px 11px; font-size:var(--fs-btn,14px); font-weight:700; font-family:inherit; cursor:pointer;
   }
   .ct-chip-row .chip.gas{ border:none; font-weight:700; padding:10px 14px; }
   .ct-chip-row .chip.gas.on{ box-shadow:0 0 0 2px #fff, 0 0 0 4px var(--ink); }
 
   .ct-cust{ background:var(--card); border:1px solid var(--line); border-left:5px solid var(--mint); border-radius:var(--radius); padding:12px 14px 4px; margin-bottom:10px; }
   .ct-cust-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:4px; }
-  .ct-cust-name{ font-size:20px; font-weight:700; min-width:0; overflow-wrap:anywhere; }
-  .ct-cust-sum{ font-size:14px; color:var(--ink-soft); white-space:nowrap; }
+  .ct-cust-name{ font-size:var(--fs-name,20px); font-weight:700; min-width:0; overflow-wrap:anywhere; }
+  .ct-cust-sum{ font-size:var(--fs-sum,14px); color:var(--ink-soft); white-space:nowrap; }
   .ct-row{ display:flex; align-items:center; gap:8px; padding:9px 0; border-top:1px solid var(--line); }
   .ct-row-main{ flex:1; min-width:0; }
   .ct-row-line1{ font-size:14px; font-weight:700; }
@@ -185,19 +203,19 @@ style.textContent = `
   .ct-dph{ position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:15px; color:var(--ink-soft); pointer-events:none; }
   #containerScreen input[type=date].empty{ color:transparent; }
 
-  .ct-sum-line{ display:flex; align-items:center; flex-wrap:wrap; gap:2px 12px; font-size:16px; padding:3px 0; }
+  .ct-sum-line{ display:grid; grid-template-columns:var(--sumw, auto) minmax(0,1fr); column-gap:10px; align-items:start; font-size:var(--fs-line,16px); padding:3px 0; }
+  .ct-sum-gases{ display:flex; flex-wrap:wrap; gap:2px 12px; min-width:0; }
   .ct-sum-line .ct-badge{ margin-right:0; }
   .ct-sum-gas{ white-space:nowrap; }
   .ct-actions{ display:flex; justify-content:flex-end; gap:8px; padding:8px 0 10px; margin-top:6px; border-top:1px solid var(--line); }
   .ct-tog{
     border:1.5px solid var(--lavender-dark); background:#fff; color:var(--lavender-ink); border-radius:999px;
-    padding:4px 14px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;
+    padding:4px 14px; font-size:var(--fs-btn,14px); font-weight:700; font-family:inherit; cursor:pointer;
   }
   .ct-tog.open{ background:var(--lavender); }
 
   .ct-inwrap{ position:relative; }
   .ct-inwrap > label.ct-inlab{ position:absolute; left:12px; top:50%; transform:translateY(-50%); margin:0; font-size:11px; color:var(--ink-soft); white-space:nowrap; pointer-events:none; z-index:1; }
-  #vehicleTimeText{ margin-left:auto; }
   .ct-datefield{ position:relative; display:flex; align-items:center; gap:10px; min-width:12.5em; padding:11px 12px; border:1.5px solid var(--line); border-radius:10px; background:#FFFDF9; }
   .ct-datefield .ct-inlab{ font-size:11px; color:var(--ink-soft); flex:none; }
   .ct-datefield .ct-datetext{ font-size:15px; white-space:nowrap; }
@@ -210,18 +228,29 @@ style.textContent = `
 
   .ct-swrap{ position:relative; overflow:hidden; border-top:1px solid var(--line); }
   .ct-swrap > .ct-row{ border-top:0; position:relative; background:var(--card); touch-action:pan-y; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
-  .ct-swbg{ position:absolute; inset:0; display:flex; font-size:15px; font-weight:700; }
+  .ct-swbg{ position:absolute; inset:0; display:flex; font-size:var(--fs-swipe,15px); font-weight:700; }
   .ct-sw-edit, .ct-sw-del{ flex:1; display:flex; align-items:center; padding:0 18px; }
   .ct-sw-edit{ background:var(--sky); color:var(--sky-ink); justify-content:flex-start; }
   .ct-sw-del{ background:var(--pink); color:var(--pink-ink); justify-content:flex-end; }
-  .ct-swipe-hint{ font-size:13px; color:var(--ink-soft); text-align:center; padding:4px 0 6px; }
+  .ct-swipe-hint{ font-size:var(--fs-hint,13px); color:var(--ink-soft); text-align:center; padding:4px 0 6px; }
   .ct-sw-edit{ background:var(--mint); color:var(--mint-ink); }
 
-  .ct-swrap > .ct-row.ct-drow{ display:grid; column-gap:10px; align-items:center; font-size:15px; padding:9px 0 9px 1em; }
+  .ct-swrap > .ct-row.ct-drow{ display:grid; column-gap:10px; align-items:center; font-size:var(--fs-row,17px); padding:9px 0; }
   .ct-d1 .ct-badge{ margin-right:0; }
   .ct-d2{ font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight:700; white-space:nowrap; }
   .ct-d3{ min-width:0; overflow-wrap:anywhere; }
   .ct-d4{ text-align:right; white-space:nowrap; }
+
+  .ct-fs{ display:inline-flex; gap:4px; background:#F2EEE4; border-radius:999px; padding:3px; }
+  .ct-fs button{ border:none; background:transparent; padding:4px 11px; border-radius:999px; font-family:inherit; font-size:12px; font-weight:700; color:var(--ink-soft); cursor:pointer; }
+  .ct-fs button.on{ background:#fff; color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+  .ct-sent{ font-size:.7em; font-weight:400; color:var(--ink-soft); border:1px solid var(--line); border-radius:4px; padding:0 3px; margin-left:6px; white-space:nowrap; }
+
+  #reportScreen .footer-actions{ display:none; }
+  .dt-title{ font-size:15px; font-weight:700; margin:0 0 8px; }
+  .dt-state{ font-size:12.5px; color:var(--ink-soft); margin:0 2px 12px; line-height:1.5; }
+  .dt-state.warn{ color:var(--pink-ink); font-weight:700; }
+  .dt-desc{ font-size:12px; color:var(--ink-soft); margin:4px 2px 14px; line-height:1.55; }
 
   .ct-dhead{ padding:9px 0 3px; border-top:1px solid var(--line); }
   .ct-dhead .ct-badge{ margin-right:0; }
@@ -328,7 +357,7 @@ section.innerHTML = `
     <button class="btn btn-outline-mint" id="ctCancelEdit" style="display:none;margin-top:8px;">更新をやめる</button>
   </div>
 
-  <h2 class="h2-flex"><span>容器ログ（<span id="ctCount">0</span>本）</span></h2>
+  <h2 class="h2-flex"><span>容器ログ（<span id="ctCount">0</span>本）</span><span class="ct-fs" id="ctFsSeg"></span></h2>
   <div class="ct-seg" id="ctFilterSeg" style="margin-bottom:10px;"></div>
   <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;">
     <div class="ct-combo" id="ctSearchCombo" style="flex:2;min-width:0;">
@@ -337,7 +366,7 @@ section.innerHTML = `
       <div class="ct-combo-list" id="ctSearchList" hidden></div>
     </div>
     <div class="ct-combo" id="ctDateCombo" style="flex:1.5;min-width:0;">
-      <input type="text" id="ctFilterDate" placeholder="入力しない" aria-label="日付検索" readonly>
+      <input type="text" id="ctFilterDate" placeholder="日付検索" aria-label="日付検索" readonly>
       <button type="button" class="ct-combo-btn" id="ctDateBtn" aria-label="日付の一覧を開く">▼</button>
       <div class="ct-combo-list" id="ctDateList" hidden></div>
     </div>
@@ -345,11 +374,6 @@ section.innerHTML = `
   <div class="ct-filter-info" id="ctFilterInfo"></div>
   <div id="ctList"></div>
 
-  <div class="footer-actions">
-    <button class="btn btn-outline-mint" id="ctCsvButton">CSVで書き出す</button>
-    <button class="btn btn-outline-mint" id="ctMailButton">容器ログだけメール送信</button>
-    <button class="btn btn-outline-pink" id="ctClearButton">容器ログをすべて削除</button>
-  </div>
   <div class="ct-status ct-offline-status"></div>
 `;
 document.querySelector("main").appendChild(section);
@@ -779,6 +803,7 @@ function saveFromForm(){
     const log = ctLogs.find(x => x.id === targetId);
     if(log){
       Object.assign(log, f, { customerCode: code, customerKana: kana });
+      delete log.sentAt;                 // 直した記録は、また未送信に戻す
       const t = $("ctTime").value;
       if(t) log.time = t;
     }
@@ -891,9 +916,26 @@ function cancelEdit(){
 /* =========================================================
    一覧
 ========================================================= */
+function applyFs(){
+  const list = $("ctList"), f = FS[ctFs];
+  [["name","--fs-name"],["sum","--fs-sum"],["line","--fs-line"],["badge","--fs-badge"],["btn","--fs-btn"],["row","--fs-row"],["hint","--fs-hint"],["swipe","--fs-swipe"]]
+    .forEach(([k, v]) => list.style.setProperty(v, f[k] + "px"));
+  const seg = $("ctFsSeg");
+  seg.innerHTML = "";
+  [["s","小"],["m","標準"],["l","大"]].forEach(([k, label]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.setAttribute("data-fs", k);
+    b.textContent = label;
+    b.className = k === ctFs ? "on" : "";
+    seg.appendChild(b);
+  });
+}
+
 function renderList(){
   const list = $("ctList");
   list.innerHTML = "";
+  applyFs();
   renderCustList();
   updateDatePh();
 
@@ -981,14 +1023,16 @@ function renderList(){
       });
       const order = sc => sc === 2 ? 0 : (sc === 3 ? 1 : 2 + sc);
 
+      const badgeW = Math.ceil(Math.max(...Object.keys(byStatus).map(sc => emW(statusName(Number(sc)))), 2) * FS[ctFs].badge + 24);
+      card.style.setProperty("--sumw", badgeW + "px");
       let html = `<div class="ct-cust-head"><span class="ct-cust-name">${escapeHtml(c.name || "（顧客名なし）")}</span>` +
                  `<span class="ct-cust-sum">合計 ${rows.length}本</span></div>`;
       Object.keys(byStatus).map(Number).sort((x, y) => order(x) - order(y)).forEach(sc => {
         const cls = sc === 2 ? "out" : (sc === 3 ? "in" : "oth");
         const parts = byStatus[sc]
           .sort((p, q) => p.ord - q.ord || p.name.localeCompare(q.name, "ja") || p.unit.localeCompare(q.unit))
-          .map(g => `<span class="ct-sum-gas">${escapeHtml(g.name)} ${g.n}本${g.hasQty ? "(" + round1(g.sum) + ")" : ""}</span>`).join("");
-        html += `<div class="ct-sum-line"><span class="ct-badge ${cls}">${escapeHtml(statusName(sc))}</span>${parts}</div>`;
+          .map(g => `<span class="ct-sum-gas">${escapeHtml(shortGas(g.name))} ${g.n}本${g.hasQty ? "(" + round1(g.sum) + ")" : ""}</span>`).join("");
+        html += `<div class="ct-sum-line"><span class="ct-badge ${cls}">${escapeHtml(statusName(sc))}</span><span class="ct-sum-gases">${parts}</span></div>`;
       });
 
       // 「明細」を押したときだけ、1本ずつ表示する（行を右へスワイプ＝変更、左へスワイプ＝削除）
@@ -1002,14 +1046,10 @@ function renderList(){
           String(p.gas || "").localeCompare(String(q.gas || ""), "ja") ||
           String(p.symbol).localeCompare(String(q.symbol)) || numCmp(p.number, q.number));
 
-        // 列の幅をそろえる（記号番号と容量は固定幅、ガス種は残り）
-        const emW = t => [...String(t)].reduce((w, ch) => {
-          const cc = ch.codePointAt(0);
-          return w + (cc >= 0xFF61 && cc <= 0xFF9F ? 0.55 : (cc <= 0x7F ? 0.62 : 1.05));
-        }, 0);
-        const capStr = l => noCap(l) ? "" : `${l.capacity}${l.unit || ""}`;
+        // 列の幅をそろえる（記号番号と容量は固定幅、ガス種は残り）。容量は数字だけ（単位は出さない）
+        const capStr = l => noCap(l) ? "" : String(l.capacity);
         const c2 = Math.max(...detail.map(l => String(l.symbol).length + 1 + String(l.number).length));
-        const c4 = Math.ceil(Math.max(...detail.map(l => emW(capStr(l)))) * 15 + 4);
+        const c4 = Math.ceil(Math.max(...detail.map(l => emW(capStr(l)))) * FS[ctFs].row + 4);
         const cols = `${c2}ch minmax(0,1fr) ${c4}px`;
 
         html += `<div class="ct-swipe-hint">← 削除　　変更 →</div>`;
@@ -1025,7 +1065,7 @@ function renderList(){
               <div class="ct-swbg"><span class="ct-sw-edit">変更</span><span class="ct-sw-del">削除</span></div>
               <div class="ct-row ct-drow" style="grid-template-columns:${cols}">
                 <span class="ct-d2">${escapeHtml(l.symbol)}-${escapeHtml(l.number)}</span>
-                <span class="ct-d3">${escapeHtml(l.gas || "")}</span>
+                <span class="ct-d3">${escapeHtml(shortGas(l.gas || ""))}${l.sentAt ? '<span class="ct-sent">済</span>' : ""}</span>
                 <span class="ct-d4">${escapeHtml(capStr(l))}</span>
               </div>
             </div>`;
@@ -1131,10 +1171,10 @@ async function saveFile(name, content, mime, withBom){
     const file = new File([blob], name, { type: mime });
     if(navigator.canShare && navigator.canShare({ files:[file] })){
       await navigator.share({ files:[file], title:name });
-      return;
+      return "shared";
     }
   }catch(err){
-    if(err && err.name === "AbortError") return;   // 共有画面を閉じただけ
+    if(err && err.name === "AbortError") return false;   // 共有画面を閉じただけ
   }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1144,44 +1184,43 @@ async function saveFile(name, content, mime, withBom){
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
+  return "downloaded";
 }
 
-$("ctCsvButton").addEventListener("click", () => {
-  if(ctLogs.length === 0){ showToast("容器ログがありません"); return; }
-  saveFile(`容器ログ_${getToday().replace(/-/g,"")}.csv`, csvText(ctLogs), "text/csv", true);
-});
-
-$("ctMailButton").addEventListener("click", () => {
-  if(ctLogs.length === 0){ showToast("容器ログがありません"); return; }
-  const subject = `容器ログ ${getToday()}`;
-  const body = "容器ログ\n\n" + csvText(ctLogs).replace(/\r\n/g, "\n");
-  const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  if(mailto.length > MAILTO_LIMIT){
-    copyToClipboard(body);
-    showToast("本文が長いためコピーしました。メールに貼り付けてください");
-    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent("（本文が長いため、コピーしました。ここに貼り付けてください）")}`;
-    return;
+/* 容器ログ：未送信の分をCSVにして、共有画面からメールで送る（添付）。共有画面が使えない環境では、保存してメールの下書きを開く */
+async function mailContainerCsv(){
+  const logs = ctLogs.filter(l => !l.sentAt);
+  if(logs.length === 0){ showToast("未送信の容器ログはありません"); return; }
+  const name = `容器ログ_${getToday().replace(/-/g,"")}.csv`;
+  const r = await saveFile(name, csvText(logs), "text/csv", true);
+  if(r === "shared"){
+    showToast("送れたら「送信済みにする」を押してください");
+  }else if(r === "downloaded"){
+    const subject = `容器ログ ${getToday()}`;
+    const body = "容器ログのCSVを添付してください（ダウンロードに保存しました）";
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
-  window.location.href = mailto;
-});
+}
 
-$("ctClearButton").addEventListener("click", () => {
-  if(ctLogs.length === 0){ showToast("容器ログがありません"); return; }
-  if(!window.confirm(`容器ログ ${ctLogs.length}件をすべて削除します。\nメール送信・CSV書き出しは済んでいますか？\n\nこの操作は元に戻せません。\n\n削除しますか？`)) return;
-  ctLogs = [];
-  ctSave();
-  cancelEdit();
-  renderList();
-  showToast("容器ログを削除しました");
-});
-
-/* 日報メールの末尾に「容器ログ」を追加する */
+/* 日報メール：送信済みにした記録は送らない。末尾に、未送信の「容器ログ」を付ける */
 const origBuildReportMail = window.buildReportMail;
 if(typeof origBuildReportMail === "function"){
   window.buildReportMail = function(){
-    const r = origBuildReportMail();
-    if(ctLogs.length > 0){
-      r.body += "【容器ログ】\n" + CSV_HEAD.join(",") + "\n" + csvLines(ctLogs).join("\n") + "\n";
+    const m0 = meetingLogs, v0 = dailyVehicleInfo;
+    let r;
+    try{
+      meetingLogs = m0.filter(l => !l.sentAt);
+      const vf = {};
+      Object.keys(v0).forEach(k => { if(!(v0[k] && v0[k].sentAt)) vf[k] = v0[k]; });
+      dailyVehicleInfo = vf;
+      r = origBuildReportMail();
+    }finally{
+      meetingLogs = m0;
+      dailyVehicleInfo = v0;
+    }
+    const unsent = ctLogs.filter(l => !l.sentAt);
+    if(unsent.length > 0){
+      r.body += "【容器ログ】\n" + CSV_HEAD.join(",") + "\n" + csvLines(unsent).join("\n") + "\n";
     }
     return r;
   };
@@ -1215,14 +1254,15 @@ window.deleteData = function(keepTodos){
 /* =========================================================
    バックアップ（ホーム画面の下部にボタンを追加）
 ========================================================= */
-function backupExport(){
+async function backupExport(){
   const data = {};
   BACKUP_KEYS.forEach(k => {
     const v = localStorage.getItem(k);
     if(v !== null) data[k] = v;
   });
   const obj = { app:"eigyo-nippo", version:1, exportedAt:new Date().toISOString(), data };
-  saveFile(`営業日報バックアップ_${getToday().replace(/-/g,"")}.json`, JSON.stringify(obj), "application/json", false);
+  const r = await saveFile(`営業日報バックアップ_${getToday().replace(/-/g,"")}.json`, JSON.stringify(obj), "application/json", false);
+  if(r){ try{ localStorage.setItem("lastBackupAt", new Date().toISOString()); }catch(e){} renderData(); }
 }
 
 const backupFile = document.createElement("input");
@@ -1256,22 +1296,205 @@ backupFile.addEventListener("change", async e => {
   location.reload();
 });
 
-const footerActions = document.querySelector("#reportScreen .footer-actions");
-if(footerActions){
-  const row = document.createElement("div");
-  row.className = "row-gap delete-row";
-  row.innerHTML =
-    '<button class="btn btn-outline-mint" id="backupExportButton">バックアップを保存</button>' +
-    '<button class="btn btn-outline-mint" id="backupImportButton">バックアップから戻す</button>';
-  footerActions.insertBefore(row, footerActions.querySelector(".delete-row"));
+/* =========================================================
+   「データ」画面：送る・保存・消す をここに集める
+========================================================= */
+const dataSection = document.createElement("section");
+dataSection.id = "dataScreen";
+dataSection.className = "screen";
+dataSection.innerHTML = `
+  <h2>データ</h2>
 
+  <div class="card">
+    <div class="dt-title">送る</div>
+    <div class="dt-state" id="dtUnsent"></div>
+    <button class="btn btn-outline-mint" id="dtMailReport">日報をメール送信</button>
+    <div class="dt-desc" id="dtMailReportDesc"></div>
+    <button class="btn btn-outline-mint" id="dtMailCsv">容器ログをメールで送る（CSV添付）</button>
+    <div class="dt-desc" id="dtMailCsvDesc"></div>
+    <button class="btn btn-outline-mint" id="dtCsv">CSVで書き出す（全件）</button>
+    <div class="dt-desc" id="dtCsvDesc"></div>
+    <button class="btn btn-mint" id="dtMarkSent">送信済みにする</button>
+    <div class="dt-desc" id="dtMarkDesc"></div>
+  </div>
+
+  <div class="card">
+    <div class="dt-title">保存</div>
+    <div class="dt-state" id="dtLastBackup"></div>
+    <button class="btn btn-outline-mint" id="dtBackup">バックアップを保存</button>
+    <div class="dt-desc">日報・車両・TODO・容器ログを、ファイルに保存します（客先名リストは含みません）。端末をなくしたときなどに戻せます。</div>
+    <button class="btn btn-outline-mint" id="dtRestore">バックアップから戻す</button>
+    <div class="dt-desc">保存したファイルを選ぶと、今のデータを置き換えます。</div>
+  </div>
+
+  <div class="card" id="dtMaster">
+    <div class="dt-title">客先名リスト</div>
+    <div class="dt-desc" style="margin-top:0;">ホームの訪問先と、容器の顧客名を選ぶためのリストです。取り込み・更新・削除ができます。</div>
+  </div>
+
+  <div class="card">
+    <div class="dt-title">消す</div>
+    <div class="dt-desc" style="margin-top:0;">消したデータは元に戻せません。先に「バックアップを保存」をおすすめします。</div>
+    <button class="btn btn-outline-pink" id="dtDelSent">送信済みの記録だけ削除</button>
+    <div class="dt-desc" id="dtDelSentDesc"></div>
+    <button class="btn btn-outline-pink" id="dtDelReport">日報・車両の記録を削除</button>
+    <div class="dt-desc" id="dtDelReportDesc"></div>
+    <button class="btn btn-outline-pink" id="dtDelContainer">容器ログを削除</button>
+    <div class="dt-desc" id="dtDelContainerDesc"></div>
+    <button class="btn btn-outline-pink" id="dtDelTodo">TODOを削除</button>
+    <div class="dt-desc" id="dtDelTodoDesc"></div>
+  </div>
+`;
+document.querySelector("main").appendChild(dataSection);
+
+// ホームにあった客先名リストの操作（取り込み・更新・削除）を、この画面へ移す
+(function moveMasterUI(){
+  const host = $("dtMaster");
+  const bar = document.querySelector("#reportScreen .master-bar");
+  const keyBox = $("masterKeyBox");
+  if(bar) host.appendChild(bar);
+  if(keyBox) host.appendChild(keyBox);
+})();
+
+// 「送信済み」の印と件数
+function vehDays(){
+  if(typeof vehicleHasData !== "function") return [];
+  return Object.keys(dailyVehicleInfo).filter(d => vehicleHasData(dailyVehicleInfo[d]));
+}
+function vehSendable(d){            // 帰社まで終わった日、または過去の日だけを、送信済みにできる
+  const v = dailyVehicleInfo[d];
+  return !!(v && ((v.return && v.return.time) || d < getToday()));
+}
+function dataCounts(){
+  const days = vehDays();
+  return {
+    visits: meetingLogs.length,
+    visitsUnsent: meetingLogs.filter(l => !l.sentAt).length,
+    vehDays: days.length,
+    vehUnsent: days.filter(d => !dailyVehicleInfo[d].sentAt).length,
+    vehMarkable: days.filter(d => !dailyVehicleInfo[d].sentAt && vehSendable(d)).length,
+    ct: ctLogs.length,
+    ctUnsent: ctLogs.filter(l => !l.sentAt).length,
+    todoPending: todoItems.filter(t => !t.done).length,
+    todoDone: todoItems.filter(t => t.done).length
+  };
+}
+function persistReport(){
+  if(typeof saveLogs === "function") saveLogs(); else localStorage.setItem("meetingLogs", JSON.stringify(meetingLogs));
+  if(typeof saveVehicle === "function") saveVehicle(); else localStorage.setItem("dailyVehicleInfo", JSON.stringify(dailyVehicleInfo));
+}
+
+function renderData(){
+  const c = dataCounts();
+  $("dtUnsent").textContent = `未送信：訪問 ${c.visitsUnsent}件・車両 ${c.vehUnsent}日・容器 ${c.ctUnsent}本`;
+  $("dtMailReportDesc").textContent = "未送信の日報・車両・容器ログと、TODOリストを、メールで送ります。";
+  $("dtMailCsvDesc").textContent = `未送信の容器ログ（${c.ctUnsent}本）を、CSVにして、共有画面からメールで送ります。`;
+  $("dtCsvDesc").textContent = `容器ログの全件（${c.ct}本）を、ExcelのCSVにして保存します。メールには付けません。`;
+  $("dtMarkDesc").textContent = "送ったあとに押します。次回のメールから、この記録を送らなくなります。";
+  const last = localStorage.getItem("lastBackupAt");
+  const el = $("dtLastBackup");
+  if(last){
+    const d = new Date(last);
+    const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    el.textContent = `最後のバックアップ：${fmtDateWeek(ds)} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    el.className = "dt-state";
+  }else{
+    el.textContent = "まだバックアップしていません";
+    el.className = "dt-state warn";
+  }
+  const sentTotal = (c.visits - c.visitsUnsent) + (c.vehDays - c.vehUnsent) + (c.ct - c.ctUnsent);
+  $("dtDelSentDesc").textContent = `送信済み：訪問 ${c.visits - c.visitsUnsent}件・車両 ${c.vehDays - c.vehUnsent}日・容器 ${c.ct - c.ctUnsent}本（未送信は残します）`;
+  $("dtDelSent").disabled = sentTotal === 0;
+  $("dtDelReportDesc").textContent = `訪問 ${c.visits}件・車両 ${c.vehDays}日（うち未送信：訪問 ${c.visitsUnsent}件・車両 ${c.vehUnsent}日）`;
+  $("dtDelContainerDesc").textContent = `容器ログ ${c.ct}本（うち未送信 ${c.ctUnsent}本）`;
+  $("dtDelTodoDesc").textContent = `未完了 ${c.todoPending}件・完了 ${c.todoDone}件`;
+}
+
+function markAllSent(){
+  const c = dataCounts();
+  if(c.visitsUnsent + c.vehMarkable + c.ctUnsent === 0){ showToast("未送信の記録はありません"); return; }
+  if(!window.confirm(`未送信の 訪問 ${c.visitsUnsent}件・車両 ${c.vehMarkable}日・容器 ${c.ctUnsent}本 を、送信済みにします。\n次回のメールからは、この分を送りません。\n\nよろしいですか？`)) return;
+  const now = new Date().toISOString();
+  meetingLogs.forEach(l => { if(!l.sentAt) l.sentAt = now; });
+  vehDays().forEach(d => { if(!dailyVehicleInfo[d].sentAt && vehSendable(d)) dailyVehicleInfo[d].sentAt = now; });
+  ctLogs.forEach(l => { if(!l.sentAt) l.sentAt = now; });
+  persistReport();
+  ctSave();
+  renderList();
+  renderData();
+  showToast("送信済みにしました");
+}
+
+function afterDelete(msg){
+  cancelEdit();
+  renderList();
+  renderData();
+  showToast(msg);
+}
+
+function delSentOnly(){
+  const c = dataCounts();
+  const n = (c.visits - c.visitsUnsent) + (c.vehDays - c.vehUnsent) + (c.ct - c.ctUnsent);
+  if(n === 0){ showToast("送信済みの記録はありません"); return; }
+  if(!window.confirm(`送信済みの 訪問 ${c.visits - c.visitsUnsent}件・車両 ${c.vehDays - c.vehUnsent}日・容器 ${c.ct - c.ctUnsent}本 を削除します。\n未送信の記録は残ります。\n\nこの操作は元に戻せません。\n\n削除しますか？`)) return;
+  meetingLogs = meetingLogs.filter(l => !l.sentAt);
+  Object.keys(dailyVehicleInfo).forEach(d => { if(dailyVehicleInfo[d] && dailyVehicleInfo[d].sentAt) delete dailyVehicleInfo[d]; });
+  ctLogs = ctLogs.filter(l => !l.sentAt);
+  persistReport();
+  ctSave();
+  afterDelete("送信済みの記録を削除しました");
+}
+
+function delReportVehicle(){
+  const c = dataCounts();
+  if(c.visits + c.vehDays === 0){ showToast("日報・車両の記録はありません"); return; }
+  if(!window.confirm(`訪問 ${c.visits}件・車両 ${c.vehDays}日 を削除します。\n（うち未送信：訪問 ${c.visitsUnsent}件・車両 ${c.vehUnsent}日）\n\nこの操作は元に戻せません。\n\n削除しますか？`)) return;
+  localStorage.removeItem("meetingLogs");
+  localStorage.removeItem("dailyVehicleInfo");
+  meetingLogs = [];
+  dailyVehicleInfo = {};
+  currentVisit = null;
+  afterDelete("日報・車両の記録を削除しました");
+}
+
+function delContainer(){
+  const c = dataCounts();
+  if(c.ct === 0){ showToast("容器ログはありません"); return; }
+  if(!window.confirm(`容器ログ ${c.ct}本 を削除します。\n（うち未送信 ${c.ctUnsent}本）\n\nこの操作は元に戻せません。\n\n削除しますか？`)) return;
+  ctLogs = [];
+  ctSave();
+  afterDelete("容器ログを削除しました");
+}
+
+function delTodo(){
+  const c = dataCounts();
+  if(c.todoPending + c.todoDone === 0){ showToast("TODOはありません"); return; }
+  if(!window.confirm(`TODO 未完了 ${c.todoPending}件・完了 ${c.todoDone}件 を削除します。\n\nこの操作は元に戻せません。\n\n削除しますか？`)) return;
+  localStorage.removeItem("todoItems");
+  todoItems = [];
+  afterDelete("TODOを削除しました");
+}
+
+$("dtMailReport").addEventListener("click", () => { const b = $("mailButton"); if(b) b.click(); });
+$("dtMailCsv").addEventListener("click", mailContainerCsv);
+$("dtCsv").addEventListener("click", async () => {
+  if(ctLogs.length === 0){ showToast("容器ログがありません"); return; }
+  await saveFile(`容器ログ全件_${getToday().replace(/-/g,"")}.csv`, csvText(ctLogs), "text/csv", true);
+});
+$("dtMarkSent").addEventListener("click", markAllSent);
+$("dtBackup").addEventListener("click", backupExport);
+$("dtRestore").addEventListener("click", () => backupFile.click());
+$("dtDelSent").addEventListener("click", delSentOnly);
+$("dtDelReport").addEventListener("click", delReportVehicle);
+$("dtDelContainer").addEventListener("click", delContainer);
+$("dtDelTodo").addEventListener("click", delTodo);
+
+// オフライン保存の注意（保存できていないときだけ出る）は、ホームの下に置く
+(function(){
   const status = document.createElement("div");
   status.className = "ct-status ct-offline-status";
-  footerActions.appendChild(status);
-
-  $("backupExportButton").addEventListener("click", backupExport);
-  $("backupImportButton").addEventListener("click", () => backupFile.click());
-}
+  $("reportScreen").appendChild(status);
+})();
 
 /* =========================================================
    オフライン保存の状態表示と Service Worker の登録
@@ -1351,15 +1574,23 @@ navBtn.id = "navContainerButton";
 navBtn.textContent = "容器";
 $("navVehicleButton").insertAdjacentElement("afterend", navBtn);
 
+const navData = document.createElement("button");
+navData.className = "nav-btn";
+navData.id = "navDataButton";
+navData.textContent = "データ";
+navBtn.insertAdjacentElement("afterend", navData);
+
 const origUpdateNav = window.updateNav;
 window.updateNav = function(name){
   origUpdateNav(name);
   const isContainer = (name === "container");
-  if(isContainer){
+  const isData = (name === "data");
+  if(isContainer || isData){
     $("navHomeButton").classList.remove("active-mint");
     $("navVehicleButton").classList.remove("active-peach");
   }
   navBtn.classList.toggle("active-sky", isContainer);
+  navData.classList.toggle("active-lav", isData);
 };
 
 function renderContainer(){
@@ -1369,6 +1600,13 @@ function renderContainer(){
   renderKana();
   renderFilter();
   renderList();
+}
+
+function goToData(){
+  vehicleViewMode = null;
+  renderData();
+  showScreen("data");
+  updateNav("data");
 }
 
 function goToContainer(){
@@ -1381,7 +1619,7 @@ function goToContainer(){
 /* 入力欄の上のラベルをなくし、欄の中に表示する
    ・文字入力の欄：薄い文字（入力を始めると消える）
    ・日付・時刻・走行距離・敬称（最初から値が入る欄）：欄の左端に、消えない小さな文字 */
-const INLINE_IDS = new Set(["vehicleDistance", "meetingPersonTitle"]);
+const INLINE_IDS = new Set(["meetingPersonTitle"]);
 
 function makeInline(inp, lb, text){
   const wrap = document.createElement("div");
@@ -1400,6 +1638,7 @@ function convertHostLabels(){
     if(lb.closest("#containerScreen")) return;
     const inp = document.getElementById(lb.getAttribute("for"));
     if(!inp) return;
+    if(inp.id === "vehicleDistance") return;     // 走行距離は、欄の上の見出し（ラベル）のまま
     const text = lb.textContent.trim();
     const type = (inp.type || "").toLowerCase();
     if(INLINE_IDS.has(inp.id) || type === "date" || type === "time"){
@@ -1413,10 +1652,24 @@ function convertHostLabels(){
 }
 convertHostLabels();
 
+// ダイヤルの案内文
+document.querySelectorAll(".dial-hint").forEach(el => {
+  if(/中心/.test(el.textContent)){
+    el.textContent = "中心  細かい　外側 大きい";
+    el.style.whiteSpace = "pre-wrap";
+  }
+});
+
 navBtn.addEventListener("click", () => {
   if(!confirmLeaveVisitIfNeeded()) return;
   currentVisit = null;
   goToContainer();
+});
+
+navData.addEventListener("click", () => {
+  if(!confirmLeaveVisitIfNeeded()) return;
+  currentVisit = null;
+  goToData();
 });
 
 /* ---------- 入力部品のイベント ---------- */
@@ -1444,6 +1697,13 @@ $("ctFilterSeg").addEventListener("click", e => {
 
 $("ctDate").addEventListener("change", () => { ctDateTouched = true; syncDateText(); });
 $("ctDate").addEventListener("input", syncDateText);
+$("ctFsSeg").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if(!b) return;
+  ctFs = b.getAttribute("data-fs");
+  try{ localStorage.setItem("ctFontSize", ctFs); }catch(err){ /* 保存できなくても、この画面では切り替わる */ }
+  renderList();
+});
 $("ctGasChips").addEventListener("scroll", updateGasShadows, { passive:true });
 window.addEventListener("resize", updateGasShadows);
 syncDateText();
