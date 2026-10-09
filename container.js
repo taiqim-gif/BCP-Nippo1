@@ -221,9 +221,25 @@ style.textContent = `
   .ct-d3{ min-width:0; overflow-wrap:anywhere; }
   .ct-d4{ text-align:right; white-space:nowrap; }
 
+  .ct-dhead{ padding:9px 0 3px; border-top:1px solid var(--line); }
+  .ct-dhead .ct-badge{ margin-right:0; }
+  .ct-dhead + .ct-swrap{ border-top:0; }
+
+  .ct-combo{ position:relative; }
+  .ct-combo > input{ width:100%; padding-right:36px; }
+  .ct-combo-btn{ position:absolute; right:4px; top:50%; transform:translateY(-50%); border:none; background:transparent; color:var(--ink-soft); font-size:12px; padding:8px 9px; cursor:pointer; }
+  .ct-combo-list{ position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:30; max-height:240px; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#fff; border:1.5px solid var(--line); border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,0.12); }
+  .ct-combo-list[hidden]{ display:none; }
+  .ct-combo-item{ display:block; width:100%; text-align:left; padding:11px 12px; border:none; border-bottom:1px solid var(--line); background:#fff; font-family:inherit; font-size:14px; color:var(--ink); cursor:pointer; }
+  .ct-combo-item:last-child{ border-bottom:none; }
+  .ct-combo-item.none{ background:#FAF6EF; color:var(--ink-soft); font-weight:700; }
+  .ct-combo-item:active{ background:var(--butter); }
+  .ct-filter-info{ font-size:11.5px; color:var(--ink-soft); margin:2px 2px 10px; }
+  .ct-filter-info:empty{ display:none; }
+
   .ct-gas-area{ align-items:center; }
   .ct-gasbar-wrap{ position:relative; flex:1; min-width:0; }
-  .ct-gasbar{ position:relative; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:4px 2px; align-items:center; }
+  .ct-gasbar{ position:relative; display:grid; grid-auto-flow:row; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:4px 2px; }
   .ct-gasbar::-webkit-scrollbar{ display:none; }
   .ct-gasbar .chip{ flex:none; white-space:nowrap; }
   .ct-gasbar-wrap::before, .ct-gasbar-wrap::after{ content:""; position:absolute; top:0; bottom:0; width:20px; pointer-events:none; z-index:2; opacity:0; transition:opacity .15s; }
@@ -312,15 +328,19 @@ section.innerHTML = `
 
   <h2 class="h2-flex"><span>容器ログ（<span id="ctCount">0</span>本）</span></h2>
   <div class="ct-seg" id="ctFilterSeg" style="margin-bottom:10px;"></div>
-  <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-    <input type="text" id="ctSearch" list="ctCustList" placeholder="客名検索" autocomplete="off" style="flex:2;min-width:0;">
-    <datalist id="ctCustList"></datalist>
-    <div class="ct-datewrap" style="flex:1.3;min-width:0;">
-      <input type="date" id="ctFilterDate" class="empty" aria-label="日付検索">
-      <span class="ct-dph" id="ctDatePh">日付検索</span>
+  <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;">
+    <div class="ct-combo" id="ctSearchCombo" style="flex:2;min-width:0;">
+      <input type="text" id="ctSearch" placeholder="客名検索" aria-label="客名検索" autocomplete="off">
+      <button type="button" class="ct-combo-btn" id="ctSearchBtn" aria-label="顧客の一覧を開く">▼</button>
+      <div class="ct-combo-list" id="ctSearchList" hidden></div>
     </div>
-    <button type="button" class="btn-mini" id="ctFilterClear">解除</button>
+    <div class="ct-combo" id="ctDateCombo" style="flex:1.5;min-width:0;">
+      <input type="text" id="ctFilterDate" placeholder="入力しない" aria-label="日付検索" readonly>
+      <button type="button" class="ct-combo-btn" id="ctDateBtn" aria-label="日付の一覧を開く">▼</button>
+      <div class="ct-combo-list" id="ctDateList" hidden></div>
+    </div>
   </div>
+  <div class="ct-filter-info" id="ctFilterInfo"></div>
   <div id="ctList"></div>
 
   <div class="footer-actions">
@@ -396,6 +416,8 @@ function renderGasChips(){
   GAS_TABLE.forEach(g => addChip(g.label || g.name, g, ctGasSel === g.code, () => pickGas(g.code)));
   addChip("その他", OTHER_GAS_STYLE, ctGasSel === "other", () => pickGas("other"));
 
+  // 上段・下段の2行（左から右へ読む順に並べる）。2行いっしょに横へ滑らせる
+  box.style.gridTemplateColumns = `repeat(${Math.ceil(box.children.length / 2)}, max-content)`;
   box.scrollLeft = prevScroll;
   const on = box.querySelector(".chip.on");   // 選んだボタンは、見える位置へ寄せる
   if(on){
@@ -507,36 +529,103 @@ function passFilter(l){
   if(ctFilter === "oth" && (l.status === 2 || l.status === 3)) return false;
   if(ctFilter !== "all" && ctFilter !== "oth" && String(l.status) !== ctFilter) return false;
 
-  const d = $("ctFilterDate").value;
-  if(d && l.date !== d) return false;
+  if(ctDateFilter && l.date !== ctDateFilter) return false;     // 日付検索（空＝入力しない）
 
-  // 検索は客名だけ（記号・番号では検索しない）
-  const q = nfkc($("ctSearch").value).toUpperCase().replace(/\s+/g, "");
-  if(q && !nfkc(l.customer).toUpperCase().replace(/\s+/g, "").includes(q)) return false;
+  const sv = $("ctSearch").value;                                 // 客名検索：客名、または読み仮名
+  if(sv.trim() && !matchCust(l, sv)) return false;
   return true;
 }
 
-// 検索欄の候補：いま登録されている客名の一覧（コンボボックス）
-let custListSig = "";
-function renderCustList(){
-  const names = [...new Set(ctLogs.map(l => l.customer).filter(Boolean))].sort((x, y) => x.localeCompare(y, "ja"));
-  const sig = names.join("\n");
-  if(sig === custListSig) return;
-  custListSig = sig;
-  const dl = $("ctCustList");
-  dl.innerHTML = "";
-  names.forEach(n => {
-    const o = document.createElement("option");
-    o.value = n;
-    dl.appendChild(o);
-  });
+function normQ(x){ return nfkc(x).toUpperCase().replace(/\s+/g, ""); }
+function hira(x){ return (typeof toHiragana === "function" ? toHiragana(x) : nfkc(x)).replace(/\s+/g, ""); }
+
+// 客名リスト（取り込み済みなら）から、記録の客の読み仮名を調べる（古い記録の分も補う）
+let _mc = null, _byCode = null, _byName = null;
+function masterMaps(){
+  if(!hasMaster()) return null;
+  if(_mc !== customerMaster){
+    _mc = customerMaster; _byCode = new Map(); _byName = new Map();
+    customerMaster.items.forEach(i => {
+      if(i.c && !_byCode.has(i.c)) _byCode.set(i.c, i);
+      if(i.n && !_byName.has(i.n)) _byName.set(i.n, i);
+    });
+  }
+  return { byCode:_byCode, byName:_byName };
+}
+function readingFor(l){
+  if(l.customerKana) return l.customerKana;
+  const m = masterMaps();
+  if(!m) return "";
+  const hit = (l.customerCode && m.byCode.get(l.customerCode)) || m.byName.get(l.customer);
+  return hit ? (hit.k || "") : "";
+}
+function matchCust(l, text){
+  const q = normQ(text);
+  if(!q) return true;
+  if(normQ(l.customer).includes(q)) return true;
+  const r = readingFor(l);
+  return !!r && hira(r).includes(hira(text));
 }
 
-// 日付検索欄が空のとき、枠の中に「日付検索」と表示する
+/* ---------- 検索欄・日付検索のコンボボックス ---------- */
+let ctDateFilter = "";   // 日付検索：YYYY-MM-DD（空＝入力しない）
+
+function comboItem(box, text, isNone, onPick){
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "ct-combo-item" + (isNone ? " none" : "");
+  b.textContent = text;
+  b.addEventListener("click", onPick);
+  box.appendChild(b);
+}
+
+function closeCombos(exceptId){
+  ["ctSearchList", "ctDateList"].forEach(id => { if(id !== exceptId) $(id).hidden = true; });
+}
+
+function renderSearchList(){
+  const box = $("ctSearchList");
+  box.innerHTML = "";
+  comboItem(box, "入力しない", true, () => { $("ctSearch").value = ""; box.hidden = true; renderList(); });
+  const seen = new Map();
+  ctLogs.forEach(l => { if(l.customer && !seen.has(l.customer)) seen.set(l.customer, l); });
+  const text = $("ctSearch").value;
+  const names = [...seen.keys()]
+    .filter(n => !text.trim() || matchCust(seen.get(n), text))
+    .sort((x, y) => x.localeCompare(y, "ja"));
+  names.forEach(n => comboItem(box, n, false, () => { $("ctSearch").value = n; box.hidden = true; renderList(); }));
+  if(names.length === 0){
+    const none = document.createElement("div");
+    none.className = "customer-empty";
+    none.textContent = "該当する顧客はありません";
+    box.appendChild(none);
+  }
+}
+
+function renderDateList(){
+  const box = $("ctDateList");
+  box.innerHTML = "";
+  comboItem(box, "入力しない", true, () => { ctDateFilter = ""; box.hidden = true; renderList(); });
+  [...new Set(ctLogs.map(l => l.date).filter(Boolean))].sort().reverse().forEach(dt =>
+    comboItem(box, fmtDateWeek(dt), false, () => { ctDateFilter = dt; box.hidden = true; renderList(); }));
+}
+
+function toggleCombo(listId, render){
+  const box = $(listId);
+  const willOpen = box.hidden;
+  closeCombos(listId);
+  if(willOpen){ render(); box.hidden = false; box.scrollTop = 0; } else { box.hidden = true; }
+}
+
+// 開いている一覧は、ログが増減したときに作り直す
+function renderCustList(){
+  if(!$("ctSearchList").hidden) renderSearchList();
+  if(!$("ctDateList").hidden) renderDateList();
+}
+
+// 日付検索の欄に、選んだ日付（なければ空＝「入力しない」の表示）
 function updateDatePh(){
-  const v = $("ctFilterDate").value;
-  $("ctDatePh").style.display = v ? "none" : "block";
-  $("ctFilterDate").classList.toggle("empty", !v);
+  $("ctFilterDate").value = ctDateFilter ? fmtDateWeek(ctDateFilter) : "";
 }
 
 /* ---------- 顧客名の選択（日報アプリの客先名リストを共用） ---------- */
@@ -562,7 +651,7 @@ function showCustomerList(items){
       b.textContent = item.n;
       b.addEventListener("click", () => {
         $("ctCustomer").value = item.n;
-        ctPicked = { code: item.c || "", name: item.n };
+        ctPicked = { code: item.c || "", name: item.n, k: item.k || "" };
         ctKana = null;
         renderKana();
         showCustomerList(null);
@@ -677,19 +766,22 @@ function saveFromForm(){
   let code = "";
   if(ctPicked && ctPicked.name === f.customer) code = ctPicked.code || "";
   else if(typeof resolveCustomerCode === "function") code = resolveCustomerCode(f.customer) || "";
+  let kana = "";                       // 読み仮名（客名リストから。読みでも検索できるように保存）
+  if(ctPicked && ctPicked.name === f.customer && ctPicked.k) kana = ctPicked.k;
+  else{ const mm = masterMaps(); const hit = mm && mm.byName.get(f.customer); kana = hit ? (hit.k || "") : ""; }
 
   const wasEditing = !!targetId;
   if(targetId){
     const log = ctLogs.find(x => x.id === targetId);
     if(log){
-      Object.assign(log, f, { customerCode: code });
+      Object.assign(log, f, { customerCode: code, customerKana: kana });
       const t = $("ctTime").value;
       if(t) log.time = t;
     }
     ctEditId = null;
     showToast("更新しました");
   }else{
-    ctLogs.push(Object.assign({ id:newId(), time:nowHM() }, f, { customerCode: code, createdAt:new Date().toISOString() }));
+    ctLogs.push(Object.assign({ id:newId(), time:nowHM() }, f, { customerCode: code, customerKana: kana, createdAt:new Date().toISOString() }));
     showToast(`${statusName(f.status)}を記録しました`);
   }
   ctSave();
@@ -718,7 +810,7 @@ function startEdit(id){
   setDate(l.date);
   $("ctTime").value = l.time || "";
   $("ctCustomer").value = l.customer || "";
-  ctPicked = l.customerCode ? { code:l.customerCode, name:l.customer } : null;
+  ctPicked = l.customerCode ? { code:l.customerCode, name:l.customer, k:l.customerKana || "" } : null;
   $("ctSymbol").value = l.symbol || "";
   $("ctNumber").value = l.number || "";
   if(typeof l.gasCode === "number" && GAS_TABLE.some(g => g.code === l.gasCode)){
@@ -747,7 +839,7 @@ function startAddTo(name, date){
   setDate(date);
   $("ctCustomer").value = name;
   const hit = ctLogs.find(l => l.customer === name && l.date === date && l.customerCode);
-  ctPicked = hit ? { code:hit.customerCode, name } : null;
+  ctPicked = hit ? { code:hit.customerCode, name, k:hit.customerKana || "" } : null;
   $("ctSymbol").value = "";
   $("ctNumber").value = "";
   $("ctTime").value = "";
@@ -810,10 +902,16 @@ function renderList(){
 
   $("ctCount").textContent = logs.length;
 
+  const info = [];
+  if(ctFilter !== "all") info.push(ctFilter === "2" ? "出庫のみ" : (ctFilter === "3" ? "空受のみ" : "出庫・空受以外"));
+  if($("ctSearch").value.trim()) info.push(`顧客「${$("ctSearch").value.trim()}」`);
+  if(ctDateFilter) info.push(`日付 ${fmtDateWeek(ctDateFilter)}`);
+  $("ctFilterInfo").textContent = info.length ? "絞り込み中：" + info.join("・") : "";
+
   if(logs.length === 0){
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = "容器ログはまだありません";
+    empty.textContent = info.length ? `条件に合う容器ログはありません（${info.join("・")}）` : "容器ログはまだありません";
     list.appendChild(empty);
     return;
   }
@@ -890,7 +988,7 @@ function renderList(){
       });
 
       // 「明細」を押したときだけ、1本ずつ表示する（行を右へスワイプ＝変更、左へスワイプ＝削除）
-      // 並び順：区分 → ガス種 → 記号・番号。区分は、同じ区分のグループの先頭の行にだけ出す。時刻は出さない
+      // 並び順：区分 → ガス種 → 記号・番号。区分は同じ区分の見出しとして1回だけ出し、記号番号の行は1文字右へ。時刻は出さない
       if(open){
         const numCmp = (p, q) => (/^\d+$/.test(p) && /^\d+$/.test(q))
           ? (Number(p) - Number(q)) || p.localeCompare(q)
@@ -900,28 +998,28 @@ function renderList(){
           String(p.gas || "").localeCompare(String(q.gas || ""), "ja") ||
           String(p.symbol).localeCompare(String(q.symbol)) || numCmp(p.number, q.number));
 
-        // 列の幅をそろえる（区分・記号番号・容量は固定幅、ガス種は残り）
+        // 列の幅をそろえる（記号番号と容量は固定幅、ガス種は残り）
         const emW = t => [...String(t)].reduce((w, ch) => {
           const cc = ch.codePointAt(0);
           return w + (cc >= 0xFF61 && cc <= 0xFF9F ? 0.55 : (cc <= 0x7F ? 0.62 : 1.05));
         }, 0);
         const capStr = l => noCap(l) ? "" : `${l.capacity}${l.unit || ""}`;
-        const c1 = Math.ceil(Math.max(...detail.map(l => emW(statusName(l.status)))) * 12 + 24);
         const c2 = Math.max(...detail.map(l => String(l.symbol).length + 1 + String(l.number).length));
         const c4 = Math.ceil(Math.max(...detail.map(l => emW(capStr(l)))) * 13 + 4);
-        const cols = `${c1}px ${c2}ch minmax(0,1fr) ${c4}px`;
+        const cols = `${c2}ch minmax(0,1fr) ${c4}px`;
 
         html += `<div class="ct-swipe-hint">← 削除　　変更 →</div>`;
         let prevStatus = null;
         detail.forEach(l => {
           const cls = l.status === 2 ? "out" : (l.status === 3 ? "in" : "oth");
-          const first = l.status !== prevStatus;
-          prevStatus = l.status;
+          if(l.status !== prevStatus){
+            prevStatus = l.status;
+            html += `<div class="ct-dhead"><span class="ct-badge ${cls}">${escapeHtml(statusName(l.status))}</span></div>`;
+          }
           html += `
             <div class="ct-swrap" data-id="${escapeHtml(l.id)}">
               <div class="ct-swbg"><span class="ct-sw-edit">変更</span><span class="ct-sw-del">削除</span></div>
               <div class="ct-row ct-drow" style="grid-template-columns:${cols}">
-                <span class="ct-d1">${first ? `<span class="ct-badge ${cls}">${escapeHtml(statusName(l.status))}</span>` : ""}</span>
                 <span class="ct-d2">${escapeHtml(l.symbol)}-${escapeHtml(l.number)}</span>
                 <span class="ct-d3">${escapeHtml(l.gas || "")}</span>
                 <span class="ct-d4">${escapeHtml(capStr(l))}</span>
@@ -1347,13 +1445,17 @@ window.addEventListener("resize", updateGasShadows);
 syncDateText();
 
 /* 検索・日付での絞り込み（過去の記録を後から探す） */
-$("ctSearch").addEventListener("input", renderList);
-$("ctFilterDate").addEventListener("change", renderList);
-$("ctFilterClear").addEventListener("click", () => {
-  $("ctSearch").value = "";
-  $("ctFilterDate").value = "";
+$("ctSearch").addEventListener("input", () => {
   renderList();
+  closeCombos("ctSearchList");
+  renderSearchList();
+  $("ctSearchList").hidden = false;
 });
+$("ctSearch").addEventListener("click", () => { if($("ctSearchList").hidden) toggleCombo("ctSearchList", renderSearchList); });
+$("ctSearchBtn").addEventListener("click", () => toggleCombo("ctSearchList", renderSearchList));
+$("ctFilterDate").addEventListener("click", () => toggleCombo("ctDateList", renderDateList));
+$("ctDateBtn").addEventListener("click", () => toggleCombo("ctDateList", renderDateList));
+document.addEventListener("pointerdown", e => { if(!e.target.closest(".ct-combo")) closeCombos(); });
 $("ctCapacity").addEventListener("input", renderAdj);
 $("ctGasOther").addEventListener("input", renderGasSelected);
 $("ctSaveButton").addEventListener("click", () => saveFromForm());
