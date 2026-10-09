@@ -78,8 +78,10 @@ let ctGasSel = null;        // ガス種：コード(数字)／"other"(その他
 let ctUnit = UNITS[0];
 let ctFilter = "all";
 let ctEditId = null;
+let ctAdding = false;       // 「この顧客に追加」「新しい記録として追加」で、続けて追加入力している状態
 let ctKana = null;
 let ctPicked = null;        // 一覧から選んだ客先 { code, name }
+const ctOpen = new Set();   // 「編集」で開いている顧客カード（日付|顧客名）
 let ctDateTouched = false;  // 日付を手で変えたか（変えていなければ開くたびに今日にする）
 
 const $ = id => document.getElementById(id);
@@ -92,7 +94,7 @@ function newId(){ return Date.now() + "-" + Math.random().toString(36).slice(2,8
 
 /* 入力の正規化（全角で入っても半角に直す） */
 function normSym(s){ return String(s || "").normalize("NFKC").toUpperCase().replace(/\s+/g,""); }
-function normNum(s){ return String(s || "").normalize("NFKC").replace(/\s+/g,""); }
+function normNum(s){ return String(s || "").normalize("NFKC").toUpperCase().replace(/\s+/g,""); }
 
 function ctSorted(logs){
   return [...logs].sort((a,b) =>
@@ -144,20 +146,52 @@ style.textContent = `
 
   .ct-status{ font-size:12px; color:var(--ink-soft); text-align:center; margin:10px 4px; line-height:1.6; }
   .ct-status:empty{ display:none; }
-  .ct-gas-selected{ margin-top:8px; font-size:15px; font-weight:700; color:var(--ink); }
-  .ct-gas-selected.none{ font-weight:400; color:var(--ink-soft); font-size:13px; }
+  .ct-gas-area{ display:flex; gap:8px; align-items:stretch; }
+  .ct-gas-area .ct-chip-row{ flex:1; min-width:0; }
+  .ct-gas-vert{
+    flex:none; width:34px; min-height:96px; border-radius:10px; overflow:hidden;
+    display:flex; align-items:center; justify-content:center; padding:8px 0;
+    font-size:14px; font-weight:700; line-height:1.1; letter-spacing:.05em;
+    background:#F2EEE4; color:var(--ink-soft);
+  }
+  .ct-gas-vert span{ writing-mode:vertical-rl; text-orientation:upright; white-space:nowrap; }
+  .ct-chip-row .chip .d2{ font-size:70%; }
+
+  #containerScreen #ctDate, #containerScreen #ctTime{
+    width:9.5em; max-width:100%; padding:6px 8px; font-size:14px; border-radius:8px;
+  }
+  #containerScreen #ctCustomer{ font-size:17px; font-weight:700; }
+  .ct-cust-right{ display:flex; align-items:center; gap:8px; flex:none; }
+  .ct-add{
+    border:1.5px solid var(--mint); background:#fff; color:var(--mint-ink); border-radius:999px;
+    padding:4px 11px; font-size:12px; font-weight:700; font-family:inherit; cursor:pointer;
+  }
   .ct-chip-row .chip.gas{ border:none; font-weight:700; padding:10px 14px; }
   .ct-chip-row .chip.gas.on{ box-shadow:0 0 0 2px #fff, 0 0 0 4px var(--ink); }
 
   .ct-cust{ background:var(--card); border:1px solid var(--line); border-left:5px solid var(--mint); border-radius:var(--radius); padding:12px 14px 4px; margin-bottom:10px; }
   .ct-cust-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:4px; }
-  .ct-cust-name{ font-size:15px; font-weight:700; min-width:0; overflow-wrap:anywhere; }
+  .ct-cust-name{ font-size:18px; font-weight:700; min-width:0; overflow-wrap:anywhere; }
   .ct-cust-sum{ font-size:12px; color:var(--ink-soft); white-space:nowrap; }
   .ct-row{ display:flex; align-items:center; gap:8px; padding:9px 0; border-top:1px solid var(--line); }
   .ct-row-main{ flex:1; min-width:0; }
   .ct-row-line1{ font-size:14px; font-weight:700; }
   .ct-row-line2{ font-size:12.5px; color:var(--ink-soft); margin-top:2px; }
   .ct-row .card-action{ flex:0 0 auto; padding:7px 11px; font-size:12px; }
+
+  .ct-datewrap{ position:relative; }
+  .ct-dph{ position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:15px; color:var(--ink-soft); pointer-events:none; }
+  #containerScreen input[type=date].empty{ color:transparent; }
+
+  .ct-sum-line{ display:flex; align-items:center; flex-wrap:wrap; gap:2px 12px; font-size:14px; padding:3px 0; }
+  .ct-sum-line .ct-badge{ margin-right:0; }
+  .ct-sum-gas{ white-space:nowrap; }
+  .ct-actions{ display:flex; justify-content:flex-end; gap:8px; padding:8px 0 10px; margin-top:6px; border-top:1px solid var(--line); }
+  .ct-tog{
+    border:1.5px solid var(--lavender-dark); background:#fff; color:var(--lavender-ink); border-radius:999px;
+    padding:4px 14px; font-size:12px; font-weight:700; font-family:inherit; cursor:pointer;
+  }
+  .ct-tog.open{ background:var(--lavender); }
 `;
 document.head.appendChild(style);
 
@@ -177,13 +211,15 @@ section.innerHTML = `
     </div>
     <div style="height:14px;"></div>
 
-    <div class="field">
-      <label for="ctDate">日付</label>
-      <input type="date" id="ctDate">
-    </div>
-    <div class="field" id="ctTimeField" style="display:none;">
-      <label for="ctTime">時刻（編集時のみ）</label>
-      <input type="time" id="ctTime">
+    <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;">
+      <div>
+        <label for="ctDate" style="display:block;font-size:12px;color:var(--ink-soft);margin-bottom:6px;">日付</label>
+        <input type="date" id="ctDate">
+      </div>
+      <div id="ctTimeField" style="display:none;">
+        <label for="ctTime" style="display:block;font-size:12px;color:var(--ink-soft);margin-bottom:6px;">時刻（編集時）</label>
+        <input type="time" id="ctTime">
+      </div>
     </div>
 
     <div class="field" style="margin-bottom:8px;">
@@ -197,8 +233,10 @@ section.innerHTML = `
 
     <div class="field">
       <label>ガス種</label>
-      <div class="ct-chip-row" id="ctGasChips"></div>
-      <div class="ct-gas-selected" id="ctGasSelected"></div>
+      <div class="ct-gas-area">
+        <div class="ct-chip-row" id="ctGasChips"></div>
+        <div class="ct-gas-vert" id="ctGasVert"><span></span></div>
+      </div>
       <input type="text" id="ctGasOther" placeholder="ガス種を入力" style="margin-top:8px;display:none;" autocomplete="off">
     </div>
 
@@ -208,7 +246,10 @@ section.innerHTML = `
         <input type="text" id="ctSymbol" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="例：AB1">
       </div>
       <div class="field" style="flex:2;">
-        <label for="ctNumber">番号（数字）</label>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <label for="ctNumber">番号（数字）</label>
+          <button type="button" class="btn-mini" id="ctNumKb" style="padding:2px 10px;margin-bottom:6px;" aria-label="キーボードの切り替え">ABC</button>
+        </div>
         <input type="text" id="ctNumber" inputmode="numeric" autocomplete="off" placeholder="例：12345">
       </div>
     </div>
@@ -227,14 +268,19 @@ section.innerHTML = `
     </div>
 
     <button class="btn btn-lavender" id="ctSaveButton">記録する</button>
+    <button class="btn btn-outline-mint" id="ctAddNewButton" style="display:none;margin-top:8px;">この内容を新しい記録として追加</button>
     <div style="text-align:center;"><button class="btn-text" id="ctCancelEdit" style="display:none;">編集をやめる</button></div>
   </div>
 
   <h2 class="h2-flex"><span>容器ログ（<span id="ctCount">0</span>本）</span></h2>
   <div class="ct-seg" id="ctFilterSeg" style="margin-bottom:10px;"></div>
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-    <input type="text" id="ctSearch" placeholder="記号・番号・顧客名で検索" autocomplete="off" style="flex:2;min-width:0;">
-    <input type="date" id="ctFilterDate" aria-label="日付で絞る" style="flex:1.3;min-width:0;">
+    <input type="text" id="ctSearch" list="ctCustList" placeholder="客名検索" autocomplete="off" style="flex:2;min-width:0;">
+    <datalist id="ctCustList"></datalist>
+    <div class="ct-datewrap" style="flex:1.3;min-width:0;">
+      <input type="date" id="ctFilterDate" class="empty" aria-label="日付検索">
+      <span class="ct-dph" id="ctDatePh">日付検索</span>
+    </div>
     <button type="button" class="btn-mini" id="ctFilterClear">解除</button>
   </div>
   <div id="ctList"></div>
@@ -301,7 +347,7 @@ function renderGasChips(){
     const b = document.createElement("button");
     b.type = "button";
     b.className = "chip gas" + (selected ? " on" : "");
-    b.textContent = text;
+    b.innerHTML = escapeHtml(text).replace(/2/g, '<span class="d2">2</span>');   // 数字の「2」は3割小さく
     b.style.background = st.bg;
     b.style.color = st.fg;
     if(st.shadow) b.style.textShadow = "0 0 3px rgba(0,0,0,0.6)";
@@ -316,21 +362,26 @@ function renderGasChips(){
   renderAdj();
 }
 
-// 押したボタンのガス種を文字でも表示する（略称・色だけに頼らず、誤入力を防ぐ）
+// 選んだガス種を、ボタン群の右端に縦書きの文字で表示する（背景色はボタンと同じ。誤入力を防ぐ）
 function renderGasSelected(){
-  const el = $("ctGasSelected");
+  const el = $("ctGasVert");
   const g = curGas();
+  let text, st = null;
   if(g){
-    el.className = "ct-gas-selected";
-    el.textContent = `選択中：${g.name}`;
+    text = nfkc(g.name);               // ｱｾﾁﾚﾝ → アセチレン（縦書きで正しく読めるよう全角に）
+    st = g;
   }else if(ctGasSel === "other"){
     const t = $("ctGasOther").value.trim();
-    el.className = "ct-gas-selected";
-    el.textContent = "選択中：その他" + (t ? `（${t}）` : "");
+    text = t ? nfkc(t) : "その他";
+    st = OTHER_GAS_STYLE;
   }else{
-    el.className = "ct-gas-selected none";
-    el.textContent = "ガス種を選んでください";
+    text = "未選択";
   }
+  el.querySelector("span").textContent = text;
+  el.style.background = st ? st.bg : "";
+  el.style.color = st ? st.fg : "";
+  el.style.textShadow = (st && st.shadow) ? "0 0 3px rgba(0,0,0,0.6)" : "";
+  el.style.fontSize = text.length > 6 ? "12px" : "";
 }
 
 // ガス種を選ぶと、決めておいた容量と単位が自動で入る
@@ -403,16 +454,33 @@ function passFilter(l){
   const d = $("ctFilterDate").value;
   if(d && l.date !== d) return false;
 
+  // 検索は客名だけ（記号・番号では検索しない）
   const q = nfkc($("ctSearch").value).toUpperCase().replace(/\s+/g, "");
-  if(q){
-    const g = GAS_TABLE.find(x => x.code === l.gasCode);
-    const hay = nfkc([
-      `${l.symbol}-${l.number}`, `${l.symbol}${l.number}`, l.customer, l.gas,
-      g ? g.label : "", statusName(l.status)
-    ].join(" ")).toUpperCase().replace(/\s+/g, "");
-    if(!hay.includes(q)) return false;
-  }
+  if(q && !nfkc(l.customer).toUpperCase().replace(/\s+/g, "").includes(q)) return false;
   return true;
+}
+
+// 検索欄の候補：いま登録されている客名の一覧（コンボボックス）
+let custListSig = "";
+function renderCustList(){
+  const names = [...new Set(ctLogs.map(l => l.customer).filter(Boolean))].sort((x, y) => x.localeCompare(y, "ja"));
+  const sig = names.join("\n");
+  if(sig === custListSig) return;
+  custListSig = sig;
+  const dl = $("ctCustList");
+  dl.innerHTML = "";
+  names.forEach(n => {
+    const o = document.createElement("option");
+    o.value = n;
+    dl.appendChild(o);
+  });
+}
+
+// 日付検索欄が空のとき、枠の中に「日付検索」と表示する
+function updateDatePh(){
+  const v = $("ctFilterDate").value;
+  $("ctDatePh").style.display = v ? "none" : "block";
+  $("ctFilterDate").classList.toggle("empty", !v);
 }
 
 /* ---------- 顧客名の選択（日報アプリの客先名リストを共用） ---------- */
@@ -492,12 +560,19 @@ $("ctCustomer").addEventListener("input", () => {
 /* =========================================================
    記録（新規／編集）
 ========================================================= */
-function setFormEditing(editing){
+// フォームの状態（通常／編集中／追加中）に合わせて、見出しとボタンを切り替える
+function updateFormMode(){
+  const editing = !!ctEditId;
+  const adding = !editing && ctAdding;
   $("ctSaveButton").textContent = editing ? "更新する" : "記録する";
-  $("ctCancelEdit").style.display = editing ? "inline-block" : "none";
-  $("ctTitle").textContent = editing ? "容器ログ（編集中）" : "容器ログ";
+  $("ctAddNewButton").style.display = editing ? "block" : "none";
+  const cancel = $("ctCancelEdit");
+  cancel.style.display = (editing || adding) ? "inline-block" : "none";
+  cancel.textContent = editing ? "編集をやめる" : "追加をやめる";
+  $("ctTitle").textContent = editing ? "容器ログ（編集中）" : (adding ? "容器ログ（追加中）" : "容器ログ");
   $("ctTimeField").style.display = editing ? "block" : "none";
 }
+function setFormEditing(){ updateFormMode(); }
 
 function readForm(){
   const g = curGas();
@@ -514,18 +589,33 @@ function readForm(){
   };
 }
 
-function saveFromForm(){
+function saveFromForm(asNew){
   const f = readForm();
+  const targetId = asNew ? null : ctEditId;       // 更新する対象（「新しい記録として追加」のときは無し）
 
   if(!f.date){ showToast("日付を入力してください"); return; }
   if(!f.customer){ showToast("顧客名を入力してください"); $("ctCustomer").focus(); return; }
   if(!/^[A-Z0-9]+$/.test(f.symbol)){ showToast("記号は半角の英数字で入力してください"); $("ctSymbol").focus(); return; }
-  if(!/^[0-9]+$/.test(f.number)){ showToast("番号は半角の数字で入力してください"); $("ctNumber").focus(); return; }
+  if(!/^[0-9]+$/.test(f.number)){
+    // 番号は数字のみ。英字が入っているときは、本当に英字かを確認してから入力できる
+    const letters = f.number.match(/[A-Z]/g);
+    if(letters && /^[A-Z0-9]+$/.test(f.number)){
+      const list = [...new Set(letters)].join("");
+      if(!window.confirm(`番号に英字「${list}」が入っています。\n番号は通常、数字だけです。\n\n本当に英字を入力しますか？`)){
+        $("ctNumber").focus();
+        return;
+      }
+    }else{
+      showToast("番号は半角の数字で入力してください（英字は確認のうえ入力できます）");
+      $("ctNumber").focus();
+      return;
+    }
+  }
   if(ctGasSel === null){ showToast("ガス種を選んでください"); return; }
   if(!f.gas){ showToast("ガス種を入力してください"); $("ctGasOther").focus(); return; }
   if(f.capacity !== "" && (!/^\d+(\.\d+)?$/.test(f.capacity) || f.capacity.replace(".", "").length > 5)){ showToast("容量は5桁までの数字で入力してください"); $("ctCapacity").focus(); return; }
 
-  const dup = ctLogs.find(l => l.id !== ctEditId && l.date === f.date && l.status === f.status &&
+  const dup = ctLogs.find(l => l.id !== targetId && l.date === f.date && l.status === f.status &&
                                l.symbol === f.symbol && l.number === f.number);
   if(dup && !window.confirm(`${f.symbol}-${f.number} は同じ日に「${statusName(f.status)}」で記録済みです。\nもう一度記録しますか？`)) return;
 
@@ -533,9 +623,9 @@ function saveFromForm(){
   if(ctPicked && ctPicked.name === f.customer) code = ctPicked.code || "";
   else if(typeof resolveCustomerCode === "function") code = resolveCustomerCode(f.customer) || "";
 
-  const wasEditing = !!ctEditId;
-  if(ctEditId){
-    const log = ctLogs.find(x => x.id === ctEditId);
+  const wasEditing = !!targetId;
+  if(targetId){
+    const log = ctLogs.find(x => x.id === targetId);
     if(log){
       Object.assign(log, f, { customerCode: code });
       const t = $("ctTime").value;
@@ -546,24 +636,32 @@ function saveFromForm(){
   }else{
     ctLogs.push(Object.assign({ id:newId(), time:nowHM() }, f, { customerCode: code, createdAt:new Date().toISOString() }));
     showToast(`${statusName(f.status)}を記録しました`);
+    if(asNew){                       // 編集中の内容を新しい記録として追加 → 同じ顧客・日付への追加入力を続ける
+      ctEditId = null;
+      ctAdding = true;
+      $("ctTime").value = "";
+    }
   }
   ctSave();
 
-  // 続けて入力しやすいよう、番号だけ消す（区分・顧客・ガス種・容量・記号は残す）
+  // 記号・番号は、記録のたびに空白（初期状態）へ戻す。区分・顧客・ガス種・容量は残す
+  $("ctSymbol").value = "";
   $("ctNumber").value = "";
-  if(wasEditing){                      // 過去の記録を直したあとは、日付を今日に戻し、顧客・記号を空にする
+  if(wasEditing){                    // 過去の記録を直したあとは、日付を今日に戻し、顧客も空にする
+    ctAdding = false;
     resetDateToToday();
     clearRecordFields();
   }
-  setFormEditing(false);
+  updateFormMode();
   renderList();
-  $("ctNumber").focus();
+  $("ctSymbol").focus();
 }
 
 function startEdit(id){
   const l = ctLogs.find(x => x.id === id);
   if(!l) return;
   ctEditId = id;
+  ctAdding = false;
   ctStatus = Number(l.status);
   ctUnit = l.unit || UNITS[0];
   ctDateTouched = true;
@@ -587,8 +685,27 @@ function startEdit(id){
   showCustomerList(null);
   renderModeAndUnit();
   renderGasChips();
-  setFormEditing(true);
+  updateFormMode();
   window.scrollTo({ top:0, behavior:"auto" });
+}
+
+// 顧客カードの「＋追加」：その顧客・日付で、新しい容器を続けて追加する
+function startAddTo(name, date){
+  ctEditId = null;
+  ctAdding = true;
+  ctDateTouched = true;
+  $("ctDate").value = date;
+  $("ctCustomer").value = name;
+  const hit = ctLogs.find(l => l.customer === name && l.date === date && l.customerCode);
+  ctPicked = hit ? { code:hit.customerCode, name } : null;
+  $("ctSymbol").value = "";
+  $("ctNumber").value = "";
+  $("ctTime").value = "";
+  showCustomerList(null);
+  updateFormMode();
+  window.scrollTo({ top:0, behavior:"auto" });
+  $("ctSymbol").focus();
+  showToast(`「${name}」に追加します`);
 }
 
 function resetDateToToday(){
@@ -606,10 +723,13 @@ function clearRecordFields(){
 }
 
 function cancelEdit(){
-  if(ctEditId){ resetDateToToday(); clearRecordFields(); }
+  if(ctEditId || ctAdding){ resetDateToToday(); clearRecordFields(); }
   ctEditId = null;
+  ctAdding = false;
+  $("ctSymbol").value = "";
   $("ctNumber").value = "";
-  setFormEditing(false);
+  $("ctTime").value = "";
+  updateFormMode();
 }
 
 /* =========================================================
@@ -618,6 +738,8 @@ function cancelEdit(){
 function renderList(){
   const list = $("ctList");
   list.innerHTML = "";
+  renderCustList();
+  updateDatePh();
 
   const logs = ctLogs
     .filter(passFilter)
@@ -670,21 +792,47 @@ function renderList(){
 
       const card = document.createElement("div");
       card.className = "ct-cust";
-      let html = `<div class="ct-cust-head"><span class="ct-cust-name">${escapeHtml(c.name || "（顧客名なし）")}</span>` +
-                 `<span class="ct-cust-sum">${rows.length}本</span></div>`;
+      const ckey = `${day.date}|${c.name}`;
+      const open = ctOpen.has(ckey);
+
+      // 区分ごと → ガス種ごと の本数
+      const byStatus = {};
       rows.forEach(l => {
-        const cls = l.status === 2 ? "out" : (l.status === 3 ? "in" : "oth");
-        const capText = (l.capacity !== "" && l.capacity != null) ? `　${escapeHtml(l.capacity)}${escapeHtml(l.unit || "")}` : "";
-        html += `
-          <div class="ct-row">
-            <div class="ct-row-main">
-              <div class="ct-row-line1"><span class="ct-badge ${cls}">${escapeHtml(statusName(l.status))}</span>${escapeHtml(l.symbol)}-${escapeHtml(l.number)}</div>
-              <div class="ct-row-line2">${escapeHtml(l.time || "")}　${escapeHtml(l.gas || "")}${capText}</div>
-            </div>
-            <button class="card-action edit ct-edit" data-id="${escapeHtml(l.id)}">編集</button>
-            <button class="card-action delete ct-del" data-id="${escapeHtml(l.id)}">削除</button>
-          </div>`;
+        const m = byStatus[l.status] || (byStatus[l.status] = {});
+        const gname = l.gas || "（ガス種なし）";
+        m[gname] = (m[gname] || 0) + 1;
       });
+      const order = sc => sc === 2 ? 0 : (sc === 3 ? 1 : 2 + sc);
+
+      let html = `<div class="ct-cust-head"><span class="ct-cust-name">${escapeHtml(c.name || "（顧客名なし）")}</span>` +
+                 `<span class="ct-cust-sum">合計 ${rows.length}本</span></div>`;
+      Object.keys(byStatus).map(Number).sort((x, y) => order(x) - order(y)).forEach(sc => {
+        const cls = sc === 2 ? "out" : (sc === 3 ? "in" : "oth");
+        const parts = Object.entries(byStatus[sc])
+          .map(([g, n]) => `<span class="ct-sum-gas">${escapeHtml(g)} ${n}本</span>`).join("");
+        html += `<div class="ct-sum-line"><span class="ct-badge ${cls}">${escapeHtml(statusName(sc))}</span>${parts}</div>`;
+      });
+
+      // 記号・番号は「編集」を押したときだけ表示する
+      if(open){
+        rows.forEach(l => {
+          const cls = l.status === 2 ? "out" : (l.status === 3 ? "in" : "oth");
+          const capText = (l.capacity !== "" && l.capacity != null) ? `　${escapeHtml(l.capacity)}${escapeHtml(l.unit || "")}` : "";
+          html += `
+            <div class="ct-row">
+              <div class="ct-row-main">
+                <div class="ct-row-line1"><span class="ct-badge ${cls}">${escapeHtml(statusName(l.status))}</span>${escapeHtml(l.symbol)}-${escapeHtml(l.number)}</div>
+                <div class="ct-row-line2">${escapeHtml(l.time || "")}　${escapeHtml(l.gas || "")}${capText}</div>
+              </div>
+              <button class="card-action edit ct-edit" data-id="${escapeHtml(l.id)}">変更</button>
+              <button class="card-action delete ct-del" data-id="${escapeHtml(l.id)}">削除</button>
+            </div>`;
+        });
+      }
+      html += `<div class="ct-actions">` +
+              `<button class="ct-add" data-name="${encodeURIComponent(c.name || "")}" data-date="${escapeHtml(day.date || "")}">＋追加</button>` +
+              `<button class="ct-tog${open ? " open" : ""}" data-key="${encodeURIComponent(ckey)}">${open ? "閉じる" : "編集"}</button>` +
+              `</div>`;
       card.innerHTML = html;
       list.appendChild(card);
     });
@@ -692,6 +840,15 @@ function renderList(){
 }
 
 $("ctList").addEventListener("click", e => {
+  const tog = e.target.closest(".ct-tog");
+  if(tog){
+    const k = decodeURIComponent(tog.getAttribute("data-key"));
+    if(ctOpen.has(k)) ctOpen.delete(k); else ctOpen.add(k);
+    renderList();
+    return;
+  }
+  const add = e.target.closest(".ct-add");
+  if(add){ startAddTo(decodeURIComponent(add.getAttribute("data-name")), add.getAttribute("data-date")); return; }
   const edit = e.target.closest(".ct-edit");
   const del = e.target.closest(".ct-del");
   if(edit){ startEdit(edit.getAttribute("data-id")); return; }
@@ -1008,7 +1165,29 @@ $("ctFilterClear").addEventListener("click", () => {
 });
 $("ctCapacity").addEventListener("input", renderAdj);
 $("ctGasOther").addEventListener("input", renderGasSelected);
-$("ctSaveButton").addEventListener("click", saveFromForm);
+$("ctSaveButton").addEventListener("click", () => saveFromForm(false));
+$("ctAddNewButton").addEventListener("click", () => saveFromForm(true));
+
+/* 記号・番号・容量は、入力しながら（確定時にも）半角に直す：全角→半角、小文字→大文字 */
+function liveNormalize(el, fn){
+  const apply = () => { const v = el.value; const n = fn(v); if(n !== v) el.value = n; };
+  el.addEventListener("input", e => { if(!e.isComposing) apply(); });
+  el.addEventListener("compositionend", apply);
+  el.addEventListener("blur", apply);
+}
+liveNormalize($("ctSymbol"), normSym);
+liveNormalize($("ctNumber"), normNum);
+liveNormalize($("ctCapacity"), normNum);
+
+// 番号は数字キーパッドが初期。英字を入れたいときだけ「ABC」で通常のキーボードに切り替える
+$("ctNumKb").addEventListener("click", () => {
+  const inp = $("ctNumber");
+  const toText = inp.getAttribute("inputmode") === "numeric";
+  inp.setAttribute("inputmode", toText ? "text" : "numeric");
+  $("ctNumKb").textContent = toText ? "123" : "ABC";
+  inp.blur();
+  setTimeout(() => inp.focus(), 50);
+});
 $("ctCancelEdit").addEventListener("click", cancelEdit);
 
 })();
