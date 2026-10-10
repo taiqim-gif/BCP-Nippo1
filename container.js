@@ -20,14 +20,19 @@ const STATUS_BUTTONS = [2, 3];   // 画面に並べるボタン(出庫・空受)
 /* ガス種(保存・送信するのは数値コードと名前。ボタンには label を表示する)
    label＝ボタンに表示する略称、cap＝選んだときに自動で入る容量(空文字なら空欄)、unit＝単位、adj＝容量の増減ボタンを出す */
 const AZURE_GRAY = "#6F8CA3";
+const AZURE_GRAY_LIGHT = "#A8BDCB";     // 薄いアズールグレー(Ar と ArCo)
+const VIVID_GREEN = "#17B26A";          // 明瞭な緑(ArCo の縞)
 const GAS_TABLE = [
   { code:1001, label:"Ace",      name:"ｱｾﾁﾚﾝ",       cap:7,  unit:"kg", adj:true, bg:"#C2694B", fg:"#fff" },   // 明るめの赤褐色
   { code:1002, label:"O2",       name:"酸素",         cap:7,  unit:"㎥", bg:"#222222", fg:"#fff" },              // 黒
   { code:1003, label:"N2",       name:"窒素",         cap:7,  unit:"㎥", bg:AZURE_GRAY, fg:"#fff" },            // アズールグレー
-  { code:1004, label:"Ar",       name:"アルゴン",     cap:7,  unit:"㎥", bg:AZURE_GRAY, fg:"#fff" },
+  { code:1004, label:"Ar",       name:"アルゴン",     cap:7,  unit:"㎥", bg:AZURE_GRAY_LIGHT, fg:"#1f2933" },   // 薄いアズールグレー
   { code:1006, label:"CO2",      name:"炭酸",         cap:30, unit:"kg", bg:"#3F9A5E", fg:"#fff" },              // 緑
-  { code:1007, label:"ArCo",     name:"アルコミック", cap:7,  unit:"㎥", fg:"#fff", shadow:true,                 // アズールグレーに緑縞
-    bg:"linear-gradient(to bottom, " + AZURE_GRAY + " 0 38%, #3F9A5E 38% 62%, " + AZURE_GRAY + " 62% 100%)" },   // 横縞：グレー・緑(細め)・グレー
+  { code:1007, label:"ArCo",     name:"アルコミック", cap:7,  unit:"㎥", fg:"#1f2933",
+    // ボタン：横縞(薄いアズールグレー・緑・薄いアズールグレー)。緑は太め(高さの40%)
+    bg:"linear-gradient(to bottom, " + AZURE_GRAY_LIGHT + " 0 30%, " + VIVID_GREEN + " 30% 70%, " + AZURE_GRAY_LIGHT + " 70% 100%)",
+    // 右側の「選んだガス種」の表示：高さ 8:2 の上の8(約68〜82%)付近に緑を置く
+    vertBg:"linear-gradient(to bottom, " + AZURE_GRAY_LIGHT + " 0 68%, " + VIVID_GREEN + " 68% 82%, " + AZURE_GRAY_LIGHT + " 82% 100%)" },
   { code:1008, label:"フロン",   name:"フロン",       cap:"", unit:"kg", bg:"#A3A9AF", fg:"#1f1f1f" },           // グレー
   { code:2001, label:"LP",       name:"プロパン",     cap:"", unit:"kg", bg:"#A3A9AF", fg:"#1f1f1f" },
   { code:5001, label:"医O2",    name:"医療用酸素",   cap:"", unit:"㎥", bg:"#222222", fg:"#fff" }               // 黒
@@ -288,6 +293,24 @@ style.textContent = `
   .ct-filter-info:empty{ display:none; }
 
   .ct-gas-area{ align-items:center; }
+  .ct-gascol{ flex:1; min-width:0; }
+  .ct-gasdir{ display:flex; justify-content:space-between; height:18px; line-height:18px; font-size:16px; font-weight:700; color:var(--lavender-ink); padding:0 4px; }
+  .ct-gasdir span{ visibility:hidden; }
+  .ct-gasdir span.on{ visibility:visible; animation:ctBlink 1s ease-in-out infinite; }
+  @keyframes ctBlink{ 0%,100%{ opacity:1; } 50%{ opacity:.15; } }
+
+  .ct-hint{ display:inline-flex; align-items:center; gap:22px; }
+  .ct-hint .hl{ display:inline-block; padding:0 2px; border-radius:4px; animation-duration:2.4s; animation-iteration-count:infinite; animation-timing-function:step-end; animation-delay:var(--d,0s); }
+  .ct-hint-l .hl{ animation-name:ctHintL; }
+  .ct-hint-r .hl{ animation-name:ctHintR; }
+  @keyframes ctHintL{ 0%{ background:var(--pink); color:var(--pink-ink); } 16.66%,100%{ background:transparent; color:inherit; } }
+  @keyframes ctHintR{ 0%{ background:var(--mint); color:var(--mint-ink); } 16.66%,100%{ background:transparent; color:inherit; } }
+  @media (prefers-reduced-motion: reduce){
+    .ct-gasdir span.on{ animation:none; }
+    .ct-hint .hl{ animation:none; }
+    .ct-hint-l .hl{ background:var(--pink); color:var(--pink-ink); }
+    .ct-hint-r .hl{ background:var(--mint); color:var(--mint-ink); }
+  }
 
   /* 一画面に収める：訪問入力・車両情報・容器ログの余白を詰める */
   #visitScreen h2{ margin:8px 0 6px; font-size:14px; }
@@ -389,7 +412,10 @@ section.innerHTML = `
     <div class="field">
       <label>ガス種</label>
       <div class="ct-gas-area">
-        <div class="ct-gasbar-wrap" id="ctGasWrap"><div class="ct-chip-row ct-gasbar" id="ctGasChips"></div></div>
+        <div class="ct-gascol">
+          <div class="ct-gasdir" aria-hidden="true"><span id="ctGasL">←</span><span id="ctGasR">→</span></div>
+          <div class="ct-gasbar-wrap" id="ctGasWrap"><div class="ct-chip-row ct-gasbar" id="ctGasChips"></div></div>
+        </div>
         <div class="ct-gas-vert" id="ctGasVert"><span></span></div>
       </div>
       <input type="text" id="ctGasOther" placeholder="ガス種を入力" style="margin-top:8px;display:none;" autocomplete="off">
@@ -542,8 +568,13 @@ function renderGasChips(){
 function updateGasShadows(){
   const box = $("ctGasChips"), wrap = $("ctGasWrap");
   if(!box || !wrap) return;
-  wrap.classList.toggle("has-left", box.scrollLeft > 2);
-  wrap.classList.toggle("has-right", box.scrollLeft + box.clientWidth < box.scrollWidth - 2);
+  const hasLeft = box.scrollLeft > 2;
+  const hasRight = box.scrollLeft + box.clientWidth < box.scrollWidth - 2;
+  wrap.classList.toggle("has-left", hasLeft);
+  wrap.classList.toggle("has-right", hasRight);
+  const L = $("ctGasL"), R = $("ctGasR");                     // 続きのある方向だけ、矢印を点滅させる
+  if(L) L.classList.toggle("on", hasLeft);
+  if(R) R.classList.toggle("on", hasRight);
 }
 
 // 選んだガス種を、ボタン群の右端に縦書きの文字で表示する(背景色はボタンと同じ。誤入力を防ぐ)
@@ -562,7 +593,7 @@ function renderGasSelected(){
     text = "未選択";
   }
   el.querySelector("span").textContent = text;
-  el.style.background = st ? st.bg : "";
+  el.style.background = st ? (st.vertBg || st.bg) : "";
   el.style.color = st ? st.fg : "";
   el.style.textShadow = (st && st.shadow) ? "0 0 3px rgba(0,0,0,0.6)" : "";
   el.style.fontSize = text.length > 6 ? "12px" : "";
@@ -1130,7 +1161,10 @@ function renderList(){
         const c4 = Math.ceil(Math.max(...detail.map(l => emW(capStr(l)))) * FS[ctFs].row + 4);
         const cols = `${c2}ch minmax(0,1fr) ${c4}px`;
 
-        html += `<div class="ct-swipe-hint">← 削除　　変更 →</div>`;
+        html += `<div class="ct-swipe-hint"><span class="ct-hint">` +
+          `<span class="ct-hint-l"><span class="hl" style="--d:.8s">←</span><span class="hl" style="--d:.4s">削</span><span class="hl" style="--d:0s">除</span></span>` +
+          `<span class="ct-hint-r"><span class="hl" style="--d:1.2s">変</span><span class="hl" style="--d:1.6s">更</span><span class="hl" style="--d:2s">→</span></span>` +
+          `</span></div>`;
         let prevStatus = null;
         detail.forEach(l => {
           const cls = l.status === 2 ? "out" : (l.status === 3 ? "in" : "oth");
@@ -1394,15 +1428,15 @@ dataSection.innerHTML = `
     <div class="dt-head">送る</div>
     <div class="dt-body">
       <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtMailReport">日報メール送信<br>(日報・車両・容器ログ)</button>
-        <div class="dt-desc">未送信分を送る</div>
+        <button class="btn btn-outline-mint" id="dtMailReport">全データをメール送信<br>(日報・車両・ToDoリスト・容器ログ)</button>
+        <div class="dt-desc">未送信の全データを送る</div>
       </div>
       <div class="dt-item">
         <button class="btn btn-outline-mint" id="dtMailCsv">容器ログだけメール送信<br>(CSV添付)</button>
         <div class="dt-desc" id="dtMailCsvDesc"></div>
       </div>
       <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtCsv">CSVで書き出す<br>(容器ログだけ全件)</button>
+        <button class="btn btn-outline-mint" id="dtCsv">容器ログだけスマホ保存<br>(CSVファイルを保存)</button>
         <div class="dt-desc" id="dtCsvDesc"></div>
       </div>
       <div class="dt-item">
