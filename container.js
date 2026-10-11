@@ -31,8 +31,8 @@ const GAS_TABLE = [
   { code:1007, label:"ArCo",     name:"アルコミック", cap:7,  unit:"㎥", fg:"#1f2933",
     // ボタン：横縞(薄いアズールグレー・緑・薄いアズールグレー)。緑は太め(高さの40%)
     bg:"linear-gradient(to bottom, " + AZURE_GRAY_LIGHT + " 0 30%, " + VIVID_GREEN + " 30% 70%, " + AZURE_GRAY_LIGHT + " 70% 100%)",
-    // 右側の「選んだガス種」の表示：高さ 8:2 の上の8(約68〜82%)付近に緑を置く
-    vertBg:"linear-gradient(to bottom, " + AZURE_GRAY_LIGHT + " 0 68%, " + VIVID_GREEN + " 68% 82%, " + AZURE_GRAY_LIGHT + " 82% 100%)" },
+    // 右側の「選んだガス種」の表示：高さを 上2:下8 に分け、上の2(約5〜19%)の付近に緑を置く
+    vertBg:"linear-gradient(to bottom, " + AZURE_GRAY_LIGHT + " 0 5%, " + VIVID_GREEN + " 5% 19%, " + AZURE_GRAY_LIGHT + " 19% 100%)" },
   { code:1008, label:"フロン",   name:"フロン",       cap:"", unit:"kg", bg:"#A3A9AF", fg:"#1f1f1f" },           // グレー
   { code:2001, label:"LP",       name:"プロパン",     cap:"", unit:"kg", bg:"#A3A9AF", fg:"#1f1f1f" },
   { code:5001, label:"医O2",    name:"医療用酸素",   cap:"", unit:"㎥", bg:"#222222", fg:"#fff" }               // 黒
@@ -174,7 +174,7 @@ style.textContent = `
   .ct-gas-area{ display:flex; gap:8px; align-items:stretch; }
   .ct-gas-area .ct-chip-row{ flex:1; min-width:0; }
   .ct-gas-vert{
-    flex:none; width:34px; min-height:96px; border-radius:10px; overflow:hidden;
+    flex:none; width:34px; min-height:88px; border-radius:10px; overflow:hidden;
     display:flex; align-items:center; justify-content:center; padding:8px 0;
     font-size:14px; font-weight:700; line-height:1.1; letter-spacing:.05em;
     background:#F2EEE4; color:var(--ink-soft);
@@ -294,22 +294,24 @@ style.textContent = `
 
   .ct-gas-area{ align-items:center; }
   .ct-gascol{ flex:1; min-width:0; }
-  .ct-gasdir{ display:flex; justify-content:space-between; height:18px; line-height:18px; font-size:16px; font-weight:700; color:var(--lavender-ink); padding:0 4px; }
+  .ct-gashead{ display:flex; justify-content:space-between; align-items:center; height:20px; margin-bottom:4px; }
+  .ct-gashead label{ margin:0; }
+  .ct-gasdir{ display:flex; gap:14px; font-size:17px; font-weight:900; line-height:1; color:var(--lavender-ink); }
   .ct-gasdir span{ visibility:hidden; }
   .ct-gasdir span.on{ visibility:visible; animation:ctBlink 1s ease-in-out infinite; }
   @keyframes ctBlink{ 0%,100%{ opacity:1; } 50%{ opacity:.15; } }
 
-  .ct-hint{ display:inline-flex; align-items:center; gap:22px; }
-  .ct-hint .hl{ display:inline-block; padding:0 2px; border-radius:4px; animation-duration:2.4s; animation-iteration-count:infinite; animation-timing-function:step-end; animation-delay:var(--d,0s); }
-  .ct-hint-l .hl{ animation-name:ctHintL; }
-  .ct-hint-r .hl{ animation-name:ctHintR; }
-  @keyframes ctHintL{ 0%{ background:var(--pink); color:var(--pink-ink); } 16.66%,100%{ background:transparent; color:inherit; } }
-  @keyframes ctHintR{ 0%{ background:var(--mint); color:var(--mint-ink); } 16.66%,100%{ background:transparent; color:inherit; } }
+  .ct-hint{ display:inline-flex; align-items:center; gap:26px; }
+  .ct-hint-l, .ct-hint-r{ display:inline-flex; align-items:center; gap:6px; }
+  .ct-hint .word{ font-weight:700; }
+  .ct-hint-l .word{ color:var(--pink-ink); }
+  .ct-hint-r .word{ color:var(--mint-ink); }
+  .ct-hint .arrow{ font-size:1.5em; font-weight:900; line-height:1; -webkit-text-stroke:1px currentColor; animation:ctBlink 1s ease-in-out infinite; }
+  .ct-hint-l .arrow{ color:#D6336C; }
+  .ct-hint-r .arrow{ color:#128F5A; }
   @media (prefers-reduced-motion: reduce){
     .ct-gasdir span.on{ animation:none; }
-    .ct-hint .hl{ animation:none; }
-    .ct-hint-l .hl{ background:var(--pink); color:var(--pink-ink); }
-    .ct-hint-r .hl{ background:var(--mint); color:var(--mint-ink); }
+    .ct-hint .arrow{ animation:none; }
   }
 
   /* 一画面に収める：訪問入力・車両情報・容器ログの余白を詰める */
@@ -320,25 +322,28 @@ style.textContent = `
   #visitScreen input[type=text], #visitScreen input[type=time], #visitScreen textarea{ padding:8px 10px; }
   #visitScreen .chip-group{ gap:6px; }
   #visitScreen .chip{ padding:7px 2px; font-size:12.5px; }
-  #visitScreen #meetingNotes{ height:46px; min-height:46px; }
-  #visitScreen #meetingContent{ min-height:56px; }
+  #visitScreen textarea{ resize:none; min-height:0; overflow-y:auto; line-height:1.45; }
+  #visitScreen .ct-inwrap input[type=time]{ width:100%; min-width:0; max-width:100%; font-size:14px; padding-right:4px; text-align:left; }
   #visitScreen .btn{ padding:11px; }
   #visitStatusField > div{ display:inline-block !important; margin:0 10px 0 0 !important; vertical-align:middle; }
-  #visitStatusField .ct-inwrap{ display:inline-block; width:11em; vertical-align:middle; }
+  #visitStatusField .ct-inwrap{ display:inline-block; width:8.5em; vertical-align:middle; }
   #visitStartTimeInput{ width:100%; padding-top:6px; padding-bottom:6px; font-size:14px; }
 
-  #vehicleScreen h2{ margin:10px 0 8px; }
+  #vehicleScreen h2{ margin:6px 0 6px; }
   .ct-h2-inline{ display:flex !important; justify-content:flex-start !important; align-items:center; gap:10px; }
-  #vehicleScreen .card{ padding:12px; margin-bottom:10px; }
-  #vehicleScreen .field{ margin-bottom:8px; }
-  #vehicleScreen .dial{ width:84px; height:84px; }
-  #vehicleScreen .dial-row{ margin-top:10px; }
-  #vehicleScreen .mode-switch-btn{ padding:8px; }
-  #vehicleScreen .dial-actions .btn{ padding:14px 10px; }
+  #vehicleScreen .card{ padding:10px; margin-bottom:8px; }
+  #vehicleScreen .field{ margin-bottom:6px; }
+  #vehicleScreen input[type=number], #vehicleScreen input[type=text]{ padding:8px 10px; }
+  #vehicleScreen .dial{ width:72px; height:72px; }
+  #vehicleScreen .dial-row{ margin-top:8px; }
+  #vehicleScreen .mode-switch-btn{ padding:6px; }
+  #vehicleScreen .dial-actions .btn{ padding:12px 10px; }
+  #vehicleScreen .btn{ padding:10px; }
+  #vehicleScreen #distanceSummaryCard{ padding:8px 12px; margin-bottom:6px; }
 
   #containerScreen h2{ margin:8px 0 8px; }
-  #containerScreen .card{ padding:12px; margin-bottom:10px; }
-  #containerScreen .field{ margin-bottom:8px; }
+  #containerScreen .card{ padding:10px; margin-bottom:8px; }
+  #containerScreen .field{ margin-bottom:6px; }
   #containerScreen .kana-grid{ gap:4px; margin-bottom:6px; }
   #containerScreen .kana-btn{ padding:6px 0; }
   .ct-lbrow{ display:flex; justify-content:space-between; align-items:center; height:26px; margin-bottom:4px; }
@@ -361,7 +366,7 @@ style.textContent = `
   .cm-tools{ display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; align-items:center; }
   .cm-count{ font-size:12px; color:var(--ink-soft); margin-left:auto; }
   .ct-gasbar-wrap{ position:relative; flex:1; min-width:0; background:#FBF1D8; border:1px solid #EEDDB4; border-radius:12px; overflow:hidden; }
-  .ct-gasbar{ position:relative; display:grid; grid-auto-flow:row; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:8px; }
+  .ct-gasbar{ position:relative; display:grid; grid-auto-flow:row; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:4px; }
   .ct-gasbar::-webkit-scrollbar{ display:none; }
   .ct-gasbar .chip{ flex:none; white-space:nowrap; }
   .ct-gasbar-wrap::before, .ct-gasbar-wrap::after{ content:""; position:absolute; top:0; bottom:0; width:20px; pointer-events:none; z-index:2; opacity:0; transition:opacity .15s; }
@@ -385,9 +390,9 @@ section.innerHTML = `
       <div class="ct-seg" id="ctStatusSeg" style="flex:2;"></div>
       <select id="ctStatusSel" style="flex:1.2;min-width:0;padding:8px 6px;" aria-label="その他の区分"></select>
     </div>
-    <div style="height:8px;"></div>
+    <div style="height:6px;"></div>
 
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
       <div class="ct-datefield">
         <span class="ct-inlab">日付</span>
         <span class="ct-datetext" id="ctDateText"></span>
@@ -396,12 +401,12 @@ section.innerHTML = `
       <div id="ctTimeField" style="display:none;">
         <div class="ct-inwrap">
           <label class="ct-inlab" for="ctTime">時刻</label>
-          <input type="time" id="ctTime" style="padding-left:46px;">
+          <input type="time" id="ctTime" style="padding-left:38px;">
         </div>
       </div>
     </div>
 
-    <div class="field" style="margin-bottom:8px;">
+    <div class="field" style="margin-bottom:6px;">
       <input type="text" id="ctCustomer" placeholder="顧客名" aria-label="顧客名" autocomplete="off">
     </div>
     <div id="ctKanaArea" style="display:none;">
@@ -410,10 +415,9 @@ section.innerHTML = `
     <div class="customer-list" id="ctCustomerList" style="display:none;"></div>
 
     <div class="field">
-      <label>ガス種</label>
+      <div class="ct-gashead"><label>ガス種</label><span class="ct-gasdir" aria-hidden="true"><span id="ctGasL">←</span><span id="ctGasR">→</span></span></div>
       <div class="ct-gas-area">
         <div class="ct-gascol">
-          <div class="ct-gasdir" aria-hidden="true"><span id="ctGasL">←</span><span id="ctGasR">→</span></div>
           <div class="ct-gasbar-wrap" id="ctGasWrap"><div class="ct-chip-row ct-gasbar" id="ctGasChips"></div></div>
         </div>
         <div class="ct-gas-vert" id="ctGasVert"><span></span></div>
@@ -1162,8 +1166,8 @@ function renderList(){
         const cols = `${c2}ch minmax(0,1fr) ${c4}px`;
 
         html += `<div class="ct-swipe-hint"><span class="ct-hint">` +
-          `<span class="ct-hint-l"><span class="hl" style="--d:.8s">←</span><span class="hl" style="--d:.4s">削</span><span class="hl" style="--d:0s">除</span></span>` +
-          `<span class="ct-hint-r"><span class="hl" style="--d:1.2s">変</span><span class="hl" style="--d:1.6s">更</span><span class="hl" style="--d:2s">→</span></span>` +
+          `<span class="ct-hint-l"><span class="arrow">←</span><span class="word">削除</span></span>` +
+          `<span class="ct-hint-r"><span class="word">変更</span><span class="arrow">→</span></span>` +
           `</span></div>`;
         let prevStatus = null;
         detail.forEach(l => {
@@ -1302,7 +1306,7 @@ async function saveFile(name, content, mime, withBom){
 /* 容器ログ：未送信の分をCSVにして、共有画面からメールで送る(添付)。共有画面が使えない環境では、保存してメールの下書きを開く */
 async function mailContainerCsv(){
   const logs = ctLogs.filter(l => !l.sentAt);
-  if(logs.length === 0){ showToast("未送信の容器ログはありません"); return; }
+  if(logs.length === 0){ showToast("未送信の容器はありません"); return; }
   const name = `容器ログ_${getToday().replace(/-/g,"")}.csv`;
   const r = await saveFile(name, csvText(logs), "text/csv", true);
   if(r === "shared"){
@@ -1428,15 +1432,15 @@ dataSection.innerHTML = `
     <div class="dt-head">送る</div>
     <div class="dt-body">
       <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtMailReport">全データをメール送信<br>(日報・車両・ToDoリスト・容器ログ)</button>
+        <button class="btn btn-outline-mint" id="dtMailReport">全データをメール送信<br>(日報・車両・ToDo・容器)</button>
         <div class="dt-desc">未送信の全データを送る</div>
       </div>
       <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtMailCsv">容器ログだけメール送信<br>(CSV添付)</button>
+        <button class="btn btn-outline-mint" id="dtMailCsv">容器だけメール送信<br>(CSV添付)</button>
         <div class="dt-desc" id="dtMailCsvDesc"></div>
       </div>
       <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtCsv">容器ログだけスマホ保存<br>(CSVファイルを保存)</button>
+        <button class="btn btn-outline-mint" id="dtCsv">容器だけスマホ保存<br>(CSV保存)</button>
         <div class="dt-desc" id="dtCsvDesc"></div>
       </div>
       <div class="dt-item">
@@ -1452,7 +1456,7 @@ dataSection.innerHTML = `
       <div class="dt-state" id="dtLastBackup"></div>
       <div class="dt-item">
         <button class="btn btn-outline-mint" id="dtBackup">バックアップ保存</button>
-        <div class="dt-desc">日報・車両・容器ログ・TODO</div>
+        <div class="dt-desc">日報・車両・容器・ToDo</div>
       </div>
       <div class="dt-item">
         <button class="btn btn-outline-mint" id="dtRestore">バックアップから戻す</button>
@@ -1484,7 +1488,7 @@ dataSection.innerHTML = `
         <div class="dt-desc" id="dtDelReportDesc"></div>
       </div>
       <div class="dt-item">
-        <button class="btn btn-outline-pink" id="dtDelContainer">容器ログを削除</button>
+        <button class="btn btn-outline-pink" id="dtDelContainer">容器を削除</button>
         <div class="dt-desc" id="dtDelContainerDesc"></div>
       </div>
       <div class="dt-item">
@@ -1786,20 +1790,32 @@ if(typeof window.renderMasterUI === "function") window.renderMasterUI();
   }
 })();
 
-function fitVisitScreen(){
-  const ta = $("meetingContent"), card = $("meetingCard"), end = $("endButton"), vs = $("visitScreen");
-  if(!ta || !card || !end || !vs || !vs.classList.contains("active") || card.style.display === "none") return;
-  ta.style.height = "56px";
-  const bottom = end.getBoundingClientRect().bottom;
-  const free = window.innerHeight - bottom - 14;
-  ta.style.height = Math.max(56, Math.min(260, 56 + free)) + "px";   // 「内容」を、画面の残りの高さまで広げる
+// 「内容」「特記事項」：最初は1行分。入力して足りなくなるところで、1行分だけ高くする。
+// 文字を消しても、高さは戻さない(入力中に動かないように)。画面を開いたときだけ高さを決め直す
+let visitMax = { c:9999, n:9999 };
+function growTA(ta, maxH){
+  const cur = ta.offsetHeight;
+  ta.style.height = "1px";
+  const need = ta.scrollHeight;
+  ta.style.height = Math.min(maxH, Math.max(cur, need)) + "px";
 }
+function fitVisitScreen(){
+  const ta = $("meetingContent"), notes = $("meetingNotes"), card = $("meetingCard"), end = $("endButton"), vs = $("visitScreen");
+  if(!ta || !notes || !card || !end || !vs || !vs.classList.contains("active") || card.style.display === "none") return;
+  ta.style.height = "1px"; notes.style.height = "1px";
+  const hc = ta.scrollHeight, hn = notes.scrollHeight;               // 空の欄の、1行分の高さ
+  ta.style.height = hc + "px"; notes.style.height = hn + "px";
+  const free = Math.max(0, window.innerHeight - end.getBoundingClientRect().bottom - 14);   // 「記録終了」が見える範囲で、増やせる高さ
+  visitMax = { c: hc + free * 0.65, n: hn + free * 0.35 };
+  growTA(ta, visitMax.c);                                             // 編集のときは、すでにある文字に合わせる
+  growTA(notes, visitMax.n);
+}
+if($("meetingContent")) $("meetingContent").addEventListener("input", () => growTA($("meetingContent"), visitMax.c));
+if($("meetingNotes")) $("meetingNotes").addEventListener("input", () => growTA($("meetingNotes"), visitMax.n));
 const origGoToVisit = window.goToVisit;
 if(typeof origGoToVisit === "function"){
-  window.goToVisit = function(){ origGoToVisit(); fitVisitScreen(); setTimeout(fitVisitScreen, 60); };
+  window.goToVisit = function(){ origGoToVisit(); fitVisitScreen(); };
 }
-window.addEventListener("resize", fitVisitScreen);
-window.addEventListener("orientationchange", () => setTimeout(fitVisitScreen, 200));
 
 // 「送信済み」の印と件数
 function vehDays(){
@@ -1912,11 +1928,11 @@ function delReportVehicle(){
 
 function delContainer(){
   const c = dataCounts();
-  if(c.ct === 0){ showToast("容器ログはありません"); return; }
-  if(!window.confirm(`容器ログ ${c.ct}本を削除します。\n(未送信 ${c.ctUnsent}本)\n\n戻せません。削除しますか?`)) return;
+  if(c.ct === 0){ showToast("容器はありません"); return; }
+  if(!window.confirm(`容器 ${c.ct}本を削除します。\n(未送信 ${c.ctUnsent}本)\n\n戻せません。削除しますか?`)) return;
   ctLogs = [];
   ctSave();
-  afterDelete("容器ログを削除しました");
+  afterDelete("容器を削除しました");
 }
 
 function delTodo(){
@@ -1931,7 +1947,7 @@ function delTodo(){
 $("dtMailReport").addEventListener("click", () => { const b = $("mailButton"); if(b) b.click(); });
 $("dtMailCsv").addEventListener("click", mailContainerCsv);
 $("dtCsv").addEventListener("click", async () => {
-  if(ctLogs.length === 0){ showToast("容器ログがありません"); return; }
+  if(ctLogs.length === 0){ showToast("容器がありません"); return; }
   await saveFile(`容器ログ全件_${getToday().replace(/-/g,"")}.csv`, csvText(ctLogs), "text/csv", true);
 });
 $("dtMarkSent").addEventListener("click", markAllSent);
@@ -2077,16 +2093,19 @@ const INLINE_IDS = new Set(["meetingPersonTitle"]);
 
 function halfParens(t){ return String(t).replace(/（/g, "(").replace(/）/g, ")"); }
 
+const SHORT_LABELS = { "開始時刻":"開始", "終了時刻":"終了" };   // 時刻欄の見出しは2文字に(欄を狭くする)
+
 function makeInline(inp, lb, text){
+  if(SHORT_LABELS[text]) text = SHORT_LABELS[text];
   const wrap = document.createElement("div");
   wrap.className = "ct-inwrap";
   inp.parentNode.insertBefore(wrap, inp);
   wrap.appendChild(inp);
   lb.className = "ct-inlab";
   lb.removeAttribute("style");
-  lb.textContent = halfParens(lb.textContent);
+  lb.textContent = halfParens(text);
   wrap.insertBefore(lb, inp);
-  inp.style.paddingLeft = (text.length * 11 + 24) + "px";
+  inp.style.paddingLeft = (text.length * 11 + (inp.type === "time" ? 16 : 24)) + "px";
   inp.style.textAlign = "left";
 }
 
