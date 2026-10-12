@@ -31,8 +31,8 @@ const GAS_TABLE = [
   { code:1007, label:"ArCo",     name:"アルコミック", cap:7,  unit:"㎥", fg:"#1f2933",
     // ボタン：横縞(薄いアズールグレー・緑・薄いアズールグレー)。緑は太め(高さの40%)
     bg:"linear-gradient(to bottom, " + AZURE_GRAY_LIGHT + " 0 30%, " + VIVID_GREEN + " 30% 70%, " + AZURE_GRAY_LIGHT + " 70% 100%)",
-    // 右側の「選んだガス種」の表示：高さを 上2:下8 に分け、上の2(約5〜19%)の付近に緑を置く
-    vertBg:"linear-gradient(to bottom, " + AZURE_GRAY_LIGHT + " 0 5%, " + VIVID_GREEN + " 5% 19%, " + AZURE_GRAY_LIGHT + " 19% 100%)" },
+    // 右側の「選んだガス種」の表示：全体は薄いアズールグレー。縦書きの文字「ルコ」(2〜3文字目)の背景だけ緑
+    vertBg:AZURE_GRAY_LIGHT, vertHL:{ from:1, to:3, bg:VIVID_GREEN } },
   { code:1008, label:"フロン",   name:"フロン",       cap:"", unit:"kg", bg:"#A3A9AF", fg:"#1f1f1f" },           // グレー
   { code:2001, label:"LP",       name:"プロパン",     cap:"", unit:"kg", bg:"#A3A9AF", fg:"#1f1f1f" },
   { code:5001, label:"医O2",    name:"医療用酸素",   cap:"", unit:"㎥", bg:"#222222", fg:"#fff" }               // 黒
@@ -362,7 +362,10 @@ style.textContent = `
   .cm-code{ font-size:12px; color:var(--ink-soft); white-space:nowrap; }
   .cm-tag{ font-size:11px; border:1px solid var(--lavender-dark); color:var(--lavender-ink); border-radius:4px; padding:0 4px; white-space:nowrap; }
   .cm-mini{ border:1.5px solid var(--line); background:#fff; border-radius:8px; padding:4px 9px; font-size:12px; font-weight:700; font-family:inherit; color:var(--ink); cursor:pointer; }
-  .cm-bar{ position:sticky; bottom:0; background:linear-gradient(to top, var(--bg) 70%, rgba(250,246,239,0)); padding:10px 0 12px; z-index:5; }
+  .cm-note{ font-size:14px; font-weight:700; color:var(--lavender-ink); margin:0 2px 8px; }
+  .cm-head{ display:flex; justify-content:space-between; font-size:12px; color:var(--ink-soft); padding:6px 4px 2px; border-bottom:1px solid var(--line); }
+  .cm-chk{ display:flex; align-items:center; gap:4px; font-size:12px; color:var(--ink-soft); padding:6px 4px; flex:none; white-space:nowrap; cursor:pointer; }
+  .cm-row.is-hidden .cm-name{ color:var(--ink-soft); text-decoration:line-through; }
   .cm-tools{ display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; align-items:center; }
   .cm-count{ font-size:12px; color:var(--ink-soft); margin-left:auto; }
   .ct-gasbar-wrap{ position:relative; flex:1; min-width:0; background:#FBF1D8; border:1px solid #EEDDB4; border-radius:12px; overflow:hidden; }
@@ -596,7 +599,16 @@ function renderGasSelected(){
   }else{
     text = "未選択";
   }
-  el.querySelector("span").textContent = text;
+  const sp = el.querySelector("span");
+  sp.textContent = text;
+  sp.style.cssText = "";
+  if(g && g.vertHL){                     // 指定した文字だけ、表示の幅いっぱいに背景を付ける(縦書きなので、文字の高さ=1em×字間)
+    const u = 1.05, h = g.vertHL;
+    const p1 = Math.round(h.from * u * 100) / 100, p2 = Math.round(h.to * u * 100) / 100;   // 浮動小数の誤差を丸める
+    sp.style.flex = "1";
+    sp.style.lineHeight = "34px";
+    sp.style.background = `linear-gradient(to bottom, transparent ${p1}em, ${h.bg} ${p1}em, ${h.bg} ${p2}em, transparent ${p2}em)`;
+  }
   el.style.background = st ? (st.vertBg || st.bg) : "";
   el.style.color = st ? st.fg : "";
   el.style.textShadow = (st && st.shadow) ? "0 0 3px rgba(0,0,0,0.6)" : "";
@@ -1560,10 +1572,16 @@ if(typeof origRenderMasterUI === "function"){
 // 表示の言葉をそろえる：「客先名リスト」→「顧客リスト」、「TODO」→「ToDo」
 const origShowToast = window.showToast;
 if(typeof origShowToast === "function"){
-  window.showToast = function(m){ origShowToast(String(m).replace(/TODO/g, "ToDo").replace(/客先名リスト/g, "顧客リスト")); };
+  window.showToast = function(m){ origShowToast(String(m).replace(/TODO/g, "ToDo").replace(/客先名リスト/g, "顧客リスト").replace(/営業所キー/g, "担当キー")); };
 }
 const nativeConfirm = window.confirm.bind(window);
-window.confirm = function(m){ return nativeConfirm(String(m).replace(/客先名リスト/g, "顧客リスト")); };
+window.confirm = function(m){ return nativeConfirm(String(m).replace(/客先名リスト/g, "顧客リスト").replace(/営業所キー/g, "担当キー")); };
+const origSetMasterMessage = window.setMasterMessage;
+if(typeof origSetMasterMessage === "function"){
+  window.setMasterMessage = function(text, isError){
+    origSetMasterMessage(String(text).replace(/営業所キー/g, "担当キー").replace(/この営業所/g, "この担当"), isError);
+  };
+}
 const origRenderTodoList = window.renderTodoList;
 function normalizeTodoHeads(){
   document.querySelectorAll(".todo-list-target h2 span:first-child").forEach(sp => {
@@ -1581,7 +1599,9 @@ custSection.id = "custScreen";
 custSection.className = "screen";
 custSection.innerHTML = `
   <div class="cm-top"><button type="button" class="btn-mini" id="cmBack">← データ</button><h2>顧客の管理</h2></div>
+  <div class="cm-note" id="cmHiddenNote"></div>
   <div class="ct-seg" id="cmTabs">
+    <button type="button" data-tab="all"></button>
     <button type="button" data-tab="show"></button>
     <button type="button" data-tab="hide"></button>
   </div>
@@ -1589,14 +1609,14 @@ custSection.innerHTML = `
     <input type="text" id="cmSearch" placeholder="顧客名・読み仮名・コードで検索" autocomplete="off">
     <div class="kana-grid" id="cmKana" style="margin-top:8px;"></div>
     <div class="cm-tools">
-      <button type="button" class="cm-mini" id="cmAll">絞り込み全部を選ぶ</button>
-      <button type="button" class="cm-mini" id="cmNone">選択を解除</button>
+      <button type="button" class="cm-mini" id="cmHideAll">絞り込んだ分を全て非表示</button>
+      <button type="button" class="cm-mini" id="cmShowAll">絞り込んだ分を全て表示に戻す</button>
       <span class="cm-count" id="cmCount"></span>
     </div>
+    <div class="cm-head"><span>顧客</span><span>非表示にする</span></div>
     <div id="cmList"></div>
     <button type="button" class="btn btn-outline-mint" id="cmMore" style="margin-top:10px;" hidden>さらに表示</button>
   </div>
-  <div class="cm-bar"><button type="button" class="btn btn-peach" id="cmApply">非表示にする(0)</button></div>
   <div class="card" id="cmAddCard">
     <div class="dt-title" id="cmAddTitle" style="font-size:15px;font-weight:700;margin-bottom:8px;">顧客を追加</div>
     <div class="cm-tools" style="display:block;">
@@ -1610,12 +1630,12 @@ custSection.innerHTML = `
 `;
 document.querySelector("main").appendChild(custSection);
 
-let cmTab = "show", cmKana = null, cmLimit = 100, cmEditId = null;
-const cmSel = new Set();
+let cmTab = "all", cmKana = null, cmLimit = 100, cmEditId = null;
 
 function cmItems(){
-  const wantHidden = cmTab === "hide";
-  let items = allCustomers().filter(i => custHidden.has(custKey(i)) === wantHidden);
+  let items = allCustomers();
+  if(cmTab === "show") items = items.filter(i => !custHidden.has(custKey(i)));
+  else if(cmTab === "hide") items = items.filter(i => custHidden.has(custKey(i)));
   const q = $("cmSearch").value;
   if(q.trim()){
     const nq = normQ(q), hq = hira(q);
@@ -1626,14 +1646,19 @@ function cmItems(){
   return items;
 }
 
-function renderCust(){
+function updateCustCounts(){
   const all = allCustomers();
   const hid = all.filter(i => custHidden.has(custKey(i))).length;
   const tabs = $("cmTabs").querySelectorAll("button");
-  tabs[0].textContent = `表示中 ${all.length - hid}`;
-  tabs[1].textContent = `非表示 ${hid}`;
+  tabs[0].textContent = `すべて ${all.length}`;
+  tabs[1].textContent = `表示中 ${all.length - hid}`;
+  tabs[2].textContent = `非表示 ${hid}`;
   tabs.forEach(b => { b.className = (b.getAttribute("data-tab") === cmTab) ? "on" : ""; });
+  $("cmHiddenNote").textContent = `非表示 ${hid}件`;
+}
 
+function renderCust(){
+  updateCustCounts();
   const grid = $("cmKana");
   grid.innerHTML = "";
   [...KANA_ROWS.map(r => r[0]), "他"].forEach(row => {
@@ -1657,21 +1682,18 @@ function renderCust(){
   }
   items.slice(0, cmLimit).forEach(i => {
     const key = custKey(i);
-    const row = document.createElement("label");
-    row.className = "cm-row";
-    row.innerHTML = `<input type="checkbox" data-key="${encodeURIComponent(key)}"${cmSel.has(key) ? " checked" : ""}>` +
-      `<span class="cm-name">${escapeHtml(i.n)}</span>` +
+    const hidden = custHidden.has(key);
+    const row = document.createElement("div");
+    row.className = "cm-row" + (hidden ? " is-hidden" : "");
+    row.innerHTML = `<span class="cm-name">${escapeHtml(i.n)}</span>` +
       (i.x ? '<span class="cm-tag">追加</span>' : "") +
       (i.c ? `<span class="cm-code">${escapeHtml(i.c)}</span>` : "") +
-      (i.x ? `<button type="button" class="cm-mini" data-act="edit" data-id="${escapeHtml(i.id)}">直す</button><button type="button" class="cm-mini" data-act="del" data-id="${escapeHtml(i.id)}">消す</button>` : "");
+      (i.x ? `<button type="button" class="cm-mini" data-act="edit" data-id="${escapeHtml(i.id)}">直す</button><button type="button" class="cm-mini" data-act="del" data-id="${escapeHtml(i.id)}">消す</button>` : "") +
+      `<label class="cm-chk"><input type="checkbox" data-key="${encodeURIComponent(key)}"${hidden ? " checked" : ""}><span>非表示</span></label>`;
     list.appendChild(row);
   });
   $("cmMore").hidden = items.length <= cmLimit;
   $("cmMore").textContent = `さらに表示(残り ${Math.max(0, items.length - cmLimit)}件)`;
-
-  const apply = $("cmApply");
-  apply.textContent = (cmTab === "show" ? "非表示にする" : "表示に戻す") + `(${cmSel.size})`;
-  apply.disabled = cmSel.size === 0;
 }
 
 function cmResetAddForm(){
@@ -1682,14 +1704,15 @@ function cmResetAddForm(){
   $("cmAddCancel").hidden = true;
 }
 
-function refreshCustomers(){
+// 保存して、ホーム・容器の顧客選択に反映する(一覧の作り直しはしない)
+function applyCustomers(){
   saveCust();
   if(typeof window.renderMasterUI === "function") window.renderMasterUI(); else applyMasterOverlay();
-  renderCust();
 }
+function refreshCustomers(){ applyCustomers(); renderCust(); }
 
 function goToCust(){
-  cmSel.clear(); cmLimit = 100;
+  cmTab = "all"; cmLimit = 100;
   renderCust();
   showScreen("cust");
   updateNav("data");
@@ -1699,26 +1722,42 @@ $("cmTabs").addEventListener("click", e => {
   const b = e.target.closest("button");
   if(!b) return;
   cmTab = b.getAttribute("data-tab");
-  cmSel.clear(); cmLimit = 100;
+  cmLimit = 100;
   renderCust();
 });
 $("cmSearch").addEventListener("input", () => { cmLimit = 100; renderCust(); });
 $("cmMore").addEventListener("click", () => { cmLimit += 100; renderCust(); });
-$("cmAll").addEventListener("click", () => { cmItems().forEach(i => cmSel.add(custKey(i))); renderCust(); });
-$("cmNone").addEventListener("click", () => { cmSel.clear(); renderCust(); });
+
+// 「非表示」のチェック：付けるとすぐ非表示、外すとすぐ表示に戻る
 $("cmList").addEventListener("change", e => {
   const cb = e.target.closest('input[type="checkbox"]');
   if(!cb) return;
   const key = decodeURIComponent(cb.getAttribute("data-key"));
-  if(cb.checked) cmSel.add(key); else cmSel.delete(key);
-  const apply = $("cmApply");
-  apply.textContent = (cmTab === "show" ? "非表示にする" : "表示に戻す") + `(${cmSel.size})`;
-  apply.disabled = cmSel.size === 0;
+  if(cb.checked) custHidden.add(key); else custHidden.delete(key);
+  applyCustomers();
+  if(cmTab === "all"){
+    cb.closest(".cm-row").classList.toggle("is-hidden", cb.checked);   // 一覧に残したまま、灰色＋取り消し線にする
+    updateCustCounts();
+  }else{
+    renderCust();                                                       // 「表示中」「非表示」の絞り込み中は、一覧から外れる
+  }
 });
+
+// 絞り込んだ分を、まとめて非表示／表示に戻す
+function cmBulk(hide){
+  const target = cmItems().filter(i => custHidden.has(custKey(i)) !== hide);
+  if(target.length === 0){ showToast(hide ? "非表示にする顧客はありません" : "表示に戻す顧客はありません"); return; }
+  if(!window.confirm(`絞り込んだ ${target.length}件を${hide ? "非表示にします" : "表示に戻します"}。\n\nよろしいですか?`)) return;
+  target.forEach(i => { if(hide) custHidden.add(custKey(i)); else custHidden.delete(custKey(i)); });
+  refreshCustomers();
+  showToast(`${target.length}件を${hide ? "非表示にしました" : "表示に戻しました"}`);
+}
+$("cmHideAll").addEventListener("click", () => cmBulk(true));
+$("cmShowAll").addEventListener("click", () => cmBulk(false));
+
 $("cmList").addEventListener("click", e => {
   const btn = e.target.closest("button[data-act]");
   if(!btn) return;
-  e.preventDefault();
   const id = btn.getAttribute("data-id");
   const ex = custExtra.find(x => x.id === id);
   if(!ex) return;
@@ -1734,20 +1773,10 @@ $("cmList").addEventListener("click", e => {
     if(!window.confirm(`「${ex.n}」を削除します。\n\n戻せません。削除しますか?`)) return;
     custHidden.delete(custKey(ex));
     custExtra = custExtra.filter(x => x.id !== id);
-    cmSel.delete(custKey(ex));
     if(cmEditId === id) cmResetAddForm();
     refreshCustomers();
     showToast("削除しました");
   }
-});
-$("cmApply").addEventListener("click", () => {
-  if(cmSel.size === 0) return;
-  const hide = cmTab === "show";
-  const n = cmSel.size;
-  cmSel.forEach(k => { if(hide) custHidden.add(k); else custHidden.delete(k); });
-  cmSel.clear();
-  refreshCustomers();
-  showToast(`${n}件を${hide ? "非表示にしました" : "表示に戻しました"}`);
 });
 $("cmAddBtn").addEventListener("click", () => {
   const n = $("cmAddName").value.trim();
@@ -2093,7 +2122,8 @@ const INLINE_IDS = new Set(["meetingPersonTitle"]);
 
 function halfParens(t){ return String(t).replace(/（/g, "(").replace(/）/g, ")"); }
 
-const SHORT_LABELS = { "開始時刻":"開始", "終了時刻":"終了" };   // 時刻欄の見出しは2文字に(欄を狭くする)
+const SHORT_LABELS = { "開始時刻":"開始", "終了時刻":"終了" };
+const LABEL_RENAME = { "営業所キー":"担当キー" };            // 顧客リストの単位は「担当」   // 時刻欄の見出しは2文字に(欄を狭くする)
 
 function makeInline(inp, lb, text){
   if(SHORT_LABELS[text]) text = SHORT_LABELS[text];
@@ -2115,7 +2145,8 @@ function convertHostLabels(){
     const inp = document.getElementById(lb.getAttribute("for"));
     if(!inp) return;
     if(inp.id === "vehicleDistance") return;     // 走行距離は、欄の上の見出し(ラベル)のまま
-    const text = lb.textContent.trim();
+    let text = lb.textContent.trim();
+    if(LABEL_RENAME[text]) text = LABEL_RENAME[text];
     const type = (inp.type || "").toLowerCase();
     if(INLINE_IDS.has(inp.id) || type === "date" || type === "time"){
       makeInline(inp, lb, text);
