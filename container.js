@@ -139,7 +139,7 @@ style.textContent = `
   .ct-dleft{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
   .ct-dline1{ display:flex; align-items:baseline; min-width:0; }
   .ct-bcpsub{ flex:none; text-align:right; }
-  .ct-wx{ display:block; width:100%; overflow:hidden; border:none; background:transparent; font-family:inherit; font-size:12.5px; font-weight:700; color:var(--ink); padding:0; text-align:left; cursor:pointer; }
+  .ct-wx{ display:block; width:100%; overflow:hidden; border:none; background:transparent; font-family:inherit; font-size:12.5px; font-weight:700; color:#0B7A7A; padding:0; text-align:left; cursor:pointer; }   /* アズールグリーン(濃いめ) */
   .ct-wx[hidden]{ display:none; }
   .ct-wxtrack{ display:inline-block; white-space:nowrap; animation:ctWxScroll var(--wx-dur, 20s) linear infinite; }
   .ct-wx.paused .ct-wxtrack{ animation-play-state:paused; }
