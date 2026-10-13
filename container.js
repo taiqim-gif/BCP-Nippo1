@@ -220,6 +220,10 @@ style.textContent = `
   .ct-tog.open{ background:var(--lavender); }
 
   .ct-inwrap{ position:relative; }
+  .ct-timebox{ position:relative; display:inline-flex; align-items:center; gap:8px; width:7.6em; min-width:0; padding:8px 10px; border:1.5px solid var(--line); border-radius:10px; background:#FFFDF9; box-sizing:border-box; vertical-align:middle; }
+  .ct-timebox .ct-inlab{ font-size:11px; color:var(--ink-soft); flex:none; }
+  .ct-timetext{ font-size:15px; white-space:nowrap; }
+  .ct-timebox > input[type=time]{ position:absolute !important; inset:0; width:100% !important; height:100% !important; max-width:none !important; opacity:0; border:0 !important; padding:0 !important; margin:0; font-size:16px; }
   .ct-inwrap > label.ct-inlab{ position:absolute; left:12px; top:50%; transform:translateY(-50%); margin:0; font-size:11px; color:var(--ink-soft); white-space:nowrap; pointer-events:none; z-index:1; }
   .ct-datefield{ position:relative; display:flex; align-items:center; gap:10px; min-width:12.5em; padding:11px 12px; border:1.5px solid var(--line); border-radius:10px; background:#FFFDF9; }
   .ct-datefield .ct-inlab{ font-size:11px; color:var(--ink-soft); flex:none; }
@@ -402,10 +406,8 @@ section.innerHTML = `
         <input type="date" id="ctDate" aria-label="日付">
       </div>
       <div id="ctTimeField" style="display:none;">
-        <div class="ct-inwrap">
-          <label class="ct-inlab" for="ctTime">時刻</label>
-          <input type="time" id="ctTime" style="padding-left:38px;">
-        </div>
+        <label for="ctTime">時刻</label>
+        <input type="time" id="ctTime">
       </div>
     </div>
 
@@ -1330,22 +1332,55 @@ async function mailContainerCsv(){
   }
 }
 
+// 緯度,経度を、小数第5位(約1メートル)までの数字にする。取れていないときは空欄
+function posText(lat, lng, loc){
+  let a = lat, b = lng;
+  if((a === "" || a == null || b === "" || b == null) && typeof loc === "string" && loc.includes(",")){
+    const p = loc.split(",");
+    a = p[0]; b = p[1];
+  }
+  const x = parseFloat(a), y = parseFloat(b);
+  return (isFinite(x) && isFinite(y)) ? `${x.toFixed(5)},${y.toFixed(5)}` : "";
+}
+
 /* 日報メール：送信済みにした記録は送らない。末尾に、未送信の「容器ログ」を付ける */
 const origBuildReportMail = window.buildReportMail;
 if(typeof origBuildReportMail === "function"){
   window.buildReportMail = function(){
     const m0 = meetingLogs, v0 = dailyVehicleInfo;
+    const visitCopies = [];
+    const today = getToday();
     let r;
     try{
-      meetingLogs = m0.filter(l => !l.sentAt);
+      // 末尾に目印を付けて渡し、できあがった本文の目印の所へ、位置情報の行を差し込む(特記事項が複数行でも崩れない)
+      meetingLogs = m0.filter(l => !l.sentAt).map((l, i) => {
+        visitCopies.push(l);
+        return Object.assign({}, l, { notes:(l.notes || "") + "\u0001L" + i + "\u0001" });
+      });
       const vf = {};
-      Object.keys(v0).forEach(k => { if(!(v0[k] && v0[k].sentAt)) vf[k] = v0[k]; });
+      Object.keys(v0).forEach(k => {
+        const v = v0[k];
+        if(v && v.sentAt) return;
+        const marked = v && (k === today || (typeof vehicleHasData === "function" && vehicleHasData(v)));
+        vf[k] = marked
+          ? Object.assign({}, v, { return: Object.assign({}, v.return, { fuel: ((v.return && v.return.fuel) || "") + "\u0001V" + k + "\u0001" }) })
+          : v;
+      });
       dailyVehicleInfo = vf;
       r = origBuildReportMail();
     }finally{
       meetingLogs = m0;
       dailyVehicleInfo = v0;
     }
+    r.body = r.body
+      .replace(/\u0001L(\d+)\u0001/g, (m, i) => {
+        const l = visitCopies[Number(i)] || {};
+        return `\n開始位置：${posText(l.startLat, l.startLng, l.startLocation)}\n終了位置：${posText(l.endLat, l.endLng, l.endLocation)}`;
+      })
+      .replace(/\u0001V([\d-]+)\u0001/g, (m, k) => {
+        const v = v0[k] || {}, d = v.departure || {}, rt = v.return || {};
+        return `\n出発位置：${posText(d.lat, d.lng, d.location)}\n帰社位置：${posText(rt.lat, rt.lng, rt.location)}`;
+      });
     const unsent = ctLogs.filter(l => !l.sentAt);
     if(unsent.length > 0){
       r.body += "【容器ログ】\n" + CSV_HEAD.join(",") + "\n" + csvLines(unsent).join("\n") + "\n";
@@ -1822,20 +1857,31 @@ if(typeof window.renderMasterUI === "function") window.renderMasterUI();
 // 「内容」「特記事項」：最初は1行分。入力して足りなくなるところで、1行分だけ高くする。
 // 文字を消しても、高さは戻さない(入力中に動かないように)。画面を開いたときだけ高さを決め直す
 let visitMax = { c:9999, n:9999 };
+function borderV(ta){
+  const cs = window.getComputedStyle(ta);
+  return (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+}
 function growTA(ta, maxH){
   const cur = ta.offsetHeight;
   ta.style.height = "1px";
-  const need = ta.scrollHeight;
+  const need = ta.scrollHeight + borderV(ta);
   ta.style.height = Math.min(maxH, Math.max(cur, need)) + "px";
+}
+function rowsHeight(ta, rows){                                         // 指定した行数ぶんの高さ
+  const cs = window.getComputedStyle(ta);
+  const fs = parseFloat(cs.fontSize) || 15;
+  const lhRaw = parseFloat(cs.lineHeight);
+  const lh = /px\s*$/.test(String(cs.lineHeight)) ? lhRaw : (lhRaw > 0 ? lhRaw * fs : fs * 1.45);   // 「1.45」のような倍率も、px も扱う
+  const pad = (parseFloat(cs.paddingTop) || 8) + (parseFloat(cs.paddingBottom) || 8) + borderV(ta);
+  return lh * rows + pad;
 }
 function fitVisitScreen(){
   const ta = $("meetingContent"), notes = $("meetingNotes"), card = $("meetingCard"), end = $("endButton"), vs = $("visitScreen");
   if(!ta || !notes || !card || !end || !vs || !vs.classList.contains("active") || card.style.display === "none") return;
   ta.style.height = "1px"; notes.style.height = "1px";
-  const hc = ta.scrollHeight, hn = notes.scrollHeight;               // 空の欄の、1行分の高さ
+  const hc = ta.scrollHeight + borderV(ta), hn = notes.scrollHeight + borderV(notes);   // 空の欄の、1行分の高さ
   ta.style.height = hc + "px"; notes.style.height = hn + "px";
-  const free = Math.max(0, window.innerHeight - end.getBoundingClientRect().bottom - 14);   // 「記録終了」が見える範囲で、増やせる高さ
-  visitMax = { c: hc + free * 0.65, n: hn + free * 0.35 };
+  visitMax = { c: Math.max(hc, rowsHeight(ta, 10)), n: Math.max(hn, rowsHeight(notes, 10)) };   // 広がるのは10行まで(それを超えると、欄の中でスクロール)
   growTA(ta, visitMax.c);                                             // 編集のときは、すでにある文字に合わせる
   growTA(notes, visitMax.n);
 }
@@ -2115,6 +2161,118 @@ function goToContainer(){
   updateNav("container");
 }
 
+/* ---------- 車両の走行距離の初期値 ---------- */
+function prevDayKey(key){
+  const p = String(key).split("-").map(Number);
+  const t = new Date(p[0], p[1] - 1, p[2] - 1);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
+}
+// 出発の初期値：前日の「帰社」の距離。なければ、これまでの距離(出発・帰社)のうち、いちばん大きい値。どちらもなければ空欄
+window.getLatestPastReturnDistance = function(excludeDate){
+  const info = dailyVehicleInfo;
+  const prev = info[prevDayKey(excludeDate)];
+  const pr = prev && prev.return ? prev.return.distance : "";
+  if(pr !== "" && pr != null && isFinite(parseFloat(pr))) return pr;
+  let max = null;
+  Object.keys(info).forEach(k => {
+    if(k === excludeDate) return;
+    const v = info[k] || {};
+    [v.departure && v.departure.distance, v.return && v.return.distance].forEach(x => {
+      const n = parseFloat(x);
+      if(isFinite(n) && (max === null || n > max)) max = n;
+    });
+  });
+  return max === null ? "" : String(max);
+};
+// 帰社の初期値：出発の距離。帰社の欄を自分で入力したあとは、上書きしない
+const origRenderVehicleScreen = window.renderVehicleScreen;
+if(typeof origRenderVehicleScreen === "function"){
+  window.renderVehicleScreen = function(){
+    try{
+      const v = getTodayVehicle();
+      if(v && v.departure && v.return && !v.return.time && !v.return.userEdited &&
+         v.departure.distance !== "" && v.departure.distance != null){
+        v.return.distance = v.departure.distance;
+      }
+    }catch(e){ /* 初期値を入れられなくても、画面は表示する */ }
+    origRenderVehicleScreen();
+  };
+}
+if($("vehicleDistance")){
+  $("vehicleDistance").addEventListener("change", () => {
+    try{
+      if(vehicleViewMode === "return"){
+        const v = getTodayVehicle();
+        if(v && v.return && !v.return.time){ v.return.userEdited = true; saveVehicle(); }
+      }
+    }catch(e){ /* 記録できなくても、入力は続けられる */ }
+  });
+}
+
+/* ---------- ToDoリストに追加する顧客名：会社の種類の語を除いて、先頭3文字 ---------- */
+const CORP_RE = /株式会社|[(（]株[)）]|㈱|有限会社|[(（]有[)）]|㈲|合同会社|[(（]合[)）]|合資会社|合名会社|一般社団法人|一般財団法人|公益社団法人|公益財団法人|社会福祉法人|医療法人|学校法人/g;
+// 北海道の市町村(全179)。「札幌市」「札幌」のどちらの形でも、名前の先頭に合えば地名として扱う
+const HK_LIST = [
+  "札幌市","江別市","千歳市","恵庭市","北広島市","石狩市","当別町","新篠津村",                                           // 石狩
+  "函館市","北斗市","松前町","福島町","知内町","木古内町","七飯町","鹿部町","森町","八雲町","長万部町",                      // 渡島
+  "江差町","上ノ国町","厚沢部町","乙部町","奥尻町","今金町","せたな町",                                                   // 檜山
+  "小樽市","島牧村","寿都町","黒松内町","蘭越町","ニセコ町","真狩村","留寿都村","喜茂別町","京極町","倶知安町","共和町",
+  "岩内町","泊村","神恵内村","積丹町","古平町","仁木町","余市町","赤井川村",                                              // 後志
+  "夕張市","岩見沢市","美唄市","芦別市","赤平市","三笠市","滝川市","砂川市","歌志内市","深川市","南幌町","奈井江町",
+  "上砂川町","由仁町","長沼町","栗山町","月形町","浦臼町","新十津川町","妹背牛町","秩父別町","雨竜町","北竜町","沼田町","幌加内町", // 空知
+  "旭川市","士別市","名寄市","富良野市","鷹栖町","東神楽町","当麻町","比布町","愛別町","上川町","東川町","美瑛町",
+  "上富良野町","中富良野町","南富良野町","占冠村","和寒町","剣淵町","下川町","美深町","音威子府村","中川町",               // 上川
+  "留萌市","増毛町","小平町","苫前町","羽幌町","初山別村","遠別町","天塩町",                                              // 留萌
+  "稚内市","猿払村","浜頓別町","中頓別町","枝幸町","豊富町","礼文町","利尻町","利尻富士町","幌延町",                      // 宗谷
+  "北見市","網走市","紋別市","美幌町","津別町","斜里町","清里町","小清水町","訓子府町","置戸町","佐呂間町","遠軽町",
+  "湧別町","滝上町","興部町","西興部村","雄武町","大空町",                                                                 // オホーツク
+  "室蘭市","苫小牧市","登別市","伊達市","豊浦町","壮瞥町","白老町","厚真町","洞爺湖町","安平町","むかわ町",               // 胆振
+  "日高町","平取町","新冠町","浦河町","様似町","えりも町","新ひだか町",                                                   // 日高
+  "帯広市","音更町","士幌町","上士幌町","鹿追町","新得町","清水町","芽室町","中札内村","更別村","大樹町","広尾町",
+  "幕別町","池田町","豊頃町","本別町","足寄町","陸別町","浦幌町",                                                         // 十勝
+  "釧路市","釧路町","厚岸町","浜中町","標茶町","弟子屈町","鶴居村","白糠町",                                              // 釧路
+  "根室市","別海町","中標津町","標津町","羅臼町"                                                                          // 根室
+];
+// 「北海道」と、市町村名(市町村を付けた形と、付けない形)。長いほうを先に調べる
+const HK_PLACES = [...new Set([...HK_LIST, ...HK_LIST.map(n => n.slice(0, -1)), "北海道"])]
+  .sort((a, b) => Array.from(b).length - Array.from(a).length);
+
+// ToDoに出す顧客名：会社の種類の語と空白を除く。
+//   ・先頭が北海道・道内の市町村名 → 地名の頭文字1文字 + 地名のあとの2文字(例: 北海道ガス → 北ガス)
+//   ・それ以外 → 先頭の3文字
+function shortCustomer(name){
+  const src = String(name || "");
+  const stripped = src.replace(CORP_RE, "").replace(/[\s\u3000]+/g, "");
+  const base = stripped || src.replace(/[\s\u3000]+/g, "");
+  for(const p of HK_PLACES){
+    if(base.startsWith(p)){
+      const rest = Array.from(base.slice(p.length));
+      if(rest.length === 0) return p;                                  // 地名だけのときは、そのまま
+      return Array.from(p)[0] + rest.slice(0, 2).join("");
+    }
+  }
+  return Array.from(base).slice(0, 3).join("");
+}
+// この版を入れた時刻より前に追加したToDoは、そのまま(変えない)
+let todoShortFrom = localStorage.getItem("todoShortFrom");
+if(!todoShortFrom){
+  todoShortFrom = new Date().toISOString();
+  try{ localStorage.setItem("todoShortFrom", todoShortFrom); }catch(e){ /* 保存できなくても動く */ }
+}
+const origSaveTodos = window.saveTodos;
+if(typeof origSaveTodos === "function"){
+  window.saveTodos = function(){
+    todoItems.forEach(t => {
+      if(t && t.source === "line" && !t.shortDone && (t.createdAt || "") >= todoShortFrom){
+        t.fullTarget = t.target;
+        t.target = shortCustomer(t.target);
+        t.shortDone = true;
+      }
+    });
+    origSaveTodos();
+  };
+}
+
 /* 入力欄の上のラベルをなくし、欄の中に表示する
    ・文字入力の欄：薄い文字(入力を始めると消える)
    ・日付・時刻・走行距離・敬称(最初から値が入る欄)：欄の左端に、消えない小さな文字 */
@@ -2139,6 +2297,34 @@ function makeInline(inp, lb, text){
   inp.style.textAlign = "left";
 }
 
+// 時刻の欄：見える部分は小さな箱「開始 09:15」。iPhoneの時刻入力は、その上に透明で重ねる(押すと、これまで通り入力画面が開く)
+function makeTimeBox(inp, lb, text){
+  if(SHORT_LABELS[text]) text = SHORT_LABELS[text];
+  const box = document.createElement("div");
+  box.className = "ct-timebox";
+  inp.parentNode.insertBefore(box, inp);
+  const tag = document.createElement("span");
+  tag.className = "ct-inlab";
+  tag.textContent = halfParens(text);
+  const txt = document.createElement("span");
+  txt.className = "ct-timetext";
+  box.appendChild(tag);
+  box.appendChild(txt);
+  box.appendChild(inp);
+  lb.textContent = halfParens(text);
+  lb.style.display = "none";
+  box.appendChild(lb);
+  inp.setAttribute("aria-label", halfParens(text));
+  const sync = () => { txt.textContent = inp.value ? inp.value : "--:--"; };
+  const proto = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  if(proto && proto.get && proto.set){          // 画面の外から値を入れても(編集を開くときなど)、箱の表示を更新する
+    Object.defineProperty(inp, "value", { configurable:true, get(){ return proto.get.call(inp); }, set(v){ proto.set.call(inp, v); sync(); } });
+  }
+  inp.addEventListener("input", sync);
+  inp.addEventListener("change", sync);
+  sync();
+}
+
 function convertHostLabels(){
   document.querySelectorAll("label[for]").forEach(lb => {
     if(lb.closest("#containerScreen")) return;
@@ -2148,7 +2334,9 @@ function convertHostLabels(){
     let text = lb.textContent.trim();
     if(LABEL_RENAME[text]) text = LABEL_RENAME[text];
     const type = (inp.type || "").toLowerCase();
-    if(INLINE_IDS.has(inp.id) || type === "date" || type === "time"){
+    if(type === "time"){
+      makeTimeBox(inp, lb, text);
+    }else if(INLINE_IDS.has(inp.id) || type === "date"){
       makeInline(inp, lb, text);
     }else if(inp.tagName === "TEXTAREA" || (inp.tagName === "INPUT" && ["text","number","password","search","tel",""].includes(type))){
       inp.placeholder = halfParens(text);
@@ -2158,6 +2346,7 @@ function convertHostLabels(){
   });
 }
 convertHostLabels();
+{ const t = $("ctTime"), l = document.querySelector('label[for="ctTime"]'); if(t && l) makeTimeBox(t, l, "時刻"); }
 
 // 画面の固定の文言（見出し・ボタンなど）の括弧を半角にする。訪問履歴・TODOなど入力された内容は書き換えない
 (function normalizeHostParens(){
