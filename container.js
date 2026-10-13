@@ -220,6 +220,12 @@ style.textContent = `
   .ct-tog.open{ background:var(--lavender); }
 
   .ct-inwrap{ position:relative; }
+  .ct-person-field{ flex:1 1 0 !important; min-width:0; }
+  .ct-title-field{ flex:0 0 138px !important; min-width:0; }
+  .done-item .line-done{ text-decoration:line-through; text-decoration-color:#D64545; text-decoration-thickness:1.5px; }
+  .done-item .done-suffix{ color:#D64545; margin-left:4px; }
+  .done-item input[type=checkbox]{ width:20px; height:20px; }
+  #doneTodoBox .btn{ margin-top:6px; }
   .ct-timebox{ position:relative; display:inline-flex; align-items:center; gap:8px; width:7.6em; min-width:0; padding:8px 10px; border:1.5px solid var(--line); border-radius:10px; background:#FFFDF9; box-sizing:border-box; vertical-align:middle; }
   .ct-timebox .ct-inlab{ font-size:11px; color:var(--ink-soft); flex:none; }
   .ct-timetext{ font-size:15px; white-space:nowrap; }
@@ -1624,9 +1630,86 @@ function normalizeTodoHeads(){
   });
 }
 if(typeof origRenderTodoList === "function"){
-  window.renderTodoList = function(){ origRenderTodoList(); normalizeTodoHeads(); };
+  window.renderTodoList = function(){ origRenderTodoList(); normalizeTodoHeads(); renderDoneTodos(); };
 }
 normalizeTodoHeads();
+
+/* ---------- 車両タブ：終了したToDoリスト。チェックを外すと、実行中へ戻る ---------- */
+const doneBox = document.createElement("div");
+doneBox.id = "doneTodoBox";
+doneBox.hidden = true;
+const vehScreen = $("vehicleScreen");
+if(vehScreen) vehScreen.appendChild(doneBox);
+let doneLimit = 20;
+
+function renderDoneTodos(){
+  const box = $("doneTodoBox");
+  if(!box) return;
+  const done = todoItems.filter(t => t && t.done)
+    .sort((a, b) => (b.completedAt || b.createdAt || "").localeCompare(a.completedAt || a.createdAt || ""));
+  box.hidden = done.length === 0;
+  box.innerHTML = "";
+  if(done.length === 0) return;
+  const h = document.createElement("h2");
+  h.className = "h2-flex";
+  h.innerHTML = '<span>終了したToDoリスト</span><span class="h2-note">チェックを外すと戻る</span>';
+  box.appendChild(h);
+  done.slice(0, doneLimit).forEach(t => {
+    const md = typeof formatMonthDay === "function" ? formatMonthDay(t.date) : "";
+    const suffix = typeof formatDoneSuffix === "function" ? formatDoneSuffix(t.completedAt) : "(済)";
+    const text = `${md}　${t.target ? t.target + "　" : ""}${t.content || ""}`;
+    const div = document.createElement("div");
+    div.className = "todo-item done-item";
+    div.setAttribute("data-id", t.id);
+    div.innerHTML = `<label><input type="checkbox" class="todo-undo" data-id="${escapeHtml(t.id)}" checked>` +
+      `<span class="todo-line"><span class="line-done">${escapeHtml(text)}</span><span class="done-suffix">${escapeHtml(suffix)}</span></span></label>`;
+    box.appendChild(div);
+  });
+  if(done.length > doneLimit){
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "btn btn-outline-mint";
+    more.id = "doneMore";
+    more.textContent = `さらに表示(残り ${done.length - doneLimit}件)`;
+    box.appendChild(more);
+  }
+}
+
+doneBox.addEventListener("change", e => {
+  const cb = e.target.closest(".todo-undo");
+  if(!cb || cb.checked) return;
+  const item = todoItems.find(t => t.id === cb.getAttribute("data-id"));
+  if(!item) return;
+  item.done = false;                    // 実行中へ戻す(並びの番号 order はそのまま＝元の位置に戻る)
+  delete item.completedAt;
+  if(typeof saveTodos === "function") saveTodos(); else localStorage.setItem("todoItems", JSON.stringify(todoItems));
+  if(typeof renderTodoList === "function") renderTodoList(); else renderDoneTodos();
+  if(typeof renderReportScreen === "function") renderReportScreen();   // 日報の「内容」の赤線と「(済)」も消える
+  showToast("ToDoリストに戻しました");
+});
+doneBox.addEventListener("click", e => {
+  if(e.target.closest("#doneMore")){ doneLimit += 20; renderDoneTodos(); }
+});
+renderDoneTodos();
+
+/* ---------- 訪問入力：面談者の欄を狭く、敬称の欄を広く／敬称に「係長」を足す ---------- */
+(function widenTitle(){
+  const tf = $("meetingPersonTitle") && $("meetingPersonTitle").closest(".field");
+  const pf = $("meetingPerson") && $("meetingPerson").closest(".field");
+  if(tf) tf.classList.add("ct-title-field");
+  if(pf) pf.classList.add("ct-person-field");
+  const dd = $("honorificDropdown"), inp = $("meetingPersonTitle");
+  if(dd && inp && ![...dd.querySelectorAll(".honorific-option")].some(b => b.textContent === "係長")){
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "honorific-option";
+    btn.textContent = "係長";
+    btn.addEventListener("mousedown", e => e.preventDefault());
+    btn.addEventListener("click", () => { inp.value = "係長"; dd.classList.remove("show"); });
+    dd.appendChild(btn);
+    if(typeof HONORIFIC_OPTIONS !== "undefined" && Array.isArray(HONORIFIC_OPTIONS) && !HONORIFIC_OPTIONS.includes("係長")) HONORIFIC_OPTIONS.push("係長");
+  }
+})();
 
 /* ---------- 顧客の管理の画面 ---------- */
 const custSection = document.createElement("section");
