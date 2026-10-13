@@ -135,17 +135,24 @@ style.textContent = `
   header{ flex-wrap:wrap; gap:6px; padding:8px 12px; }
   header .nav-btn{ flex:1 1 0; min-width:0; padding:9px 4px; font-size:14px; text-align:center; white-space:nowrap; }
   .nav-btn.active-lav{ background:var(--lavender); color:var(--lavender-ink); border-color:var(--lavender-dark); }
-  .ct-datebox{ display:flex; flex:0 0 100%; flex-direction:row; align-items:center; gap:8px; min-width:0; }
+  .ct-datebox{ display:flex; flex:0 0 100%; flex-direction:column; gap:1px; min-width:0; }
   .ct-dleft{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
   .ct-dline1{ display:flex; align-items:baseline; min-width:0; }
-  .ct-bcpsub{ flex:none; text-align:right; }
+  .ct-bcpsub{ text-align:left; }
   .ct-wx{ display:block; width:100%; overflow:hidden; border:none; background:transparent; font-family:inherit; font-size:12.5px; font-weight:700; color:#0B7A7A; padding:0; text-align:left; cursor:pointer; }   /* アズールグリーン(濃いめ) */
   .ct-wx[hidden]{ display:none; }
-  .ct-wxtrack{ display:inline-block; white-space:nowrap; animation:ctWxScroll var(--wx-dur, 20s) linear infinite; }
-  .ct-wx.paused .ct-wxtrack{ animation-play-state:paused; }
-  .ct-wx.static .ct-wxtrack{ animation:none; }
-  @keyframes ctWxScroll{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
-  @media (prefers-reduced-motion: reduce){ .ct-wxtrack{ animation:none; } }
+  .ct-wxpage{ display:inline-block; white-space:nowrap; transform-origin:50% 0; }
+  .ct-wxpage.flip{ animation:ctWxFlip .4s ease-out; }
+  @keyframes ctWxFlip{ from{ transform:perspective(220px) rotateX(-80deg); opacity:0; } to{ transform:perspective(220px) rotateX(0); opacity:1; } }
+  .ct-wxdots{ display:inline-flex; gap:3px; margin-left:8px; vertical-align:middle; }
+  .ct-wxdots i{ width:5px; height:5px; border-radius:50%; background:#B7D5D5; display:inline-block; }
+  .ct-wxdots i.on{ background:#0B7A7A; }
+  @media (prefers-reduced-motion: reduce){ .ct-wxpage.flip{ animation:none; } }
+  .todo-date{ color:#6F8CA3; font-size:11px; font-weight:600; font-family:"Avenir Next Condensed","DIN Condensed","Arial Narrow",sans-serif; font-stretch:condensed; letter-spacing:-0.02em; margin-right:6px; }
+  .dt-frame.wx{ background:#E9F6F6; border-color:#7FBFBF; }
+  .dt-frame.wx .dt-head{ background:#BFE3E3; color:#0B5F5F; }
+  #wxSpeedSeg{ display:grid; grid-template-columns:1fr 1fr; border-radius:14px; }
+  #wxSpeedSeg button{ white-space:nowrap; }
   .ct-wxsheet{ position:fixed; left:0; right:0; bottom:0; z-index:120; background:#fff; border-top:2px solid var(--line); border-radius:16px 16px 0 0; padding:14px 16px 20px; box-shadow:0 -6px 20px rgba(0,0,0,0.15); max-height:70vh; overflow-y:auto; }
   .ct-wxsheet[hidden]{ display:none; }
   .ct-wxsheet h3{ margin:0 0 8px; font-size:16px; }
@@ -1616,6 +1623,16 @@ dataSection.innerHTML = `
       </div>
     </div>
   </section>
+
+  <section class="dt-frame wx">
+    <div class="dt-head">天気の表示</div>
+    <div class="dt-body">
+      <div class="dt-item">
+        <div class="dt-desc" style="margin:0 0 8px;">めくる速さ</div>
+        <div class="ct-seg" id="wxSpeedSeg"></div>
+      </div>
+    </div>
+  </section>
 `;
 document.querySelector("main").appendChild(dataSection);
 
@@ -1792,10 +1809,16 @@ function wxCodeWord(code){
   return WX_CODE_WORDS[c] || ({ "1":"晴れ", "2":"くもり", "3":"雨", "4":"雪" })[c[0]] || "";
 }
 // 今日・明日・明後日の3日分
+// 「10/15(水)」の形(JSTの日付から)
+function wxMonthDay(key){
+  const p = String(key).split("-").map(Number);
+  const wd = "日月火水木金土"[new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay()];
+  return `${p[1]}/${p[2]}(${wd})`;
+}
 function wxDays(d, nowMs){
   const labels = ["今日", "明日", "明後日"];
   return labels.map((label, i) => {
-    const key = wxJstDate(nowMs + i * 24 * 3600 * 1000), out = { label, key };
+    const key = wxJstDate(nowMs + i * 24 * 3600 * 1000), out = { label, key, disp: i === 0 ? "今日" : wxMonthDay(key) };
     let si = (d.wTimes || []).findIndex(t => String(t).slice(0, 10) === key);
     if(si < 0 && !d.wTimes && i < (d.weathers || []).length) si = i;           // 古い保存形式
     const wi = (d.wkT || []).findIndex(t => String(t).slice(0, 10) === key);
@@ -1815,41 +1838,89 @@ function wxDays(d, nowMs){
     return out;
   });
 }
+// 気温は「最高/最低」。分からないほうは「*」
+function wxTempText(day){
+  return `${day.max != null ? day.max + "℃" : "*"}/${day.min != null ? day.min + "℃" : "*"}`;
+}
 function wxItemText(day){
   if(!day.text) return "";
   const icon = wxIcon(day.code);
-  let s = `${day.label}：${icon ? icon + " " : ""}${day.word}`;
-  if(day.max != null) s += ` 最高${day.max}℃`;
-  if(day.min != null) s += ` 最低${day.min}℃`;
-  if(day.popsNow && day.popsNow.length) s += " 降水 " + day.popsNow.map(x => `${x.label}${x.v}%`).join(" ");
+  let s = `${day.disp}：${icon ? icon + " " : ""}${day.word}　 ${wxTempText(day)}`;     // 天気と気温の間は、全角1文字ぶん広く
+  const pn = day.popsNow ? day.popsNow.slice(0, 2) : [];                              // 今日は「今」と「次の6時間」
+  if(pn.length) s += " 降水 " + pn.map(x => `${x.label}${x.v}%`).join(" ");
   else if(day.pop != null) s += ` 降水${day.pop}%`;
   return s;
 }
 function wxIcon(code){ return ({ "1":"☀", "2":"☁", "3":"☂", "4":"❄" })[String(code || "")[0]] || ""; }
 
 function wxLoad(){ try{ return JSON.parse(localStorage.getItem(WX_KEY) || "null"); }catch(e){ return null; } }
-function wxReduced(){ try{ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }catch(e){ return false; } }
-let wxDayIdx = 0;
-function wxRender(){
-  const d = wxLoad(), btn = $("ctWx");
+/* めくる速さ(端末ごとの設定)：2秒／2.8秒(初期値)／4秒／止める */
+const WX_SPEED_KEY = "wxSpeed";
+const WX_SPEEDS = [["2000","速い(2秒)"], ["2800","標準(2.8秒)"], ["4000","ゆっくり(4秒)"], ["stop","止める"]];
+function wxSpeed(){ const v = localStorage.getItem(WX_SPEED_KEY); return WX_SPEEDS.some(x => x[0] === v) ? v : "2800"; }
+function wxInterval(){ const v = wxSpeed(); return v === "stop" ? 0 : parseInt(v, 10); }
+function wxManual(){ return wxReduced() || wxInterval() === 0; }          // 自動でめくらない(タップで次へ、長押しで詳細)
+let wxPage = 0;
+function wxItems(){
+  const d = wxLoad();
+  if(!d || !d.weathers || !d.weathers.length) return [];
+  const now = Date.now();
+  const mark = (now - Date.parse(d.fetchedAt) > 3 * 3600 * 1000) ? "* " : "";     // 3時間より古いときは「*」
+  return wxDays(d, now).map(wxItemText).filter(Boolean).map(t => mark + t);
+}
+function wxRender(flip){
+  const btn = $("ctWx");
   if(!btn) return;
-  const track = btn.querySelector(".ct-wxtrack");
-  const items = (d && d.weathers && d.weathers.length) ? wxDays(d, Date.now()).map(wxItemText).filter(Boolean) : [];
-  if(items.length === 0){ btn.hidden = true; track.textContent = ""; return; }
-  const mark = (Date.now() - Date.parse(d.fetchedAt) > 3 * 3600 * 1000) ? "* " : "";     // 3時間より古いときは「*」
+  const items = wxItems(), pg = btn.querySelector(".ct-wxpage"), dots = btn.querySelector(".ct-wxdots");
+  if(items.length === 0){ btn.hidden = true; pg.textContent = ""; return; }
+  wxPage = ((wxPage % items.length) + items.length) % items.length;
+  pg.textContent = items[wxPage];
+  [...dots.children].forEach((el, i) => { el.style.display = i < items.length ? "" : "none"; el.classList.toggle("on", i === wxPage); });
   btn.hidden = false;
-  if(wxReduced()){
-    wxDayIdx = wxDayIdx % items.length;
-    track.textContent = mark + items[wxDayIdx];
-    btn.classList.add("static");
-  }else{
-    btn.classList.remove("static");
-    const one = mark + items.join("　　│　　") + "　　│　　";
-    track.textContent = one + one;                  // 同じものを2つつなげて、切れ目なく左へ流す
-    const half = track.scrollWidth / 2;
-    btn.style.setProperty("--wx-dur", (half > 0 ? Math.max(12, half / 30) : 20) + "s");   // 約30ピクセル/秒
+  if(flip && !wxReduced()){ pg.classList.remove("flip"); void pg.offsetWidth; pg.classList.add("flip"); }   // ページが返るように切り替える
+}
+function wxStep(dir){ wxPage += dir; wxRender(true); }
+let wxTimer = null;
+function wxRestartTimer(){
+  clearInterval(wxTimer);
+  wxTimer = null;
+  const ms = wxInterval();
+  if(ms > 0 && !wxReduced()){
+    wxTimer = setInterval(() => {
+      const btn = $("ctWx");
+      if(!btn || btn.hidden || btn.classList.contains("paused") || document.hidden) return;   // 触れている間・非表示の間は止める
+      wxStep(1);
+    }, ms);
   }
 }
+function renderWxSpeedSeg(){
+  const seg = $("wxSpeedSeg");
+  if(!seg) return;
+  seg.innerHTML = "";
+  WX_SPEEDS.forEach(([v, label]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.setAttribute("data-v", v);
+    b.textContent = label;
+    b.className = v === wxSpeed() ? "on" : "";
+    seg.appendChild(b);
+  });
+}
+if($("wxSpeedSeg")){
+  $("wxSpeedSeg").addEventListener("click", e => {
+    const b = e.target.closest("button");
+    if(!b) return;
+    try{ localStorage.setItem(WX_SPEED_KEY, b.getAttribute("data-v")); }catch(err){ /* 保存できなくても、この画面では切り替わる */ }
+    renderWxSpeedSeg();
+    wxRestartTimer();
+  });
+}
+window.ctWxPages = wxItems;
+window.ctWxStep = wxStep;
+window.ctWxInterval = wxInterval;
+window.ctWxPageIndex = () => wxPage;
+window.ctWxRestart = wxRestartTimer;
+function wxReduced(){ try{ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }catch(e){ return false; } }
 function wxRecordDaily(d){
   try{
     const day = getToday();
@@ -1934,6 +2005,17 @@ if(typeof origSetMasterMessage === "function"){
     origSetMasterMessage(String(text).replace(/営業所キー/g, "担当キー").replace(/この営業所/g, "この担当"), isError);
   };
 }
+// ToDoの行の先頭の日付(10/9など)を、小さなアズールグレーの文字にする(顧客名・内容の部分は、そのまま)
+function styleTodoDates(){
+  document.querySelectorAll(".todo-line").forEach(el => {
+    if(el.getAttribute("data-dstyled")) return;
+    const m = /^(\d{1,2}\/\d{1,2})\u3000([\s\S]*)$/.exec(el.textContent);
+    if(!m) return;
+    el.setAttribute("data-dstyled", "1");
+    el.innerHTML = `<span class="todo-date">${escapeHtml(m[1])}</span>${escapeHtml(m[2])}`;
+  });
+}
+window.ctStyleTodoDates = styleTodoDates;
 const origRenderTodoList = window.renderTodoList;
 function normalizeTodoHeads(){
   document.querySelectorAll(".todo-list-target h2 span:first-child").forEach(sp => {
@@ -1941,7 +2023,7 @@ function normalizeTodoHeads(){
   });
 }
 if(typeof origRenderTodoList === "function"){
-  window.renderTodoList = function(){ origRenderTodoList(); normalizeTodoHeads(); renderDoneTodos(); };
+  window.renderTodoList = function(){ origRenderTodoList(); normalizeTodoHeads(); styleTodoDates(); renderDoneTodos(); };
 }
 normalizeTodoHeads();
 
@@ -1968,12 +2050,12 @@ function renderDoneTodos(){
   done.slice(0, doneLimit).forEach(t => {
     const md = typeof formatMonthDay === "function" ? formatMonthDay(t.date) : "";
     const suffix = typeof formatDoneSuffix === "function" ? formatDoneSuffix(t.completedAt) : "(済)";
-    const text = `${md}　${t.target ? t.target + "　" : ""}${t.content || ""}`;
+    const rest = `${t.target ? t.target + "　" : ""}${t.content || ""}`;
     const div = document.createElement("div");
     div.className = "todo-item done-item";
     div.setAttribute("data-id", t.id);
     div.innerHTML = `<label><input type="checkbox" class="todo-undo" data-id="${escapeHtml(t.id)}" checked>` +
-      `<span class="todo-line"><span class="line-done">${escapeHtml(text)}</span><span class="done-suffix">${escapeHtml(suffix)}</span></span></label>`;
+      `<span class="todo-line"><span class="line-done">${md ? `<span class="todo-date">${escapeHtml(md)}</span>` : ""}${escapeHtml(rest)}</span><span class="done-suffix">${escapeHtml(suffix)}</span></span></label>`;
     box.appendChild(div);
   });
   if(done.length > doneLimit){
@@ -2504,40 +2586,53 @@ if(dateEl && dateEl.parentNode){
   const l1 = document.createElement("div");
   l1.className = "ct-dline1";
   l1.appendChild(dateEl);
-  const wx = document.createElement("button");     // 今日〜明後日の天気が、左へ流れる掲示
+  const wx = document.createElement("button");     // 今日〜明後日の天気を、1日1行で、ページをめくるように見せる
   wx.type = "button";
   wx.id = "ctWx";
   wx.className = "ct-wx";
   wx.hidden = true;
-  const track = document.createElement("span");
-  track.className = "ct-wxtrack";
-  wx.appendChild(track);
+  const pg = document.createElement("span");
+  pg.className = "ct-wxpage";
+  const dots = document.createElement("span");
+  dots.className = "ct-wxdots";
+  dots.innerHTML = "<i></i><i></i><i></i>";
+  wx.appendChild(pg);
+  wx.appendChild(dots);
   left.appendChild(l1);
   left.appendChild(wx);
-  const sub = document.createElement("div");       // 右端に2行
+  const sub = document.createElement("div");       // 一番上の1行
   sub.className = "ct-bcpsub";
-  sub.innerHTML = "BCP用<br>オフライン使用可";
-  box.appendChild(left);
+  sub.textContent = "BCP用オフライン使用可";
   box.appendChild(sub);
+  box.appendChild(left);
 
-  let pressTimer = null, longPressed = false;
-  wx.addEventListener("pointerdown", () => {       // 触れている間は、流れが止まる
+  let pressTimer = null, longPressed = false, swiped = false, startX = 0;
+  wx.addEventListener("pointerdown", e => {         // 触れている間は、めくりが止まる
     wx.classList.add("paused");
     longPressed = false;
+    swiped = false;
+    startX = e.clientX || 0;
     clearTimeout(pressTimer);
-    pressTimer = setTimeout(() => { if(wxReduced()){ longPressed = true; wxShowSheet(); } }, 500);
+    pressTimer = setTimeout(() => { if(wxManual()){ longPressed = true; wxShowSheet(); } }, 500);
   });
-  ["pointerup", "pointercancel", "pointerleave"].forEach(t => wx.addEventListener(t, () => { wx.classList.remove("paused"); clearTimeout(pressTimer); }));
+  const release = () => { wx.classList.remove("paused"); clearTimeout(pressTimer); };
+  wx.addEventListener("pointerup", e => {           // 左右になぞると、手でめくれる
+    const dx = (e.clientX || 0) - startX;
+    if(Math.abs(dx) > 30){ swiped = true; wxStep(dx < 0 ? 1 : -1); }
+    release();
+  });
+  ["pointercancel", "pointerleave"].forEach(t => wx.addEventListener(t, release));
   wx.addEventListener("click", () => {
-    if(wxReduced()){                                // 「動きを減らす」: 流さず1日分。タップで日が替わり、長押しで詳細
+    if(swiped){ swiped = false; return; }
+    if(wxManual()){                                 // 自動でめくらないとき: タップで次の日、長押しで詳細
       if(longPressed){ longPressed = false; return; }
-      wxDayIdx++;
-      wxRender();
+      wxStep(1);
       return;
     }
-    if(wxSheet.hidden) wxShowSheet(); else wxSheet.hidden = true;
+    if(wxSheet.hidden) wxShowSheet(); else wxSheet.hidden = true;                // 通常: タップで詳細
   });
   wxRender();                                       // 保存してある天気をすぐ出し、少し待ってから、最新を取りに行く
+  wxRestartTimer();
   setTimeout(() => refreshWeather(false), 800);
 }
 
@@ -2577,6 +2672,7 @@ function renderContainer(){
 
 function goToData(){
   vehicleViewMode = null;
+  renderWxSpeedSeg();
   setDelOpen(false);
   renderData();
   showScreen("data");
