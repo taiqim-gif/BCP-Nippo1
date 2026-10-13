@@ -135,11 +135,17 @@ style.textContent = `
   header{ flex-wrap:wrap; gap:6px; padding:8px 12px; }
   header .nav-btn{ flex:1 1 0; min-width:0; padding:9px 4px; font-size:14px; text-align:center; white-space:nowrap; }
   .nav-btn.active-lav{ background:var(--lavender); color:var(--lavender-ink); border-color:var(--lavender-dark); }
-  .ct-datebox{ display:flex; flex:0 0 100%; flex-direction:column; gap:1px; min-width:0; }
-  .ct-dline1{ display:flex; align-items:baseline; gap:10px; min-width:0; }
-  .ct-wx{ border:none; background:transparent; font-family:inherit; font-size:13px; font-weight:700; color:var(--ink); padding:0; white-space:nowrap; cursor:pointer; }
-  .ct-dline2{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; min-width:0; }
-  #ctWxPops{ font-size:10.5px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .ct-datebox{ display:flex; flex:0 0 100%; flex-direction:row; align-items:center; gap:8px; min-width:0; }
+  .ct-dleft{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .ct-dline1{ display:flex; align-items:baseline; min-width:0; }
+  .ct-bcpsub{ flex:none; text-align:right; }
+  .ct-wx{ display:block; width:100%; overflow:hidden; border:none; background:transparent; font-family:inherit; font-size:12.5px; font-weight:700; color:var(--ink); padding:0; text-align:left; cursor:pointer; }
+  .ct-wx[hidden]{ display:none; }
+  .ct-wxtrack{ display:inline-block; white-space:nowrap; animation:ctWxScroll var(--wx-dur, 20s) linear infinite; }
+  .ct-wx.paused .ct-wxtrack{ animation-play-state:paused; }
+  .ct-wx.static .ct-wxtrack{ animation:none; }
+  @keyframes ctWxScroll{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce){ .ct-wxtrack{ animation:none; } }
   .ct-wxsheet{ position:fixed; left:0; right:0; bottom:0; z-index:120; background:#fff; border-top:2px solid var(--line); border-radius:16px 16px 0 0; padding:14px 16px 20px; box-shadow:0 -6px 20px rgba(0,0,0,0.15); max-height:70vh; overflow-y:auto; }
   .ct-wxsheet[hidden]{ display:none; }
   .ct-wxsheet h3{ margin:0 0 8px; font-size:16px; }
@@ -148,7 +154,7 @@ style.textContent = `
   .ct-wxsheet .wx-note{ font-size:11.5px; color:var(--ink-soft); margin-top:8px; }
   .ct-wxsheet .wx-btns{ display:flex; gap:10px; margin-top:12px; }
   .ct-datebox #dateDisplay{ display:block; white-space:nowrap; line-height:1.25; }
-  .ct-bcpsub{ font-size:10px; font-weight:400; color:var(--ink-soft); white-space:nowrap; line-height:1.2; }
+  .ct-bcpsub{ font-size:10px; font-weight:400; color:var(--ink-soft); white-space:nowrap; line-height:1.25; }
   .nav-btn.active-sky{ background:var(--sky); color:var(--sky-ink); border-color:var(--sky-dark); }
 
   #containerScreen input[type=date]{
@@ -1719,7 +1725,7 @@ const wxJstDate = ms => new Date(ms + 9 * 3600 * 1000).toISOString().slice(0, 10
 
 function wxParse(json, area, lat, lng){
   const rep0 = json[0], ts = rep0.timeSeries;
-  const pick = (arr, name) => arr.find(a => a.area && a.area.name === name) || arr[0];
+  const pick = (arr, name) => (arr || []).find(a => a.area && a.area.name === name) || (arr || [])[0] || {};
   const a0 = pick(ts[0].areas, area.name), a1 = pick(ts[1].areas, area.name);
   let tp = null;
   if(ts[2] && ts[2].areas && ts[2].areas.length){
@@ -1727,14 +1733,25 @@ function wxParse(json, area, lat, lng){
     ts[2].areas.forEach(p => { const c = WX_POINTS[p.area.name]; if(c){ const d = wxDist(lat, lng, c[0], c[1]); if(d < bd){ bd = d; tp = p; } } });
     if(!tp) tp = ts[2].areas[0];
   }
-  return {
+  const d = {
     office: area.office, areaName: area.name, report: rep0.reportDatetime, fetchedAt: new Date().toISOString(),
-    weathers: (a0.weathers || []).map(wxClean), codes: a0.weatherCodes || [],
+    wTimes: ts[0].timeDefines || [], weathers: (a0.weathers || []).map(wxClean), codes: a0.weatherCodes || [],
     popsT: ts[1].timeDefines || [], popsV: a1.pops || [],
     tempName: tp ? tp.area.name : "", tempsT: tp ? (ts[2].timeDefines || []) : [], tempsV: tp ? (tp.temps || []) : []
   };
+  const wk = json[1];                                   // 週間予報：翌々日など、短い予報にない日を補う
+  if(wk && wk.timeSeries && wk.timeSeries[0]){
+    const w0 = pick(wk.timeSeries[0].areas, area.name);
+    d.wkT = wk.timeSeries[0].timeDefines || []; d.wkCodes = w0.weatherCodes || []; d.wkPops = w0.pops || [];
+    const t1 = wk.timeSeries[1];
+    if(t1 && t1.areas && t1.areas.length){
+      const wp = t1.areas.find(p => p.area && p.area.name === d.tempName) || t1.areas[0];
+      d.wkMin = wp.tempsMin || []; d.wkMax = wp.tempsMax || [];
+    }
+  }
+  return d;
 }
-function wxTemps(d, nowMs){
+function wxTempsFor(d, dayKey){
   const out = {};
   (d.tempsT || []).forEach((t, i) => {
     const v = parseFloat(d.tempsV[i]);
@@ -1743,7 +1760,10 @@ function wxTemps(d, nowMs){
     out[day] = out[day] || {};
     if(hour === 9) out[day].max = v; else if(hour === 0) out[day].min = v;
   });
-  const today = out[wxJstDate(nowMs)] || {};
+  return out[dayKey] || {};
+}
+function wxTemps(d, nowMs){
+  const today = wxTempsFor(d, wxJstDate(nowMs));
   if(today.min != null && today.max != null && today.min >= today.max) delete today.min;   // 今日の最低は、過ぎた時刻の値が入ることがある
   return today;
 }
@@ -1758,19 +1778,77 @@ function wxPops(d, nowMs){                    // 今のブロックと、その�
   }
   return res;
 }
+// 天気コード → 短い言葉(よく出るものだけ。ないものは、最初の数字から 晴れ・くもり・雨・雪)
+const WX_CODE_WORDS = {
+  "100":"晴れ","101":"晴れ 時々 くもり","102":"晴れ 一時 雨","103":"晴れ 時々 雨","104":"晴れ 一時 雪","105":"晴れ 時々 雪",
+  "110":"晴れ のち くもり","111":"晴れ のち くもり","112":"晴れ のち 一時 雨","113":"晴れ のち 時々 雨","114":"晴れ のち 雨","115":"晴れ のち 一時 雪",
+  "200":"くもり","201":"くもり 時々 晴れ","202":"くもり 一時 雨","203":"くもり 時々 雨","204":"くもり 一時 雪","205":"くもり 時々 雪",
+  "210":"くもり のち 晴れ","211":"くもり のち 晴れ","212":"くもり のち 一時 雨","213":"くもり のち 時々 雨","214":"くもり のち 雨","215":"くもり のち 一時 雪",
+  "300":"雨","301":"雨 時々 晴れ","302":"雨 時々 止む","303":"雨 時々 雪","311":"雨 のち 晴れ","313":"雨 のち くもり","314":"雨 のち 時々 雪",
+  "400":"雪","401":"雪 時々 晴れ","402":"雪 時々 止む","403":"雪 時々 雨","411":"雪 のち 晴れ","413":"雪 のち くもり","414":"雪 のち 雨"
+};
+function wxCodeWord(code){
+  const c = String(code || "");
+  return WX_CODE_WORDS[c] || ({ "1":"晴れ", "2":"くもり", "3":"雨", "4":"雪" })[c[0]] || "";
+}
+// 今日・明日・明後日の3日分
+function wxDays(d, nowMs){
+  const labels = ["今日", "明日", "明後日"];
+  return labels.map((label, i) => {
+    const key = wxJstDate(nowMs + i * 24 * 3600 * 1000), out = { label, key };
+    let si = (d.wTimes || []).findIndex(t => String(t).slice(0, 10) === key);
+    if(si < 0 && !d.wTimes && i < (d.weathers || []).length) si = i;           // 古い保存形式
+    const wi = (d.wkT || []).findIndex(t => String(t).slice(0, 10) === key);
+    if(si >= 0 && d.weathers && d.weathers[si]){ out.text = d.weathers[si]; out.code = (d.codes || [])[si]; out.word = out.text.split(" ")[0]; }
+    else if(wi >= 0 && d.wkCodes && d.wkCodes[wi]){ out.code = d.wkCodes[wi]; out.text = wxCodeWord(out.code); out.word = out.text.replace(/ /g, ""); }
+    const tm = i === 0 ? wxTemps(d, nowMs) : wxTempsFor(d, key);
+    if(tm.max == null && wi >= 0 && d.wkMax){ const v = parseFloat(d.wkMax[wi]); if(isFinite(v)) tm.max = v; }
+    if(tm.min == null && wi >= 0 && d.wkMin){ const v = parseFloat(d.wkMin[wi]); if(isFinite(v)) tm.min = v; }
+    out.max = tm.max; out.min = tm.min;
+    if(i === 0){ out.popsNow = wxPops(d, nowMs); }
+    else{
+      const vals = [];
+      (d.popsT || []).forEach((t, j) => { if(String(t).slice(0, 10) === key){ const v = parseFloat(d.popsV[j]); if(isFinite(v)) vals.push(v); } });
+      if(vals.length) out.pop = Math.max(...vals);
+      else if(wi >= 0 && d.wkPops){ const v = parseFloat(d.wkPops[wi]); if(isFinite(v)) out.pop = v; }
+    }
+    return out;
+  });
+}
+function wxItemText(day){
+  if(!day.text) return "";
+  const icon = wxIcon(day.code);
+  let s = `${day.label}：${icon ? icon + " " : ""}${day.word}`;
+  if(day.max != null) s += ` 最高${day.max}℃`;
+  if(day.min != null) s += ` 最低${day.min}℃`;
+  if(day.popsNow && day.popsNow.length) s += " 降水 " + day.popsNow.map(x => `${x.label}${x.v}%`).join(" ");
+  else if(day.pop != null) s += ` 降水${day.pop}%`;
+  return s;
+}
 function wxIcon(code){ return ({ "1":"☀", "2":"☁", "3":"☂", "4":"❄" })[String(code || "")[0]] || ""; }
 
 function wxLoad(){ try{ return JSON.parse(localStorage.getItem(WX_KEY) || "null"); }catch(e){ return null; } }
+function wxReduced(){ try{ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }catch(e){ return false; } }
+let wxDayIdx = 0;
 function wxRender(){
-  const d = wxLoad(), btn = $("ctWx"), pops = $("ctWxPops");
-  if(!btn || !pops) return;
-  if(!d || !d.weathers || !d.weathers.length){ btn.hidden = true; pops.textContent = ""; return; }
-  const now = Date.now(), tm = wxTemps(d, now), word = (d.weathers[0] || "").split(" ")[0];
-  const stale = now - Date.parse(d.fetchedAt) > 3 * 3600 * 1000;
-  btn.textContent = `${wxIcon(d.codes[0])} ${word}${tm.max != null ? " " + tm.max + "℃" : ""}${stale ? " *" : ""}`.trim();
+  const d = wxLoad(), btn = $("ctWx");
+  if(!btn) return;
+  const track = btn.querySelector(".ct-wxtrack");
+  const items = (d && d.weathers && d.weathers.length) ? wxDays(d, Date.now()).map(wxItemText).filter(Boolean) : [];
+  if(items.length === 0){ btn.hidden = true; track.textContent = ""; return; }
+  const mark = (Date.now() - Date.parse(d.fetchedAt) > 3 * 3600 * 1000) ? "* " : "";     // 3時間より古いときは「*」
   btn.hidden = false;
-  const p = wxPops(d, now);
-  pops.textContent = p.length ? "降水 " + p.map(x => `${x.label}${x.v}%`).join(" ") : "";
+  if(wxReduced()){
+    wxDayIdx = wxDayIdx % items.length;
+    track.textContent = mark + items[wxDayIdx];
+    btn.classList.add("static");
+  }else{
+    btn.classList.remove("static");
+    const one = mark + items.join("　　│　　") + "　　│　　";
+    track.textContent = one + one;                  // 同じものを2つつなげて、切れ目なく左へ流す
+    const half = track.scrollWidth / 2;
+    btn.style.setProperty("--wx-dur", (half > 0 ? Math.max(12, half / 30) : 20) + "s");   // 約30ピクセル/秒
+  }
 }
 function wxRecordDaily(d){
   try{
@@ -1826,15 +1904,17 @@ document.body.appendChild(wxSheet);
 function wxShowSheet(){
   const d = wxLoad();
   if(!d){ return; }
-  const now = Date.now(), tm = wxTemps(d, now), p = wxPops(d, now);
+  const now = Date.now(), days = wxDays(d, now), p = wxPops(d, now), tm = days[0];
   const hm = iso => { const x = new Date(iso); return isNaN(x.getTime()) ? "" : `${x.getMonth() + 1}/${x.getDate()} ${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`; };
   const row = (a, b) => `<div class="wx-row"><span>${escapeHtml(a)}</span><span>${escapeHtml(b)}</span></div>`;
+  const sub = day => `${day.max != null ? "最高 " + day.max + "℃" : ""}${day.min != null ? "　最低 " + day.min + "℃" : ""}${day.pop != null ? "　降水 " + day.pop + "%" : ""}`.trim();
   wxSheet.innerHTML = `<h3>天気(気象庁) ${escapeHtml(d.areaName)}</h3>` +
-    row("今日", d.weathers[0] || "") +
+    row("今日", days[0].text || "") +
     row("気温", `${tm.max != null ? "最高 " + tm.max + "℃" : ""}${tm.min != null ? "　最低 " + tm.min + "℃" : ""}${d.tempName ? "(" + d.tempName + ")" : ""}`) +
     row("降水確率", p.map(x => `${x.label} ${x.v}%`).join("　")) +
-    row("明日", d.weathers[1] || "") +
-    `<div class="wx-note">発表 ${escapeHtml(hm(d.report))}　取得 ${escapeHtml(hm(d.fetchedAt))}　出典: 気象庁ホームページ(予報区ごとの予報で、地点の天気とは異なる場合があります)</div>` +
+    row("明日", `${days[1].text || ""}${sub(days[1]) ? "　" + sub(days[1]) : ""}`) +
+    row("明後日", `${days[2].text || ""}${sub(days[2]) ? "　" + sub(days[2]) : ""}`) +
+    `<div class="wx-note">発表 ${escapeHtml(hm(d.report))}　取得 ${escapeHtml(hm(d.fetchedAt))}　出典: 気象庁ホームページ(予報区ごとの予報で、地点の天気とは異なる場合があります。明後日は週間予報から補うため、天気は短い言葉です)</div>` +
     `<div class="wx-btns"><button type="button" class="btn btn-outline-mint" id="wxRefresh">更新</button><button type="button" class="btn btn-mint" id="wxClose">閉じる</button></div>`;
   wxSheet.hidden = false;
 }
@@ -2419,28 +2499,45 @@ if(dateEl && dateEl.parentNode){
   const box = document.createElement("div");
   box.className = "ct-datebox";
   dateEl.parentNode.insertBefore(box, dateEl);
-  const sub = document.createElement("div");
-  sub.className = "ct-bcpsub";
-  sub.textContent = "BCP用オフライン使用可";
+  const left = document.createElement("div");
+  left.className = "ct-dleft";
   const l1 = document.createElement("div");
   l1.className = "ct-dline1";
   l1.appendChild(dateEl);
-  const wx = document.createElement("button");
+  const wx = document.createElement("button");     // 今日〜明後日の天気が、左へ流れる掲示
   wx.type = "button";
   wx.id = "ctWx";
   wx.className = "ct-wx";
   wx.hidden = true;
-  l1.appendChild(wx);
-  const l2 = document.createElement("div");
-  l2.className = "ct-dline2";
-  const pops = document.createElement("span");
-  pops.id = "ctWxPops";
-  l2.appendChild(pops);
-  l2.appendChild(sub);
-  box.appendChild(l1);
-  box.appendChild(l2);
-  wx.addEventListener("click", () => { if(wxSheet.hidden) wxShowSheet(); else wxSheet.hidden = true; });
-  wxRender();                                   // 保存してある天気をすぐ出し、少し待ってから、最新を取りに行く
+  const track = document.createElement("span");
+  track.className = "ct-wxtrack";
+  wx.appendChild(track);
+  left.appendChild(l1);
+  left.appendChild(wx);
+  const sub = document.createElement("div");       // 右端に2行
+  sub.className = "ct-bcpsub";
+  sub.innerHTML = "BCP用<br>オフライン使用可";
+  box.appendChild(left);
+  box.appendChild(sub);
+
+  let pressTimer = null, longPressed = false;
+  wx.addEventListener("pointerdown", () => {       // 触れている間は、流れが止まる
+    wx.classList.add("paused");
+    longPressed = false;
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(() => { if(wxReduced()){ longPressed = true; wxShowSheet(); } }, 500);
+  });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(t => wx.addEventListener(t, () => { wx.classList.remove("paused"); clearTimeout(pressTimer); }));
+  wx.addEventListener("click", () => {
+    if(wxReduced()){                                // 「動きを減らす」: 流さず1日分。タップで日が替わり、長押しで詳細
+      if(longPressed){ longPressed = false; return; }
+      wxDayIdx++;
+      wxRender();
+      return;
+    }
+    if(wxSheet.hidden) wxShowSheet(); else wxSheet.hidden = true;
+  });
+  wxRender();                                       // 保存してある天気をすぐ出し、少し待ってから、最新を取りに行く
   setTimeout(() => refreshWeather(false), 800);
 }
 
