@@ -137,16 +137,14 @@ style.textContent = `
   .nav-btn.active-lav{ background:var(--lavender); color:var(--lavender-ink); border-color:var(--lavender-dark); }
   .ct-datebox{ display:flex; flex:0 0 100%; flex-direction:column; gap:1px; min-width:0; }
   .ct-dleft{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
-  .ct-dline1{ display:flex; align-items:baseline; min-width:0; }
-  .ct-bcpsub{ text-align:left; }
+  .ct-dline1{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; min-width:0; }
+  .ct-bcpsub{ flex:none; text-align:right; }
   .ct-wx{ display:block; width:100%; overflow:hidden; border:none; background:transparent; font-family:inherit; font-size:12.5px; font-weight:700; color:#0B7A7A; padding:0; text-align:left; cursor:pointer; }   /* アズールグリーン(濃いめ) */
   .ct-wx[hidden]{ display:none; }
-  .ct-wxpage{ display:inline-block; white-space:nowrap; transform-origin:50% 0; }
+  .ct-wxpage{ display:inline-block; white-space:pre; transform-origin:50% 0; }
+  .wx-d{ color:#5B4A9E; }
   .ct-wxpage.flip{ animation:ctWxFlip .4s ease-out; }
   @keyframes ctWxFlip{ from{ transform:perspective(220px) rotateX(-80deg); opacity:0; } to{ transform:perspective(220px) rotateX(0); opacity:1; } }
-  .ct-wxdots{ display:inline-flex; gap:3px; margin-left:8px; vertical-align:middle; }
-  .ct-wxdots i{ width:5px; height:5px; border-radius:50%; background:#B7D5D5; display:inline-block; }
-  .ct-wxdots i.on{ background:#0B7A7A; }
   @media (prefers-reduced-motion: reduce){ .ct-wxpage.flip{ animation:none; } }
   .todo-date{ color:#6F8CA3; font-size:11px; font-weight:600; font-family:"Avenir Next Condensed","DIN Condensed","Arial Narrow",sans-serif; font-stretch:condensed; letter-spacing:-0.02em; margin-right:6px; }
   .dt-frame.wx{ background:#E9F6F6; border-color:#7FBFBF; }
@@ -1818,7 +1816,7 @@ function wxMonthDay(key){
 function wxDays(d, nowMs){
   const labels = ["今日", "明日", "明後日"];
   return labels.map((label, i) => {
-    const key = wxJstDate(nowMs + i * 24 * 3600 * 1000), out = { label, key, disp: i === 0 ? "今日" : wxMonthDay(key) };
+    const key = wxJstDate(nowMs + i * 24 * 3600 * 1000), out = { label, key, disp: wxMonthDay(key) };      // 今日も、明日・明後日と同じ「10/14(火)」の形
     let si = (d.wTimes || []).findIndex(t => String(t).slice(0, 10) === key);
     if(si < 0 && !d.wTimes && i < (d.weathers || []).length) si = i;           // 古い保存形式
     const wi = (d.wkT || []).findIndex(t => String(t).slice(0, 10) === key);
@@ -1838,45 +1836,71 @@ function wxDays(d, nowMs){
     return out;
   });
 }
-// 気温は「最高/最低」。分からないほうは「*」
-function wxTempText(day){
-  return `${day.max != null ? day.max + "℃" : "*"}/${day.min != null ? day.min + "℃" : "*"}`;
+// 「この後」：今から6時間後を含む6時間の区切りの降水確率。天気の言葉は、その日の予報から
+function wxLater(d, nowMs, days){
+  const t = d.popsT || [], target = nowMs + 6 * 3600 * 1000;
+  for(let i = 0; i < t.length; i++){
+    const st = Date.parse(t[i]);
+    if(st <= target && target < st + 6 * 3600 * 1000){
+      const v = parseFloat((d.popsV || [])[i]);
+      if(!isFinite(v)) return null;
+      const key = String(t[i]).slice(0, 10), base = days.find(x => x.key === key);
+      if(!base || !base.text) return null;
+      return { later:true, disp:`この後 ${parseInt(String(t[i]).slice(11, 13), 10)}時〜`, text:base.text, code:base.code, word:base.word, pop:v };
+    }
+  }
+  return null;
 }
-function wxItemText(day){
-  if(!day.text) return "";
+// 1ページの表示を、長い版から短い版の順に作る(1行に入らないときは、後ろの情報から落とす)
+//   日付ページ: 10/14(火)：　☁ くもり　 18/12 ℃ (0%)  →  (降水を落とす)  →  (最低気温を「*」にする)
+//   この後    : この後 12時〜：　☁ くもり　 (10%)      →  (降水を落とす)
+function wxVariants(day){
+  if(!day || !day.text) return [];
   const icon = wxIcon(day.code);
-  let s = `${day.disp}：${icon ? icon + " " : ""}${day.word}　 ${wxTempText(day)}`;     // 天気と気温の間は、全角1文字ぶん広く
-  const pn = day.popsNow ? day.popsNow.slice(0, 2) : [];                              // 今日は「今」と「次の6時間」
-  if(pn.length) s += " 降水 " + pn.map(x => `${x.label}${x.v}%`).join(" ");
-  else if(day.pop != null) s += ` 降水${day.pop}%`;
-  return s;
+  const lead = `　${icon ? icon + " " : ""}${day.word}`;            // 「：」のあとに全角1文字の空き
+  const head = `${day.disp}：`;
+  let bodies;
+  if(day.later){
+    bodies = [`${lead}　 (${day.pop}%)`, lead];
+  }else{
+    const f = v => v != null ? String(v) : "*";
+    const nowP = day.popsNow && day.popsNow[0] ? `(${day.popsNow[0].v}%)` : (day.pop != null ? `(${day.pop}%)` : "");
+    const temps = `${f(day.max)}/${f(day.min)} ℃`;
+    bodies = [`${lead}　 ${temps}${nowP ? " " + nowP : ""}`, `${lead}　 ${temps}`, `${lead}　 ${f(day.max)}/* ℃`];
+  }
+  return bodies.filter((x, i) => i === 0 || x !== bodies[i - 1]).map(body => ({ head, body }));
 }
 function wxIcon(code){ return ({ "1":"☀", "2":"☁", "3":"☂", "4":"❄" })[String(code || "")[0]] || ""; }
 
 function wxLoad(){ try{ return JSON.parse(localStorage.getItem(WX_KEY) || "null"); }catch(e){ return null; } }
-/* めくる速さ(端末ごとの設定)：2秒／2.8秒(初期値)／4秒／止める */
+/* めくる速さ(端末ごとの設定)：3秒／3.5秒(初期値)／4秒／止める */
 const WX_SPEED_KEY = "wxSpeed";
-const WX_SPEEDS = [["2000","速い(2秒)"], ["2800","標準(2.8秒)"], ["4000","ゆっくり(4秒)"], ["stop","止める"]];
-function wxSpeed(){ const v = localStorage.getItem(WX_SPEED_KEY); return WX_SPEEDS.some(x => x[0] === v) ? v : "2800"; }
+const WX_SPEEDS = [["3000","速い(3秒)"], ["3500","標準(3.5秒)"], ["4000","ゆっくり(4秒)"], ["stop","止める"]];
+function wxSpeed(){ const v = localStorage.getItem(WX_SPEED_KEY); return WX_SPEEDS.some(x => x[0] === v) ? v : "3500"; }
 function wxInterval(){ const v = wxSpeed(); return v === "stop" ? 0 : parseInt(v, 10); }
 function wxManual(){ return wxReduced() || wxInterval() === 0; }          // 自動でめくらない(タップで次へ、長押しで詳細)
 let wxPage = 0;
-function wxItems(){
+function wxPageList(){
   const d = wxLoad();
   if(!d || !d.weathers || !d.weathers.length) return [];
-  const now = Date.now();
+  const now = Date.now(), days = wxDays(d, now), later = wxLater(d, now, days);
   const mark = (now - Date.parse(d.fetchedAt) > 3 * 3600 * 1000) ? "* " : "";     // 3時間より古いときは「*」
-  return wxDays(d, now).map(wxItemText).filter(Boolean).map(t => mark + t);
+  return [days[0], later, days[1], days[2]].filter(Boolean)
+    .map(day => wxVariants(day).map(v => ({ head: mark + v.head, body: v.body })))
+    .filter(vs => vs.length);
 }
+function wxItems(){ return wxPageList().map(vs => vs[0].head + vs[0].body); }
 function wxRender(flip){
   const btn = $("ctWx");
   if(!btn) return;
-  const items = wxItems(), pg = btn.querySelector(".ct-wxpage"), dots = btn.querySelector(".ct-wxdots");
-  if(items.length === 0){ btn.hidden = true; pg.textContent = ""; return; }
-  wxPage = ((wxPage % items.length) + items.length) % items.length;
-  pg.textContent = items[wxPage];
-  [...dots.children].forEach((el, i) => { el.style.display = i < items.length ? "" : "none"; el.classList.toggle("on", i === wxPage); });
+  const pages = wxPageList(), pg = btn.querySelector(".ct-wxpage");
+  if(pages.length === 0){ btn.hidden = true; pg.textContent = ""; return; }
+  wxPage = ((wxPage % pages.length) + pages.length) % pages.length;
   btn.hidden = false;
+  for(const v of pages[wxPage]){                   // 1行に収まる、いちばん情報の多い版を選ぶ(途中で切れた文字は出さない)
+    pg.innerHTML = `<span class="wx-d">${escapeHtml(v.head)}</span>${escapeHtml(v.body)}`;
+    if(!(btn.clientWidth > 0 && pg.scrollWidth > btn.clientWidth)) break;
+  }
   if(flip && !wxReduced()){ pg.classList.remove("flip"); void pg.offsetWidth; pg.classList.add("flip"); }   // ページが返るように切り替える
 }
 function wxStep(dir){ wxPage += dir; wxRender(true); }
@@ -2593,17 +2617,13 @@ if(dateEl && dateEl.parentNode){
   wx.hidden = true;
   const pg = document.createElement("span");
   pg.className = "ct-wxpage";
-  const dots = document.createElement("span");
-  dots.className = "ct-wxdots";
-  dots.innerHTML = "<i></i><i></i><i></i>";
   wx.appendChild(pg);
-  wx.appendChild(dots);
   left.appendChild(l1);
   left.appendChild(wx);
-  const sub = document.createElement("div");       // 一番上の1行
+  const sub = document.createElement("div");       // 日付と同じ行の右端
   sub.className = "ct-bcpsub";
   sub.textContent = "BCP用オフライン使用可";
-  box.appendChild(sub);
+  l1.appendChild(sub);
   box.appendChild(left);
 
   let pressTimer = null, longPressed = false, swiped = false, startX = 0;
