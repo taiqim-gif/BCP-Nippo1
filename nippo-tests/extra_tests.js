@@ -1282,3 +1282,44 @@ ok(edited37.length===1 && edited37[0].date==="2026-09-30" && !edited37[0].sentAt
 $("ctCardEdit").hidden=true;
 // 行のスライドは、そのまま
 ok(!!d.querySelector("#ctList .ct-swrap > .ct-row") || true,"(the per-row swipe is unchanged and is covered by the earlier tests)");
+
+// ---- 38) 1本を記録したら、日付・区分・顧客名を1行のまとめに縮める ----
+$("navContainerButton").click(); if($("ctCancelEdit").style.display!=="none") $("ctCancelEdit").click();
+const top38=()=>$("ctTopArea").style.display!=="none", sum38=()=>$("ctTopSum").style.display!=="none";
+set("ctCustomer",""); ev($("ctCustomer"),"input");
+ok(top38() && !sum38(),"customer empty: date, 区分 and customer are all shown (no summary row)");
+d.querySelector('#ctStatusSeg button[data-status="2"]').click(); chip("O2").click();
+set("ctCustomer","まとめテスト商店"); ev($("ctCustomer"),"input");
+ok(top38() && !sum38(),"typing a customer name does not collapse yet");
+set("ctSymbol","M"); set("ctNumber","1"); confirmAnswer=true; $("ctSaveButton").click();
+ok(!top38() && sum38(),"after recording one: the top part is collapsed into one row");
+const m38=/^\d{4}-(\d{1,2})-(\d{1,2})/.exec($("ctDate").value);
+ok($("ctTopSumDate").textContent===`${+m38[1]}/${+m38[2]}` && $("ctTopSumSt").textContent==="出庫" && $("ctTopSumCust").textContent==="まとめテスト商店","summary row = date (M/D), 区分, customer: "+$("ctTopSum").textContent);
+ok($("ctGasArea").style.display==="none" && $("ctGasSum").style.display!=="none","gas type stays outside the summary, in its own 1-line form");
+ok(d.activeElement===$("ctSymbol"),"the cursor goes back to the symbol field");
+set("ctSymbol","M"); set("ctNumber","2"); $("ctSaveButton").click();
+ok(!top38() && sum38() && stored().filter(l=>l.customer==="まとめテスト商店").length===2,"next record with the same customer: still collapsed");
+$("ctTopSum").click();
+ok(top38() && !sum38(),"tapping the summary row opens the top part");
+d.querySelector('#ctStatusSeg button[data-status="3"]').click();
+ok(top38() && !sum38(),"changing 区分 while opened keeps it open");
+set("ctSymbol","M"); set("ctNumber","3"); $("ctSaveButton").click();
+ok(!top38() && $("ctTopSumSt").textContent==="空受" && $("containerScreen").getAttribute("data-sc")==="in","after recording, collapsed again with the new 区分 (空受, peach)");
+set("ctCustomer",""); ev($("ctCustomer"),"input");
+ok(top38() && !sum38(),"clearing the customer name ((X)) shows everything again");
+set("ctCustomer","まとめテスト商店"); ev($("ctCustomer"),"input");
+ok(top38(),"typing the same name again does not collapse by itself");
+set("ctSymbol","M"); set("ctNumber","4"); $("ctSaveButton").click();
+ok(!top38(),"(collapsed after recording)");
+$("ctCustomer").value="別の顧客";
+ok(top38() && !sum38(),"when the customer changes (e.g. filled from another tab), everything is shown again");
+// 記録を直すときは、全部を出す
+set("ctCustomer","まとめテスト商店"); ev($("ctCustomer"),"input"); set("ctSymbol","M"); set("ctNumber","5"); $("ctSaveButton").click();
+ok(!top38(),"(collapsed after recording)");
+const card38=[...d.querySelectorAll("#ctList .ct-cust")].find(c=>c.querySelector(".ct-cust-name").textContent==="まとめテスト商店");
+if(card38 && !card38.querySelector(".ct-hwrap")) card38.querySelector(".ct-tog").click();
+const row38=[...d.querySelectorAll("#ctList .ct-cust")].find(c=>c.querySelector(".ct-cust-name").textContent==="まとめテスト商店").querySelector(".ct-row");
+await swipe(row38,100);
+ok($("ctSaveButton").textContent==="更新" && top38() && !sum38(),"editing a record (right swipe): everything is shown, not collapsed");
+$("ctCancelEdit").click();
+ok(top38() && !sum38() && $("ctCustomer").value==="","after 更新をやめる: the form is cleared and everything is shown");

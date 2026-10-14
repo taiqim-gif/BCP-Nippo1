@@ -419,6 +419,14 @@ style.textContent = `
   .ct-gassum{ flex:1; min-width:0; display:flex; align-items:center; gap:10px; margin:0 8px; min-height:42px; cursor:pointer; }
   .ct-gassum-arrow{ font-size:12px; color:var(--ink-soft); flex:none; }
   .ct-gassum-chip{ padding:6px 14px; border-radius:999px; font-weight:700; font-size:14px; white-space:nowrap; }
+  .ct-topsum{ display:flex; align-items:center; gap:10px; min-height:42px; padding:4px 10px; margin-bottom:8px; border-radius:10px; background:#fff; border:1px solid var(--sky-dark); cursor:pointer; }
+  .ct-topsum-date{ flex:none; font-size:15px; font-weight:700; color:var(--ink); }
+  .ct-topsum-st{ flex:none; padding:4px 12px; border-radius:999px; font-size:14px; font-weight:700; background:var(--sky); color:var(--sky-ink); }
+  .ct-topsum-cust{ flex:1; min-width:0; font-size:17px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #containerScreen[data-sc="in"] .ct-topsum{ border-color:var(--peach-dark); }
+  #containerScreen[data-sc="in"] .ct-topsum-st{ background:var(--peach); color:var(--peach-ink); }
+  #containerScreen[data-sc="oth"] .ct-topsum{ border-color:var(--lavender-dark); }
+  #containerScreen[data-sc="oth"] .ct-topsum-st{ background:var(--lavender); color:var(--lavender-ink); }
   .ct-gassum-cap{ flex:1; min-width:0; font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ct-gasdir{ display:flex; gap:14px; font-size:17px; font-weight:900; line-height:1; color:var(--lavender-ink); margin-right:42px; }
   .ct-gasdir span{ visibility:hidden; }
@@ -565,6 +573,8 @@ section.id = "containerScreen";
 section.className = "screen";
 section.innerHTML = `
   <section class="dt-frame compact ctin"><div class="dt-head"><span id="ctTitle">容器ログ</span></div><div class="dt-body">
+    <div class="ct-topsum" id="ctTopSum" role="button" tabindex="0" aria-label="日付・区分・顧客名を直す" style="display:none;"><span class="ct-topsum-date" id="ctTopSumDate"></span><span class="ct-topsum-st" id="ctTopSumSt"></span><span class="ct-topsum-cust" id="ctTopSumCust"></span><span class="ct-gassum-arrow" aria-hidden="true">▼</span></div>
+    <div id="ctTopArea">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
       <div class="ct-datefield">
         <span class="ct-inlab">日付</span>
@@ -590,6 +600,7 @@ section.innerHTML = `
       <div class="kana-grid" id="ctKanaGrid"></div>
     </div>
     <div class="customer-list" id="ctCustomerList" style="display:none;"></div>
+    </div>
 
     <div class="field">
       <div class="ct-gashead" id="ctGasHead"><label>ガス種</label><span class="ct-gassum" id="ctGasSum" role="button" tabindex="0" aria-label="ガス種を選び直す" style="display:none;"><span class="ct-gassum-chip" id="ctGasSumChip"></span><span class="ct-gassum-cap" id="ctGasSumCap"></span><span class="ct-gassum-arrow" aria-hidden="true">▼</span></span><span class="ct-gasdir" aria-hidden="true"><span id="ctGasL">←</span><span id="ctGasR">→</span></span></div>
@@ -665,6 +676,29 @@ function flashText(t, cust, gas, scls){
   flashTimer = setTimeout(() => flashEl.classList.remove("show"), 1200);
 }
 
+/* ---------- 日付・区分・顧客名を、1行のまとめに縮める ----------
+   1本を記録したら縮める(同じ顧客で続けて入れるとき、記号・番号だけを見せる)。
+   まとめの行を押す・顧客名が変わる・消す・記録を直すときは、全部を出す */
+let ctTopFor = "";             // 縮めたときの顧客名(空なら、縮めない)
+function renderTopCollapse(){
+  const sum = $("ctTopSum"), area = $("ctTopArea");
+  if(!sum || !area) return;
+  const cust = $("ctCustomer").value.trim();
+  const collapsed = !!ctTopFor && cust === ctTopFor && !ctEditId;
+  if(!collapsed) ctTopFor = "";
+  area.style.display = collapsed ? "none" : "";
+  sum.style.display = collapsed ? "flex" : "none";
+  if(collapsed){
+    const m = /^\d{4}-(\d{1,2})-(\d{1,2})/.exec($("ctDate").value || "");
+    $("ctTopSumDate").textContent = m ? `${+m[1]}/${+m[2]}` : "--/--";
+    $("ctTopSumSt").textContent = statusName(ctStatus);
+    $("ctTopSumCust").textContent = cust;
+  }
+}
+function openTopArea(){ ctTopFor = ""; renderTopCollapse(); }
+$("ctTopSum").addEventListener("click", openTopArea);                       // 1行のどこを押しても、開く
+$("ctTopSum").addEventListener("keydown", e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); openTopArea(); } });
+
 /* ---------- 部品の描画 ---------- */
 function renderStatus(){
   const seg = $("ctStatusSeg");
@@ -696,6 +730,7 @@ function renderStatus(){
   sel.classList.toggle("sel-on", inSelect);
   $("containerScreen").setAttribute("data-sc", ctStatus === 2 ? "out" : (ctStatus === 3 ? "in" : "oth"));   // 出庫=水色・空受=ピーチ・他の区分=ラベンダー
   if(typeof window.ctRenderBar === "function") window.ctRenderBar();
+  renderTopCollapse();
 }
 
 function renderModeAndUnit(){
@@ -1087,6 +1122,7 @@ function syncCtKana(){
   const area = $("ctKanaArea");
   if(!area) return;
   area.style.display = (hasMaster() && !$("ctCustomer").value.trim()) ? "block" : "none";
+  renderTopCollapse();          // 顧客名が変わったり、消えたりしたら、全部を出す
 }
 function renderKana(){
   const area = $("ctKanaArea");
@@ -1141,6 +1177,7 @@ function updateFormMode(){
   cancel.textContent = editing ? "更新をやめる" : "追加をやめる";
   $("ctTitle").textContent = editing ? "容器ログ(変更中)" : (adding ? "容器ログ(追加中)" : "容器ログ");
   $("ctTimeField").style.display = editing ? "block" : "none";
+  renderTopCollapse();
 }
 function setFormEditing(){ updateFormMode(); }
 
@@ -1232,6 +1269,8 @@ function saveFromForm(){
     ctAdding = false;
     resetDateToToday();
     clearRecordFields();
+  }else{
+    ctTopFor = f.customer;           // 新しく記録したら、日付・区分・顧客名を1行に縮める
   }
   updateFormMode();
   renderList();
@@ -1296,7 +1335,7 @@ function fmtDateWeek(iso){
   const y = +m[1], mo = +m[2], d = +m[3];
   return `${y}/${mo}/${d}　(${WEEK[new Date(y, mo - 1, d).getDay()]})`;
 }
-function syncDateText(){ $("ctDateText").textContent = $("ctDate").value ? fmtDateWeek($("ctDate").value) : "----/--/--"; }
+function syncDateText(){ $("ctDateText").textContent = $("ctDate").value ? fmtDateWeek($("ctDate").value) : "----/--/--"; renderTopCollapse(); }
 function setDate(v){ $("ctDate").value = v; syncDateText(); }
 
 function resetDateToToday(){
