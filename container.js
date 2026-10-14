@@ -189,6 +189,7 @@ style.textContent = `
   #homeStartButton{ background:#3F9A5E; color:#fff; }
   .dt-frame.hm2 .todo-list-target > h2{ position:relative; }
   .todo-count{ position:absolute; left:50%; transform:translateX(-50%); font-size:14px; font-weight:700; white-space:nowrap; pointer-events:none; }
+  body.kb-pad{ padding-bottom:60vh !important; }     /* 入力中だけ、画面の高さの約6割の余白を下に足す。iPhoneが画面を動かす余地になる */
   header{ overflow:hidden; max-height:240px; transition:max-height .2s ease, padding .2s ease, opacity .2s ease, border-width .2s ease; }
   header.banner-off{ max-height:0; padding-top:0; padding-bottom:0; opacity:0; border-bottom-width:0; }
   .ct-clr{ position:relative; }
@@ -444,9 +445,10 @@ style.textContent = `
   .ct-lbrow .btn-mini{ padding:2px 10px; line-height:1.2; }
 
   .ct-flash{ position:fixed; left:50%; top:40%; transform:translate(-50%,-50%) scale(.9); font-size:64px; font-weight:700; color:var(--mint-ink); background:rgba(255,255,255,0.95); border:3px solid var(--mint-dark); border-radius:24px; padding:14px 44px; z-index:200; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; }
-  .ct-flash{ writing-mode:horizontal-tb; text-align:center; max-width:92vw; }
-  .ct-flash-main{ font-size:64px; line-height:1.1; font-weight:700; white-space:nowrap; }
-  .ct-flash-sub{ font-size:17px; font-weight:700; margin-top:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:84vw; color:var(--ink); }
+  .ct-flash{ writing-mode:horizontal-tb; text-align:center; width:max-content; max-width:90vw; font-size:20px; color:var(--sky-ink); border-color:var(--sky-dark); padding:14px 24px; }
+  .ct-flash-main{ font-size:28px; line-height:1.2; font-weight:700; white-space:nowrap; }
+  .ct-flash-cust{ font-size:20px; font-weight:700; margin-top:8px; color:var(--ink); overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .ct-flash-gas{ font-size:20px; font-weight:700; margin-top:4px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ct-flash.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
 
   /* 顧客の管理 */
@@ -480,15 +482,15 @@ tabColors.textContent = `
   /* ホーム＝ミントグリーン(ボタンと同じ色)の濃淡 */
   .dt-frame.hm1{ background:#EEF9F5; border-color:var(--mint-dark); }
   .dt-frame.hm1 .dt-head{ background:var(--mint); color:var(--mint-ink); }
-  .dt-frame.hm2{ background:#FFF3EA; border-color:#EE8A57; }
-  .dt-frame.hm2 .dt-head, .dt-frame.hm2 .todo-list-target > h2{ background:var(--peach-dark); color:var(--peach-ink); }
+  .dt-frame.hm2{ background:#F3EFFC; border-color:var(--lavender-dark); }
+  .dt-frame.hm2 .dt-head, .dt-frame.hm2 .todo-list-target > h2{ background:var(--lavender); color:var(--lavender-ink); }
   .dt-frame.hm3{ background:#F6FCFA; border-color:#B6E5D6; }
   .dt-frame.hm3 .dt-head{ background:#C9EFE4; color:var(--mint-ink); }
   /* 車両＝ピーチの濃淡(車両情報は、出発=ピーチ・帰社=スカイのまま) */
-  .dt-frame.veh2{ background:#FFF3EA; border-color:#EE8A57; }
-  .dt-frame.veh2 .dt-head{ background:var(--peach-dark); color:var(--peach-ink); }
-  .dt-frame.veh3{ background:#FFF9F4; border-color:#F6D2BB; }
-  .dt-frame.veh3 .dt-head{ background:#FFE3D0; color:var(--peach-ink); }
+  .dt-frame.veh2{ background:#F3EFFC; border-color:var(--lavender-dark); }
+  .dt-frame.veh2 .dt-head{ background:var(--lavender); color:var(--lavender-ink); }
+  .dt-frame.veh3{ background:#F8F5FD; border-color:#D6CBF3; }
+  .dt-frame.veh3 .dt-head{ background:#E6DDF9; color:var(--lavender-ink); }
   /* 容器＝スカイの濃淡 */
   .dt-frame.ctin{ background:#EDF6FB; border-color:var(--sky-dark); }
   .dt-frame.ctin .dt-head{ background:var(--sky); color:var(--sky-ink); }
@@ -606,8 +608,8 @@ flashEl.className = "ct-flash";
 flashEl.id = "ctFlash";
 document.body.appendChild(flashEl);
 let flashTimer = null;
-function flashText(t, sub){
-  flashEl.innerHTML = `<div class="ct-flash-main">${escapeHtml(t)}</div>` + (sub ? `<div class="ct-flash-sub">${escapeHtml(sub)}</div>` : "");
+function flashText(t, cust, gas){
+  flashEl.innerHTML = `<div class="ct-flash-main">${escapeHtml(t)}</div>` + (cust ? `<div class="ct-flash-cust">${escapeHtml(cust)}</div>` : "") + (gas ? `<div class="ct-flash-gas">${escapeHtml(gas)}</div>` : "");
   flashEl.classList.add("show");
   clearTimeout(flashTimer);
   flashTimer = setTimeout(() => flashEl.classList.remove("show"), 1200);
@@ -1157,7 +1159,11 @@ function saveFromForm(){
   }
   ctSave();
   trackCustomer(f.customer);
-  flashText(wasEditing ? "更新" : "登録", [f.customer, f.gas, f.capacity !== "" ? `${f.capacity}${f.unit ? " " + f.unit : ""}` : ""].filter(Boolean).join("　"));
+  const fg = GAS_TABLE.find(g => g.code === f.gasCode);
+  const gname = nfkc(f.gas || "");
+  const glabel = fg && fg.label && fg.label !== gname ? fg.label : "";
+  flashText(wasEditing ? "更新" : "登録", f.customer,
+    [gname, glabel, f.capacity !== "" ? `${f.capacity}${f.unit ? " " + f.unit : ""}` : ""].filter(Boolean).join("　"));   // 1行目=顧客名(2行まで)、2行目=ガス種・容量・単位
 
   // 記号・番号は、記録のたびに空白(初期状態)へ戻す。区分・顧客・ガス種・容量は残す
   $("ctSymbol").value = "";
@@ -3190,10 +3196,10 @@ function attachClear(inp){
   const isInput = el => !!(el && el.tagName && (
     (el.tagName === "INPUT" && !["checkbox", "radio", "button", "submit", "file", "range"].includes((el.type || "").toLowerCase())) ||
     el.tagName === "TEXTAREA" || el.tagName === "SELECT"));
-  const hide = () => { clearTimeout(t); if(!hidden){ hidden = true; hdr.classList.add("banner-off"); } };
+  const hide = () => { clearTimeout(t); if(!hidden){ hidden = true; hdr.classList.add("banner-off"); document.body.classList.add("kb-pad"); } };
   const show = () => {
     clearTimeout(t);
-    t = setTimeout(() => { if(isInput(document.activeElement)) return; hidden = false; hdr.classList.remove("banner-off"); }, 300);
+    t = setTimeout(() => { if(isInput(document.activeElement)) return; hidden = false; hdr.classList.remove("banner-off"); document.body.classList.remove("kb-pad"); }, 300);
   };
   document.addEventListener("focusin", e => { if(isInput(e.target)) hide(); });
   document.addEventListener("focusout", e => { if(isInput(e.target)) show(); });
