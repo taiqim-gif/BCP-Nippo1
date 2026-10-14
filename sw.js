@@ -6,7 +6,9 @@
    ・客先名リスト（master フォルダ）は保管せず、常にネットから取得する
    ※ アプリを大きく作り替えたときは、下の CACHE の v1 → v2 に変える
 ========================================================= */
-const CACHE = "nippo-cache-v1";
+const CACHE = "nippo-cache-v3";
+const FONT_CACHE = "nippo-fonts-v1";                    // Google Fonts（見た目用）を保管する入れ物
+const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
 
 const CORE = [
   "./",
@@ -36,7 +38,7 @@ self.addEventListener("install", event => {
 self.addEventListener("activate", event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
+    await Promise.all(keys.filter(k => k !== CACHE && k !== FONT_CACHE).map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });
@@ -69,12 +71,32 @@ async function networkFirst(req){
   }
 }
 
+// フォント：保管したものをすぐ使い、裏で最新を取り直す（電波が弱くても画面表示が止まらない）
+async function fontsCacheFirst(event){
+  const req = event.request;
+  const cache = await caches.open(FONT_CACHE);
+  const hit = await cache.match(req);
+  const update = fetch(req).then(res => {
+    if(res && (res.ok || res.type === "opaque")) cache.put(req, res.clone());
+    return res;
+  }).catch(() => null);
+  if(hit){
+    event.waitUntil(update);
+    return hit;
+  }
+  return (await update) || Response.error();
+}
+
 self.addEventListener("fetch", event => {
   const req = event.request;
   if(req.method !== "GET") return;
 
   const url = new URL(req.url);
-  if(url.origin !== self.location.origin) return;       // Google Fonts など外部は対象外
+  if(FONT_HOSTS.includes(url.hostname)){
+    event.respondWith(fontsCacheFirst(event));
+    return;
+  }
+  if(url.origin !== self.location.origin) return;       // それ以外の外部は対象外
   if(url.pathname.includes("/master/")) return;         // 客先名リストは保管しない
 
   event.respondWith(networkFirst(req));

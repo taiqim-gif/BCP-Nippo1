@@ -146,6 +146,9 @@ style.textContent = `
   .wx-grid{ display:grid; grid-template-columns:repeat(3, 52px); row-gap:1px; text-align:center; }
   .wx-r1{ color:#0B7A7A; font-size:15px; font-weight:700; white-space:pre; overflow:hidden; line-height:22px; height:22px; }
   .wx-grid.icons .wx-r1{ font-size:17px; }
+  .wx-grid.temp .wx-r1{ font-size:13px; }
+  .wx-grid.pop .wx-r1{ color:#5B4A9E; }
+  .wx-pc{ font-size:13px; }
   .wx-r2{ color:#5B4A9E; font-size:11px; font-weight:700; line-height:1.2; }
   .wx-grid.flip .wx-r1{ animation:ctWxFlip .4s ease-out; }
   @keyframes ctWxFlip{ from{ transform:perspective(220px) rotateX(-80deg); opacity:0; } to{ transform:perspective(220px) rotateX(0); opacity:1; } }
@@ -156,8 +159,12 @@ style.textContent = `
   .dt-frame.compact .dt-body{ padding:8px 8px 2px; }
   .dt-frame.compact .h2-note{ font-size:11px; font-weight:400; }
   #vehicleScreen .dt-frame .card, #containerScreen .dt-frame .card{ background:transparent; border:none; box-shadow:none; padding:0; margin-bottom:8px; }
-  .dt-frame.veh1{ background:var(--vc-tint, #EDF6FB); border-color:var(--vc, var(--sky-dark)); }
-  .dt-frame.veh1 .dt-head{ background:var(--vc, var(--sky)); color:var(--vc-ink, var(--sky-ink)); justify-content:flex-start; gap:10px; }
+  .dt-frame.veh1{ background:#EDF6FB; border-color:var(--sky-dark); }
+  .dt-frame.veh1 .dt-head{ background:var(--sky); color:var(--sky-ink); justify-content:flex-start; gap:10px; }
+  .dt-frame.veh1[data-mode="departure"]{ background:#FFF3EA; border-color:var(--peach-dark); }
+  .dt-frame.veh1[data-mode="departure"] .dt-head{ background:var(--peach); color:var(--peach-ink); }
+  .dt-frame.veh1[data-mode="return"]{ background:#EDF6FB; border-color:var(--sky-dark); }
+  .dt-frame.veh1[data-mode="return"] .dt-head{ background:var(--sky); color:var(--sky-ink); }
   .dt-frame.veh2{ background:#F3EFFC; border-color:var(--lavender-dark); margin-top:28px; }
   .dt-frame.veh2 .dt-head{ background:var(--lavender); color:var(--lavender-ink); }
   .dt-frame.veh3{ background:#F2EEE4; border-color:#CFC8BB; }
@@ -166,6 +173,7 @@ style.textContent = `
   .dt-frame.ctin .dt-head{ background:var(--mint); color:var(--mint-ink); }
   .dt-frame.ctlist{ background:#FFF3EA; border-color:var(--peach-dark); margin-top:14px; }
   .dt-frame.ctlist .dt-head{ background:var(--peach); color:var(--peach-ink); }
+  .todo-item input[type=checkbox]{ transform:scale(1.55); margin:0 9px 0 7px; }
   #vehicleScreen .todo-line, #reportScreen .todo-line{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* 長押しで、文字の選択やメニューが出ないように */
   .dt-frame.hm1{ background:#EEF9F5; border-color:var(--mint-dark); }
   .dt-frame.hm1 .dt-head{ background:var(--mint); color:var(--mint-ink); }
@@ -179,9 +187,13 @@ style.textContent = `
   .dt-frame.hm3 .dt-head{ background:var(--peach); color:var(--peach-ink); }
   #reportScreen .dt-frame .card{ background:transparent; border:none; box-shadow:none; padding:0; margin-bottom:8px; }
   .dt-frame[hidden]{ display:none; }
+  #homeStartButton{ background:#3F9A5E; color:#fff; }
+  .dt-frame.hm2 .todo-list-target > h2{ position:relative; }
+  .todo-count{ position:absolute; left:50%; transform:translateX(-50%); font-size:14px; font-weight:700; white-space:nowrap; pointer-events:none; }
+  body.ct-locked{ overflow:hidden; }
   .ct-clr{ position:relative; }
   .ct-clr > input{ padding-right:34px !important; }
-  .ct-clrbtn{ position:absolute; top:3px; right:4px; width:26px; height:26px; border:none; background:transparent; color:#9C948C; font-size:18px; line-height:1; cursor:pointer; padding:0; }
+  .ct-clrbtn{ position:absolute; top:3px; right:4px; width:32px; height:26px; border:none; background:transparent; color:#B9B1A8; font-size:11px; line-height:1; cursor:pointer; padding:0; font-family:inherit; }
   .ct-clrbtn[hidden]{ display:none; }
   .ct-combo .ct-clrbtn{ right:34px; }
   .todo-date{ color:#6F8CA3; font-size:11px; font-weight:600; font-family:"Avenir Next Condensed","DIN Condensed","Arial Narrow",sans-serif; font-stretch:condensed; letter-spacing:-0.02em; margin-right:6px; }
@@ -459,12 +471,6 @@ section.id = "containerScreen";
 section.className = "screen";
 section.innerHTML = `
   <section class="dt-frame compact ctin"><div class="dt-head"><span id="ctTitle">容器ログ</span></div><div class="dt-body">
-    <div style="display:flex;gap:8px;align-items:stretch;">
-      <div class="ct-seg" id="ctStatusSeg" style="flex:2;"></div>
-      <select id="ctStatusSel" style="flex:1.2;min-width:0;padding:8px 6px;" aria-label="他の区分"></select>
-    </div>
-    <div style="height:6px;"></div>
-
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
       <div class="ct-datefield">
         <span class="ct-inlab">日付</span>
@@ -476,6 +482,12 @@ section.innerHTML = `
         <input type="time" id="ctTime">
       </div>
     </div>
+
+    <div style="display:flex;gap:8px;align-items:stretch;">
+      <div class="ct-seg" id="ctStatusSeg" style="flex:2;"></div>
+      <select id="ctStatusSel" style="flex:1.2;min-width:0;padding:8px 6px;" aria-label="他の区分"></select>
+    </div>
+    <div style="height:6px;"></div>
 
     <div class="field" style="margin-bottom:6px;">
       <input type="text" id="ctCustomer" placeholder="顧客名" aria-label="顧客名" autocomplete="off">
@@ -692,7 +704,7 @@ function pickGas(sel){
     ctUnit = OTHER_GAS_UNIT;
     renderModeAndUnit();
     renderGasChips();
-    $("ctGasOther").focus();
+    $("ctGasOther").focus({ preventScroll:true });
     return;
   }
   const g = curGas();
@@ -933,7 +945,7 @@ function showCustomerList(items){
         ctKana = null;
         renderKana();
         showCustomerList(null);
-        $("ctSymbol").focus();
+        $("ctSymbol").focus({ preventScroll:true });
       });
       box.appendChild(b);
     });
@@ -1017,26 +1029,26 @@ function saveFromForm(){
   const targetId = ctEditId;                      // 変更中ならその記録を更新、そうでなければ新しい記録
 
   if(!f.date){ showToast("日付を入力してください"); return; }
-  if(!f.customer){ showToast("顧客名を入力してください"); $("ctCustomer").focus(); return; }
-  if(!/^[A-Z0-9]+$/.test(f.symbol)){ showToast("記号は半角の英数字で入力してください"); $("ctSymbol").focus(); return; }
+  if(!f.customer){ showToast("顧客名を入力してください"); $("ctCustomer").focus({ preventScroll:true }); return; }
+  if(!/^[A-Z0-9]+$/.test(f.symbol)){ showToast("記号は半角の英数字で入力してください"); $("ctSymbol").focus({ preventScroll:true }); return; }
   if(!/^[0-9]+$/.test(f.number)){
     // 番号は数字のみ。英字が入っているときは、本当に英字かを確認してから入力できる
     const letters = f.number.match(/[A-Z]/g);
     if(letters && /^[A-Z0-9]+$/.test(f.number)){
       const list = [...new Set(letters)].join("");
       if(!window.confirm(`番号に英字入力しますか？\n(入力された英字：${list})`)){
-        $("ctNumber").focus();
+        $("ctNumber").focus({ preventScroll:true });
         return;
       }
     }else{
       showToast("番号は半角の数字で入力してください(英字は確認のうえ入力できます)");
-      $("ctNumber").focus();
+      $("ctNumber").focus({ preventScroll:true });
       return;
     }
   }
   if(ctGasSel === null){ showToast("ガス種を選んでください"); return; }
-  if(!f.gas){ showToast("ガス種を入力してください"); $("ctGasOther").focus(); return; }
-  if(f.capacity !== "" && (!/^\d+(\.\d+)?$/.test(f.capacity) || f.capacity.replace(".", "").length > 5)){ showToast("容量は5桁までの数字で入力してください"); $("ctCapacity").focus(); return; }
+  if(!f.gas){ showToast("ガス種を入力してください"); $("ctGasOther").focus({ preventScroll:true }); return; }
+  if(f.capacity !== "" && (!/^\d+(\.\d+)?$/.test(f.capacity) || f.capacity.replace(".", "").length > 5)){ showToast("容量は5桁までの数字で入力してください"); $("ctCapacity").focus({ preventScroll:true }); return; }
 
   const dup = ctLogs.find(l => l.id !== targetId && l.date === f.date && l.status === f.status &&
                                l.symbol === f.symbol && l.number === f.number);
@@ -1078,7 +1090,7 @@ function saveFromForm(){
   }
   updateFormMode();
   renderList();
-  $("ctSymbol").focus();
+  $("ctSymbol").focus({ preventScroll:true });
 }
 
 function startEdit(id){
@@ -1128,7 +1140,7 @@ function startAddTo(name, date){
   showCustomerList(null);
   updateFormMode();
   window.scrollTo({ top:0, behavior:"auto" });
-  $("ctSymbol").focus();
+  $("ctSymbol").focus({ preventScroll:true });
   showToast(`「${name}」に追加します`);
 }
 
@@ -1444,6 +1456,67 @@ async function saveFile(name, content, mime, withBom){
   return "downloaded";
 }
 
+function csvQuote(v){ const t = String(v == null ? "" : v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }
+function csvRows(head, rows){ return [head, ...rows].map(r => r.map(csvQuote).join(",")).join("\r\n"); }
+
+// 複数のCSVを、共有画面からまとめて添付する。共有画面が使えない環境では、1つずつ保存する
+async function saveFiles(files, title, text){
+  const blobs = files.map(f => ({ name:f.name, blob:new Blob(["\ufeff" + f.content], { type:"text/csv" }) }));
+  try{
+    const fl = blobs.map(b => new File([b.blob], b.name, { type:"text/csv" }));
+    if(navigator.canShare && navigator.canShare({ files:fl })){
+      await navigator.share({ files:fl, title, text });
+      return "shared";
+    }
+  }catch(err){
+    if(err && err.name === "AbortError") return false;
+  }
+  blobs.forEach(b => {
+    const url = URL.createObjectURL(b.blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = b.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  });
+  return "downloaded";
+}
+
+/* 全データ：未送信の訪問・車両・容器と、ToDoリストを、4つのCSVにして、メールで送る(添付) */
+async function mailAllCsv(){
+  const today = getToday(), ymd = today.replace(/-/g, "");
+  const visits = meetingLogs.filter(l => !l.sentAt).slice()
+    .sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.startTime || "").localeCompare(b.startTime || ""));
+  const vdays = Object.keys(dailyVehicleInfo).filter(k => { const v = dailyVehicleInfo[k]; return v && !v.sentAt && vehicleHasData(v); }).sort();
+  let wx = {};
+  try{ wx = JSON.parse(localStorage.getItem("dailyWeather") || "{}") || {}; }catch(e){ wx = {}; }
+  const todos = [...todoItems.filter(t => !t.done).sort(sortByTodoOrder),
+    ...todoItems.filter(t => t.done).sort((a, b) => (a.completedAt || a.createdAt || "").localeCompare(b.completedAt || b.createdAt || ""))];
+  const cts = ctLogs.filter(l => !l.sentAt);
+  const files = [];
+  if(visits.length) files.push({ name:`訪問_${ymd}.csv`, content:csvRows(
+    ["日付","番号","顧客コード","訪問先","開始時刻","終了時刻","面談者","敬称","内容","特記事項","開始位置","終了位置"],
+    visits.map(l => [l.date, l.number, l.customerCode, l.target, formatTimeOnly(l.startTime), formatTimeOnly(l.endTime), l.attendee, l.attendeeTitle, l.content, l.notes,
+      posText(l.startLat, l.startLng, l.startLocation), posText(l.endLat, l.endLng, l.endLocation)])) });
+  if(vdays.length) files.push({ name:`車両_${ymd}.csv`, content:csvRows(
+    ["日付","出発時刻","出発距離","帰社時刻","帰社距離","給油量","出発位置","帰社位置","天気","最高","最低"],
+    vdays.map(k => { const v = dailyVehicleInfo[k], d = v.departure || {}, r = v.return || {}, w = wx[k] || {};
+      return [k, formatTimeOnly(d.time), d.distance, formatTimeOnly(r.time), r.distance, r.fuel, posText(d.lat, d.lng, d.location), posText(r.lat, r.lng, r.location), w.text, w.max, w.min]; })) });
+  if(todos.length) files.push({ name:`ToDo_${ymd}.csv`, content:csvRows(
+    ["状態","日付","顧客名","内容","対応日"],
+    todos.map(t => [t.done ? "済" : "未対応", formatMonthDay(t.date), t.target, t.content, t.done ? formatCompletedDay(t.completedAt) : ""])) });
+  if(cts.length) files.push({ name:`容器ログ_${ymd}.csv`, content:csvText(cts) });
+  if(files.length === 0){ showToast("送るデータがありません"); return; }
+  const title = `営業日報 ${today}`;
+  const text = `営業日報 ${today}\n訪問${visits.length}件・車両${vdays.length}日・ToDo${todos.length}件・容器${cts.length}本(CSVを添付)`;
+  const r = await saveFiles(files, title, text);
+  if(r === "shared"){
+    showToast("送れたら「送信済みにする」を押してください");
+  }else if(r === "downloaded"){
+    window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + "\n(CSVはダウンロードに保存しました。添付してください)")}`;
+  }
+}
+window.ctMailAllCsv = mailAllCsv;
+
 /* 容器ログ：未送信の分をCSVにして、共有画面からメールで送る(添付)。共有画面が使えない環境では、保存してメールの下書きを開く */
 async function mailContainerCsv(){
   const logs = ctLogs.filter(l => !l.sentAt);
@@ -1611,7 +1684,7 @@ dataSection.innerHTML = `
     <div class="dt-head">送る</div>
     <div class="dt-body">
       <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtMailReport">全データをメール送信<br>(日報・車両・ToDo・容器)</button>
+        <button class="btn btn-outline-mint" id="dtMailReport">全データをメール送信<br>(CSV添付)</button>
         <div class="dt-desc">未送信の全データを送る</div>
       </div>
       <div class="dt-item">
@@ -1941,7 +2014,7 @@ function wxCols(){
 function wxCellText(c, mode){
   if(mode === 0) return c.icons || "--";
   if(mode === 1) return c.pop != null ? c.pop + "%" : "--";
-  return `${c.max != null ? c.max : "--"}/${c.min != null ? c.min : "--"}`;
+  return `${c.max != null ? c.max : "--"} / ${c.min != null ? c.min : "--"}`;
 }
 let wxMode = 0;                                   // 0=アイコン 1=降水確率 2=気温
 function wxView(){
@@ -1955,11 +2028,18 @@ function wxRender(flip){
   const v = wxView();
   if(!v){ btn.hidden = true; return; }
   btn.hidden = false;
-  btn.querySelectorAll(".wx-r1").forEach((el, i) => { el.textContent = v.r1[i]; });
+  btn.querySelectorAll(".wx-r1").forEach((el, i) => {
+    const t = v.r1[i];
+    if(v.mode === 1 && /%$/.test(t)) el.innerHTML = `${escapeHtml(t.slice(0, -1))}<span class="wx-pc">%</span>`;     // 数字は15px、「%」だけ13px
+    else el.textContent = t;
+  });
   btn.querySelectorAll(".wx-r2").forEach((el, i) => { el.textContent = v.r2[i]; });
   const st = btn.querySelector(".wx-stale");
   if(st) st.hidden = !v.stale;
-  btn.querySelector(".wx-grid").classList.toggle("icons", v.mode === 0);      // アイコンのときだけ、大きい文字
+  const grid = btn.querySelector(".wx-grid");
+  grid.classList.toggle("icons", v.mode === 0);      // アイコン17px
+  grid.classList.toggle("pop", v.mode === 1);        // 降水確率は、日付と同じ紫
+  grid.classList.toggle("temp", v.mode === 2);       // 気温は13px
   if(flip && !wxReduced()){ const g = btn.querySelector(".wx-grid"); g.classList.remove("flip"); void g.offsetWidth; g.classList.add("flip"); }   // ページが返るように切り替える
 }
 function wxStep(dir){ wxMode = ((wxMode + dir) % 3 + 3) % 3; wxRender(true); }
@@ -2091,6 +2171,18 @@ if(typeof origSetMasterMessage === "function"){
     origSetMasterMessage(String(text).replace(/営業所キー/g, "担当キー").replace(/この営業所/g, "この担当"), isError);
   };
 }
+// ホームのToDoリストの帯の真ん中に、未実行の件数「(3件)」を出す
+function addTodoCount(){
+  const n = todoItems.filter(t => t && !t.done).length;
+  document.querySelectorAll("#reportScreen .todo-list-target > h2").forEach(h => {
+    if(h.querySelector(".todo-count")) return;
+    const c = document.createElement("span");
+    c.className = "todo-count";
+    c.textContent = `(${n}件)`;
+    const first = h.querySelector("span");
+    if(first && first.nextSibling) h.insertBefore(c, first.nextSibling); else h.appendChild(c);
+  });
+}
 // ToDoの行の先頭の日付(10/9など)を、小さなアズールグレーの文字にする(顧客名・内容の部分は、そのまま)
 function styleTodoDates(){
   document.querySelectorAll(".todo-line").forEach(el => {
@@ -2109,7 +2201,7 @@ function normalizeTodoHeads(){
   });
 }
 if(typeof origRenderTodoList === "function"){
-  window.renderTodoList = function(){ origRenderTodoList(); normalizeTodoHeads(); styleTodoDates(); renderDoneTodos(); };
+  window.renderTodoList = function(){ origRenderTodoList(); normalizeTodoHeads(); styleTodoDates(); renderDoneTodos(); addTodoCount(); };
 }
 normalizeTodoHeads();
 
@@ -2174,6 +2266,11 @@ doneBox.addEventListener("click", e => {
   if(e.target.closest("#doneMore")){ doneLimit += 20; renderDoneTodos(); }
 });
 renderDoneTodos();
+
+/* ---------- ToDo：実行済(や、実行中へ戻す)のは、□を押したときだけ ---------- */
+document.addEventListener("click", e => {
+  if(e.target.closest(".todo-item .todo-line") && !e.target.closest('input[type="checkbox"]')){ e.preventDefault(); e.stopPropagation(); }
+}, true);
 
 /* ---------- ToDoの並べ替え：「≡」を0.2秒押し続けると、つかめる ---------- */
 window.attachTodoDrag = function(handle, container){
@@ -2791,7 +2888,7 @@ function delTodo(){
   afterDelete("ToDoリストを削除しました");
 }
 
-$("dtMailReport").addEventListener("click", () => { const b = $("mailButton"); if(b) b.click(); });
+$("dtMailReport").addEventListener("click", mailAllCsv);
 $("dtMailCsv").addEventListener("click", mailContainerCsv);
 $("dtCsv").addEventListener("click", async () => {
   if(ctLogs.length === 0){ showToast("容器がありません"); return; }
@@ -2985,7 +3082,7 @@ function attachClear(inp){
   const b = document.createElement("button");
   b.type = "button";
   b.className = "ct-clrbtn";
-  b.textContent = "☒";
+  b.textContent = "(X)";
   b.setAttribute("aria-label", "全消去");
   b.hidden = true;
   wrap.appendChild(b);
@@ -3007,6 +3104,60 @@ function attachClear(inp){
 }
 ["homeVisitTarget", "visitTarget", "ctCustomer", "ctSearch", "cmSearch", "cmAddName"].forEach(id => attachClear($(id)));
 
+/* ---------- 容器ログの入力中は、画面を動かさない ----------
+   アプリからの自動の画面移動はしない。iPhoneがキーボードに合わせて画面を動かしたときは、すぐ元の位置に戻す */
+(function ctScrollLock(){
+  const scr = $("containerScreen");
+  if(!scr) return;
+  let lockY = null, active = false, t = null;
+  const isField = el => !!(el && el.closest && el.closest("#containerScreen .dt-frame.ctin") && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName));
+  const back = () => { if(active && lockY !== null && Math.abs((window.scrollY || 0) - lockY) > 1) window.scrollTo(0, lockY); };
+  scr.addEventListener("focusin", e => {
+    if(!isField(e.target)) return;
+    clearTimeout(t);
+    if(!active){ active = true; lockY = window.scrollY || 0; document.body.classList.add("ct-locked"); }
+    [0, 60, 200, 450, 800].forEach(ms => setTimeout(back, ms));       // iPhoneの自動移動が終わるまで、何度か戻す
+  });
+  scr.addEventListener("focusout", () => {
+    clearTimeout(t);
+    t = setTimeout(() => { if(!isField(document.activeElement)){ active = false; lockY = null; document.body.classList.remove("ct-locked"); } }, 300);
+  });
+  window.addEventListener("scroll", back, { passive:true });
+  if(window.visualViewport){ ["scroll", "resize"].forEach(ev => window.visualViewport.addEventListener(ev, back)); }
+})();
+
+/* ---------- 画面の左右の端のなぞりで、隣のタブへ(ホーム → 車両 → 容器 → データ) ---------- */
+(function edgeSwipe(){
+  const TABS = [["reportScreen", "navHomeButton"], ["vehicleScreen", "navVehicleButton"], ["containerScreen", "navContainerButton"], ["dataScreen", "navDataButton"]];
+  let st = null;
+  const cur = () => TABS.findIndex(([sid]) => $(sid) && $(sid).classList.contains("active"));       // 訪問入力・顧客の管理の画面では、-1(使わない)
+  document.addEventListener("touchstart", e => {
+    st = null;
+    const t = e.touches && e.touches[0];
+    if(!t || e.touches.length > 1) return;
+    const W = window.innerWidth;
+    if(t.clientX <= 24) st = { side:"L", x:t.clientX, y:t.clientY };
+    else if(t.clientX >= W - 24) st = { side:"R", x:t.clientX, y:t.clientY };
+  }, { passive:true });
+  document.addEventListener("touchend", e => {
+    if(!st) return;
+    const t = e.changedTouches && e.changedTouches[0], s0 = st;
+    st = null;
+    if(!t) return;
+    const dx = t.clientX - s0.x, dy = t.clientY - s0.y;
+    if(Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;        // 70px以上、ほぼ横
+    if(document.querySelector(".todo-item.dragging")) return;
+    const i = cur();
+    if(i < 0) return;
+    let j = null;
+    if(s0.side === "L" && dx > 0) j = i - 1;                                    // 左の端から右へ → 前のタブ
+    else if(s0.side === "R" && dx < 0) j = i + 1;                               // 右の端から左へ → 次のタブ
+    if(j === null || j < 0 || j >= TABS.length) return;
+    const b = $(TABS[j][1]);
+    if(b) b.click();                                                            // タブを押したときと同じ(訪問中の確認も出る)
+  }, { passive:true });
+})();
+
 /* ---------- ホームで作業した顧客名を控える ---------- */
 if($("homeVisitTarget")){
   $("homeVisitTarget").addEventListener("input", () => { if(!$("homeVisitTarget").value.trim()) forgetHomeCustomer(); });   // 1文字ごとには控えない
@@ -3016,29 +3167,14 @@ if($("homeStartButton")) $("homeStartButton").addEventListener("click", () => tr
 if($("endButton")) $("endButton").addEventListener("click", () => trackCustomer($("visitTarget") ? $("visitTarget").value : "", "home"));
 
 /* ---------- 車両情報のカードの色：いまの登録(出発／帰社)のボタンと同じ色 ---------- */
-function vehicleModeButton(mode){
-  const word = mode === "return" ? "帰社" : "出発";
-  const c = [...document.querySelectorAll("#vehicleScreen button")].filter(b => !b.closest("#doneTodoBox") && b.textContent.trim().startsWith(word));
-  return c.find(b => b.classList.contains("mode-switch-btn")) || c[0] || null;
-}
-function parseRgb(str){
-  const m = /rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)(?:[ ,/]+([\d.]+))?/.exec(String(str || ""));
-  return m ? { r:+m[1], g:+m[2], b:+m[3], a:m[4] === undefined ? 1 : +m[4] } : null;
-}
 function applyVehicleCardColor(){
   const fr = document.querySelector("#vehicleScreen .dt-frame.veh1");
   if(!fr) return;
-  const btn = vehicleModeButton(vehicleViewMode === "return" ? "return" : "departure");
-  const c = btn ? parseRgb(window.getComputedStyle(btn).backgroundColor) : null;
-  if(!c || c.a === 0){ ["--vc", "--vc-tint", "--vc-ink"].forEach(p => fr.style.removeProperty(p)); return; }   // ボタンが見つからないときは、元の水色
-  const mix = k => Math.round(c[k] + (255 - c[k]) * 0.82);
-  const lum = (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255;
-  fr.style.setProperty("--vc", `rgb(${c.r}, ${c.g}, ${c.b})`);
-  fr.style.setProperty("--vc-tint", `rgb(${mix("r")}, ${mix("g")}, ${mix("b")})`);
-  fr.style.setProperty("--vc-ink", lum > 0.6 ? "#4A4340" : "#fff");
+  fr.setAttribute("data-mode", vehicleViewMode === "return" ? "return" : "departure");     // 出発の登録=ピーチ、帰社の登録=スカイ
 }
 window.ctVehicleCardColor = applyVehicleCardColor;
 if($("vehicleScreen")) $("vehicleScreen").addEventListener("click", e => { if(e.target.closest(".mode-switch-btn")) setTimeout(applyVehicleCardColor, 0); });
+applyVehicleCardColor();
 
 /* ---------- 車両の走行距離の初期値 ---------- */
 function prevDayKey(key){
