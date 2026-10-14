@@ -1323,3 +1323,41 @@ await swipe(row38,100);
 ok($("ctSaveButton").textContent==="更新" && top38() && !sum38(),"editing a record (right swipe): everything is shown, not collapsed");
 $("ctCancelEdit").click();
 ok(top38() && !sum38() && $("ctCustomer").value==="","after 更新をやめる: the form is cleared and everything is shown");
+
+// ---- 39) 容器タブでは上下に動かない(バナー・余白・入力確認バーは、タブを開いている間ずっと同じ)・ガス種と容量を1行に ----
+const hdr39=d.querySelector("header"), bar39=$("ctConfirmBar");
+if(d.activeElement && d.activeElement.blur) d.activeElement.blur();
+$("navVehicleButton").click(); await sleep(1100);
+ok(!hdr39.classList.contains("banner-off") && !d.body.classList.contains("kb-pad") && bar39.hidden,"other tabs (not typing): banner shown, no bottom space, no confirmation bar");
+$("navContainerButton").click(); await sleep(50);
+ok(hdr39.classList.contains("banner-off") && d.body.classList.contains("kb-pad") && !bar39.hidden,"opening the 容器 tab: banner hidden, bottom space added and the confirmation bar shown at once, before any input");
+$("ctSymbol").focus(); $("ctSymbol").dispatchEvent(new w.FocusEvent("focusin",{bubbles:true}));
+ok(hdr39.classList.contains("banner-off") && d.body.classList.contains("kb-pad") && !bar39.hidden,"focusing 記号: nothing changes (no movement)");
+$("ctSymbol").blur(); $("ctSymbol").dispatchEvent(new w.FocusEvent("focusout",{bubbles:true})); await sleep(1100);
+ok(hdr39.classList.contains("banner-off") && d.body.classList.contains("kb-pad") && !bar39.hidden,"leaving 記号: nothing changes (no movement)");
+$("navHomeButton").click(); await sleep(1100);
+ok(!hdr39.classList.contains("banner-off") && !d.body.classList.contains("kb-pad") && bar39.hidden,"going to another tab: the banner comes back, the space and the bar go away");
+// 開いたとき、入力の前に、カードの位置を合わせる
+const sb39=[]; const sbBak39=w.scrollBy; w.scrollBy=o=>sb39.push(o);
+const card39=d.querySelector("#containerScreen .dt-frame.ctin"), rb39=card39.getBoundingClientRect;
+card39.getBoundingClientRect=()=>({top:400,bottom:800,left:0,right:100,width:100,height:400});
+$("navContainerButton").click(); await sleep(50);
+ok(sb39.length>=1 && sb39[0].behavior==="auto" && sb39[0].top>0,"opening the 容器 tab brings the input card up under the bar right away (before the keyboard)");
+card39.getBoundingClientRect=rb39; w.scrollBy=sbBak39;
+// ガス種と容量を1行に
+d.querySelector('#ctStatusSeg button[data-status="2"]').click(); chip("O2").click();
+const head39=$("ctGasHead");
+ok(head39.classList.contains("collapsed") && head39.contains($("ctCapacity")) && head39.contains($("ctUnitSeg")) && $("ctCapField").style.display==="none","gas chosen: gas, capacity and unit buttons are on one line (the separate capacity row is hidden)");
+ok($("ctCapacity").value==="7" && [...$("ctUnitSeg").children].some(b=>b.classList.contains("on") && b.textContent==="㎥"),"the one-line form keeps the capacity 7 and unit ㎥");
+const css39=[...d.querySelectorAll("style")].map(x=>x.textContent).join("\n");
+ok(/\.ct-gashead\.collapsed \.ct-gassum-cap\{ display:none; \}/.test(css39) && /\.ct-gashead\.collapsed > label\{ display:none; \}/.test(css39),"the capacity text in the gas line and the ガス種 label are hidden on the one line (no repeat)");
+$("ctGasSum").click();
+ok(!head39.contains($("ctCapacity")) && $("ctCapField").contains($("ctCapacity")) && $("ctCapField").style.display!=="none","opening the gas list: capacity goes back to its own row");
+chip("N2").click();
+ok(head39.contains($("ctCapacity")),"choosing again: back to one line");
+$("ctGasSum").click(); chip("その他").click();
+ok(!head39.contains($("ctCapacity")) && $("ctCapField").style.display!=="none","その他: not collapsed, capacity in its own row");
+chip("O2").click();
+$("ctCapacity").focus(); set("ctCapacity","9"); ev($("ctCapacity"),"input");
+ok(d.activeElement===$("ctCapacity") && head39.contains($("ctCapacity")),"typing the capacity on the one line keeps the cursor");
+$("ctCapacity").blur();

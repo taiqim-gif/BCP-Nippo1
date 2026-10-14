@@ -416,6 +416,13 @@ style.textContent = `
   .ct-gashead{ display:flex; justify-content:space-between; align-items:center; height:20px; margin-bottom:4px; }
   .ct-gashead label{ margin:0; }
   .ct-gashead.collapsed{ height:auto; min-height:42px; }
+  /* ガス種を選んで縮んだときは、ガス種・容量・単位を1行に並べる */
+  .ct-gashead.collapsed > label{ display:none; }
+  .ct-gashead.collapsed .ct-gassum{ margin:0 8px 0 0; }
+  .ct-gashead.collapsed .ct-gassum-cap{ display:none; }
+  .ct-gashead.collapsed #ctCapBox{ flex:none; gap:6px; }
+  .ct-gashead.collapsed #ctCapacity{ width:4.5em !important; }
+  .ct-gashead.collapsed #ctUnitSeg{ width:96px !important; }
   .ct-gassum{ flex:1; min-width:0; display:flex; align-items:center; gap:10px; margin:0 8px; min-height:42px; cursor:pointer; }
   .ct-gassum-arrow{ font-size:12px; color:var(--ink-soft); flex:none; }
   .ct-gassum-chip{ padding:6px 14px; border-radius:999px; font-weight:700; font-size:14px; white-space:nowrap; }
@@ -613,8 +620,8 @@ section.innerHTML = `
       <input type="text" id="ctGasOther" placeholder="ガス種を入力" style="margin-top:8px;display:none;" autocomplete="off">
     </div>
 
-    <div class="field">
-      <div style="display:flex;gap:10px;align-items:center;">
+    <div class="field" id="ctCapField">
+      <div id="ctCapBox" style="display:flex;gap:10px;align-items:center;">
         <input type="text" id="ctCapacity" enterkeyhint="next" inputmode="decimal" maxlength="5" placeholder="容量" aria-label="容量(最大5桁)" autocomplete="off" style="width:7em;flex:none;text-align:right;">
         <div class="ct-seg" id="ctUnitSeg" style="flex:none;width:140px;"></div>
       </div>
@@ -797,6 +804,16 @@ function renderGasCollapse(){
   area.style.display = collapsed ? "none" : "";
   if(dir) dir.style.display = collapsed ? "none" : "";
   sum.style.display = collapsed ? "flex" : "none";
+  const capBox = $("ctCapBox"), capField = $("ctCapField");
+  if(capBox && capField){
+    const dest = collapsed ? head : capField;
+    if(capBox.parentNode !== dest){
+      const refocus = document.activeElement === $("ctCapacity");
+      dest.appendChild(capBox);
+      if(refocus) $("ctCapacity").focus();
+    }
+    capField.style.display = collapsed ? "none" : "";
+  }
   if(collapsed){
     const chip = $("ctGasSumChip");
     chip.textContent = `${nfkc(g.name)}　${g.label || ""}`.trim();
@@ -3410,7 +3427,6 @@ function attachClear(inp){
   bar.className = "ct-confirm cb-out";
   bar.hidden = true;
   hdr.insertAdjacentElement("afterend", bar);
-  const ctinFocused = () => { const a = document.activeElement; return !!(a && a.closest && a.closest("#containerScreen .dt-frame.ctin") && isInput(a)); };
   function renderConfirmBar(){
     const f = readForm(), today = getToday();
     const sc = ctStatus === 2 ? "out" : (ctStatus === 3 ? "in" : "oth");
@@ -3426,19 +3442,36 @@ function attachClear(inp){
     bar.innerHTML = `<div class="cb-l1"><span class="cb-st">${escapeHtml(statusName(ctStatus))}</span>${dateHtml}<span class="cb-cust">${f.customer ? escapeHtml(f.customer) : miss("顧客名未入力")}</span></div>` +
                     `<div class="cb-l2"><span class="cb-gas">${gas}</span><span class="cb-no">${no}</span></div>`;
   }
+  const ctOn = () => !!$("containerScreen") && $("containerScreen").classList.contains("active");
   function syncBar(){
-    const on = hidden && !!$("containerScreen") && $("containerScreen").classList.contains("active") && ctinFocused();
+    const on = ctOn();          // 容器タブの間は、入力確認バーをずっと出す(出し入れで画面が上下に動かないように)
     if(on) renderConfirmBar();
     bar.hidden = !on;
   }
   window.ctRenderBar = () => { if(!bar.hidden) renderConfirmBar(); };
   ["input", "change", "click"].forEach(ev => $("containerScreen").addEventListener(ev, () => { if(!bar.hidden) renderConfirmBar(); }));
 
-  const hide = () => { clearTimeout(t); if(!hidden){ hidden = true; hdr.classList.add("banner-off"); document.body.classList.add("kb-pad"); } syncBar(); };
+  // 容器タブの間は、バナーを消したまま・下の余白を付けたままにする(入力の前後で、画面が上下に動かない)
+  let ctWas = false;
+  function apply(){
+    const on = ctOn(), off = hidden || on;
+    hdr.classList.toggle("banner-off", off);
+    document.body.classList.toggle("kb-pad", off);
+    syncBar();
+    if(on && !ctWas){                       // 容器タブを開いたら、入力の前に、入力のカードの上を入力確認バーの下へ合わせておく
+      ctWas = true;
+      const card = document.querySelector("#containerScreen .dt-frame.ctin");
+      if(card) alignCard(card);
+    }
+    if(!on) ctWas = false;
+  }
+  const hide = () => { clearTimeout(t); hidden = true; apply(); };
   const show = () => {
     clearTimeout(t);
-    t = setTimeout(() => { if(isInput(document.activeElement)) return; hidden = false; hdr.classList.remove("banner-off"); document.body.classList.remove("kb-pad"); syncBar(); }, 200);   // 約0.2秒で戻る
+    t = setTimeout(() => { if(isInput(document.activeElement)) return; hidden = false; apply(); }, 200);   // 約0.2秒で戻る
   };
+  if($("containerScreen") && typeof MutationObserver === "function")
+    new MutationObserver(apply).observe($("containerScreen"), { attributes:true, attributeFilter:["class"] });
 
   // 入力欄が、画面の見える範囲の上で切れたり、キーボードの下に隠れたときだけ、位置を直す(切れていなければ、何もしない)。動きは、なめらかに
   function ensureVisible(el){
@@ -3463,6 +3496,7 @@ function attachClear(inp){
     if(Math.abs(dy) > 2) window.scrollBy({ top: dy, behavior:"auto" });
   }
   window.ctAlignCard = alignCard;
+  apply();
   document.addEventListener("focusin", e => {
     if(!isInput(e.target)) return;
     hide();

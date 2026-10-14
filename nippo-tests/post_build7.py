@@ -9,5 +9,13 @@ rep('$("dtMailReport").click();\nok(w.__mailClicks===1,"日報メール送信 �
 rep('ok($("ctFlash").classList.contains("show") && $("ctFlash").textContent==="登録","「登録」 shown big right after recording");','ok($("ctFlash").classList.contains("show") && $("ctFlash").querySelector(".ct-flash-main").textContent==="登録" && $("ctFlash").querySelector(".ct-flash-cust").textContent==="△△工業" && $("ctFlash").querySelector(".ct-flash-gas").textContent==="酸素　O2　7 ㎥","「登録」 shown right after recording, with the customer name and the gas / capacity / unit below it (horizontal)");')
 rep('ok(!$("ctFlash").classList.contains("show"),"「登録」 disappears after ~0.8s");','ok($("ctFlash").classList.contains("show"),"「登録」 is still shown at ~0.9s (it stays about 1.2s)");\nawait sleep(500);\nok(!$("ctFlash").classList.contains("show"),"「登録」 disappears after ~1.2s");')
 rep('ok(/\\.ct-flash\\{[^}]*font-size:64px/.test(css2),"「登録」 is large");','ok(/\\.ct-flash-main\\{[^}]*font-size:28px/.test(css2) && /\\.ct-flash\\{[^}]*writing-mode:horizontal-tb/.test(css2),"「登録」 is large and horizontal");')
+# 39) 容器タブの間は、バナー・余白・入力確認バーを出し入れしない。ガス種・容量を1行に
+rep('ok(!hdr32.classList.contains("banner-off"),"the banner comes back about 0.2s after the input ends");','ok(hdr32.classList.contains("banner-off"),"on the 容器 tab the banner stays hidden after the input ends (no up/down movement)");')
+rep('ok(!hdr32.classList.contains("banner-off"),"(and it returns)");','ok(hdr32.classList.contains("banner-off"),"(on the 容器 tab it still stays hidden)");')
+rep('ok(!d.body.classList.contains("kb-pad"),"no extra bottom space while not typing");','ok(d.body.classList.contains("kb-pad"),"on the 容器 tab the bottom space is kept even while not typing (no jump)");')
+rep('ok(!d.body.classList.contains("kb-pad") && !d.querySelector("header").classList.contains("banner-off"),"the space is removed together with the banner coming back");','ok(d.body.classList.contains("kb-pad") && d.querySelector("header").classList.contains("banner-off"),"on the 容器 tab the space and the hidden banner stay after the input ends");')
+rep('ok(bar37.hidden,"the confirmation bar is hidden while not typing");','ok(!bar37.hidden,"on the 容器 tab the confirmation bar is shown even while not typing");')
+rep('ok(bar37.hidden,"when the input ends the bar disappears (with the banner coming back)");','ok(!bar37.hidden,"on the 容器 tab the bar stays after the input ends (no up/down movement)");')
+rep('before35($("ctCustomer"),$("ctGasChips")) && before35($("ctGasChips"),$("ctCapacity"))','before35($("ctCustomer"),$("ctGasSum")) && before35($("ctGasSum"),$("ctCapacity"))')
 open("smoke8.js","w",encoding="utf-8").write(t)
 print("post7")
