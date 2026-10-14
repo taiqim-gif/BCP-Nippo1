@@ -44,6 +44,17 @@ const OTHER_GAS_STYLE = { bg:"#2D87E3", fg:"#fff" };                  // 「そ�
 const OTHER_GAS_UNIT = "㎥";                                           // 「その他」を選んだときの初期の単位
 const ADJ_STEPS = [-0.2, -0.1, 0, 0.1, 0.2];   // ｱｾﾁﾚﾝの容量の増減ボタン(0.0＝基準に戻す)
 const UNITS = ["㎥","kg"];
+// ガス種ごとの基本の容量(ボタンで選べる。欄に手で打つこともできる)
+const SEAMLESS_CAPS = [0.5, 1.5, 3, 7];
+const CAP_PRESETS = {
+  1001: SEAMLESS_CAPS,                          // アセチレン(7のときだけ、増減のボタン)
+  1002: [0.5, 1.5, 3, 7, 42, 132, 140, 175],    // 酸素(カードル 42/140/175、ベッセル 132)
+  1003: [0.5, 1.5, 3, 7, 107, 140],             // 窒素(カードル 140、ベッセル 107)
+  1004: SEAMLESS_CAPS, 1007: SEAMLESS_CAPS, 5001: SEAMLESS_CAPS,
+  1006: [2.5, 5, 7, 30, 160],                   // 炭酸(ベッセル 160)
+  1008: [10, 20],                               // フロン
+  2001: [5, 8, 10, 20, 50]                      // プロパン
+};
 
 const CT_KEY = "containerLogs";
 const BACKUP_KEYS = ["meetingLogs","dailyVehicleInfo","todoItems","containerLogs","customerHidden","customerExtra","dailyWeather"];
@@ -172,7 +183,8 @@ style.textContent = `
   .dt-frame.ctin .dt-head{ background:var(--mint); color:var(--mint-ink); }
   .dt-frame.ctlist{ background:#FFF3EA; border-color:var(--peach-dark); margin-top:14px; }
   .dt-frame.ctlist .dt-head{ background:var(--peach); color:var(--peach-ink); }
-  .todo-item input[type=checkbox]{ transform:scale(1.55); margin:0 9px 0 7px; }
+  .todo-item input[type=checkbox]{ transform:scale(1.2); margin:0 5px 0 3px; }
+  .todo-item .todo-line{ font-size:13px; line-height:1.35; white-space:normal; overflow:hidden; text-overflow:clip; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }   /* 2行まで。3行目からは… */
   #vehicleScreen .todo-line, #reportScreen .todo-line{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* 長押しで、文字の選択やメニューが出ないように */
   .dt-frame.hm1{ background:#EEF9F5; border-color:var(--mint-dark); }
   .dt-frame.hm1 .dt-head{ background:var(--mint); color:var(--mint-ink); }
@@ -188,23 +200,48 @@ style.textContent = `
   .dt-frame[hidden]{ display:none; }
   #homeStartButton{ background:#3F9A5E; color:#fff; }
   .dt-frame.hm2 .todo-list-target > h2{ position:relative; }
+  .dt-frame.hm2[data-add] > .dt-head{ position:relative; display:flex; justify-content:space-between; align-items:center; }
+  .dt-frame.hm2[data-add] .todo-list-target > h2{ display:none; }          /* 見出しは、カードの帯の1つだけにする */
+  .dt-frame.hm2[data-add] .dt-head + .dt-body{ padding:8px 8px 2px; }
+  .home-todo-add{ display:flex; gap:8px; align-items:center; margin:0 0 4px; }
+  .home-todo-add input{ flex:1; min-width:0; }
+  .home-todo-add .btn{ flex:none; width:auto; padding:9px 16px; margin:0; }
+  .dt-frame.hm2[data-add] .todo-list-target > .todo-item{ margin:8px 0 0; }
   .todo-count{ position:absolute; left:50%; transform:translateX(-50%); font-size:14px; font-weight:700; white-space:nowrap; pointer-events:none; }
   body.kb-pad{ padding-bottom:60vh !important; }     /* 入力中だけ、画面の高さの約6割の余白を下に足す。iPhoneが画面を動かす余地になる */
   header{ overflow:hidden; max-height:240px; transition:opacity .15s ease; }
+  header.ct-navonly .ct-datebox{ display:none; }
+  header.ct-navonly{ padding-top:6px; padding-bottom:6px; }
   header.banner-off{ max-height:0; padding-top:0; padding-bottom:0; opacity:0; border-bottom-width:0; transition:none; }     /* 消すときは、すぐ消す(iPhoneが、消えたあとの位置で、見える位置を決められる) */
-  .ct-confirm{ position:sticky; top:0; z-index:9; padding:6px 12px 7px; border-bottom:2px solid var(--line); }
+  /* 容器タブの上のカード：白地。区分の色は、左の太い帯・下の線・区分の項目・「記録する」だけに使う */
+  .ct-confirm{ position:sticky; top:0; z-index:9; margin:14px 10px 0; padding:12px 8px 8px 10px; background:#fff; color:var(--ink); border:1px solid var(--line); border-left:8px solid var(--cd); border-bottom:3px solid var(--cd); border-radius:14px; box-shadow:0 3px 10px rgba(0,0,0,0.12);
+    --c:var(--sky); --cd:var(--sky-dark); --ci:var(--sky-ink); --cl:#EAF6FC; }
+  .ct-confirm.cb-in{ --c:var(--peach); --cd:var(--peach-dark); --ci:var(--peach-ink); --cl:#FFF3EA; }
+  .ct-confirm.cb-oth{ --c:var(--lavender); --cd:var(--lavender-dark); --ci:var(--lavender-ink); --cl:#F3EFFC; }
   .ct-confirm[hidden]{ display:none; }
-  .cb-out{ background:var(--sky); color:var(--sky-ink); }
-  .cb-in{ background:var(--peach); color:var(--peach-ink); }
-  .cb-oth{ background:var(--lavender); color:var(--lavender-ink); }
-  .cb-l1{ display:flex; align-items:center; gap:8px; min-width:0; }
-  .cb-st{ font-weight:700; font-size:15px; background:rgba(255,255,255,0.65); padding:1px 10px; border-radius:999px; white-space:nowrap; }
-  .cb-cust{ font-size:16px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-  .cb-l2{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-top:3px; }
-  .cb-gas{ font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-  .cb-no{ font-size:18px; font-weight:700; white-space:nowrap; }
-  .cb-miss, .cb-date{ color:#C0392B; font-weight:700; }
-  .cb-date{ font-size:14px; white-space:nowrap; }
+  .cb-tag{ position:absolute; top:-11px; left:12px; background:var(--cd); color:var(--ci); font-size:12px; font-weight:700; font-style:normal; padding:1px 10px; border-radius:999px; border:2px solid #fff; white-space:nowrap; }   /* カード全体の状態：入力中・変更中・追加中 */
+  .cb-tag.ed{ background:#fff; color:#C0392B; border-color:#C0392B; }
+  .cb-row1{ display:flex; align-items:center; gap:6px; }
+  .cb-l1{ display:flex; align-items:stretch; gap:6px; min-width:0; flex:1; }
+  .ct-confirm .cb-l2{ display:flex; align-items:center; gap:6px; margin-top:5px; }
+  .cb-l2t{ display:flex; gap:6px; flex:1; min-width:0; }
+  .cb-slot{ font:inherit; font-size:16px; font-weight:700; line-height:1.25; text-align:left; color:var(--ink); background:#fff; border:2px solid var(--line); border-radius:10px; padding:2px 8px 3px; min-height:44px; white-space:nowrap; cursor:pointer; flex:none; min-width:0; }
+  .cb-slot::before{ content:attr(data-label); display:block; font-size:10px; font-weight:400; color:var(--ink-soft); line-height:1.2; }   /* 項目の小さな名前 */
+  .cb-v{ display:block; overflow:hidden; text-overflow:ellipsis; }
+  .cb-slot.on{ border-color:var(--cd); background:var(--cl); box-shadow:0 0 0 2px var(--c); }   /* 今の項目は、区分の色の太い枠 */
+  .cb-slot.cb-st{ background:var(--c); border-color:var(--cd); color:var(--ci); }
+  .cb-slot.cb-st::before{ color:var(--ci); }
+  .cb-l1 .cb-cust, .cb-l2t .cb-gas{ flex:1 1 auto; }
+  .cb-gaspill{ display:inline-block; padding:1px 10px; border-radius:999px; font-size:15px; }   /* ガス種は、ボンベ(ボタン)と同じ色 */
+  .cb-miss{ color:#C0392B; font-size:14px; font-weight:700; }
+  .cb-slot.cb-date{ color:#C0392B; }
+  .ct-confirm #ctCancelEdit{ flex:none; }
+  .cb-l3{ display:flex; gap:6px; align-items:stretch; margin-top:6px; }
+  .cb-l3 input[type=text]{ min-width:0; margin:0; font-size:18px; font-weight:700; padding:8px 10px; border:2px solid var(--line); border-radius:10px; }
+  .cb-l3 input[type=text]:focus{ border-color:var(--cd); box-shadow:0 0 0 2px var(--c); outline:none; }
+  .cb-l3 #ctSymbol{ flex:1 1 0; }
+  .cb-l3 #ctNumber{ flex:1.7 1 0; }
+  .cb-l3 #ctSaveButton{ flex:none; width:auto; margin:0; padding:8px 16px; font-size:17px; font-weight:700; background:var(--cd); color:var(--ci); border:none; border-radius:10px; }
   .ct-clr{ position:relative; }
   .ct-clr > input{ padding-right:34px !important; }
   .ct-clrbtn{ position:absolute; top:3px; right:4px; width:32px; height:26px; border:none; background:transparent; color:#B9B1A8; font-size:11px; line-height:1; cursor:pointer; padding:0; font-family:inherit; }
@@ -332,6 +369,13 @@ style.textContent = `
   .ct-numwrap input{ padding-right:60px; }
   .ct-numwrap .ct-numkb{ position:absolute; right:6px; top:50%; transform:translateY(-50%); padding:3px 10px; }
   .ct-adj-row{ display:flex; flex-wrap:nowrap; gap:6px; }
+  #containerScreen .ct-sec{ display:none; }
+  #containerScreen .ct-sec.on{ display:block; }
+  .ct-sec-hint{ font-size:13px; color:var(--ink-soft); padding:4px 2px; }
+  .ct-sec-hint[hidden]{ display:none; }
+  .ct-cappre{ display:flex; flex-wrap:nowrap; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; margin:-2px 0 8px; padding-bottom:2px; }
+  .ct-cappre .chip.on{ background:var(--butter); border-color:var(--butter-dark); color:var(--butter-ink); }
+  .ct-cappre .chip{ flex:none; min-width:44px; padding:8px 10px; text-align:center; white-space:nowrap; font-weight:700; }
   .ct-adj-row .chip{ flex:1; min-width:0; padding:9px 0; text-align:center; white-space:nowrap; }
 
   .ct-swrap{ position:relative; overflow:hidden; border-top:1px solid var(--line); }
@@ -415,19 +459,6 @@ style.textContent = `
   .ct-gascol{ flex:1; min-width:0; }
   .ct-gashead{ display:flex; justify-content:space-between; align-items:center; height:20px; margin-bottom:4px; }
   .ct-gashead label{ margin:0; }
-  .ct-gashead.collapsed{ height:auto; min-height:42px; }
-  .ct-gassum{ flex:1; min-width:0; display:flex; align-items:center; gap:10px; margin:0 8px; min-height:42px; cursor:pointer; }
-  .ct-gassum-arrow{ font-size:12px; color:var(--ink-soft); flex:none; }
-  .ct-gassum-chip{ padding:6px 14px; border-radius:999px; font-weight:700; font-size:14px; white-space:nowrap; }
-  .ct-topsum{ display:flex; align-items:center; gap:10px; min-height:42px; padding:4px 10px; margin-bottom:8px; border-radius:10px; background:#fff; border:1px solid var(--sky-dark); cursor:pointer; }
-  .ct-topsum-date{ flex:none; font-size:15px; font-weight:700; color:var(--ink); }
-  .ct-topsum-st{ flex:none; padding:4px 12px; border-radius:999px; font-size:14px; font-weight:700; background:var(--sky); color:var(--sky-ink); }
-  .ct-topsum-cust{ flex:1; min-width:0; font-size:17px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #containerScreen[data-sc="in"] .ct-topsum{ border-color:var(--peach-dark); }
-  #containerScreen[data-sc="in"] .ct-topsum-st{ background:var(--peach); color:var(--peach-ink); }
-  #containerScreen[data-sc="oth"] .ct-topsum{ border-color:var(--lavender-dark); }
-  #containerScreen[data-sc="oth"] .ct-topsum-st{ background:var(--lavender); color:var(--lavender-ink); }
-  .ct-gassum-cap{ flex:1; min-width:0; font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ct-gasdir{ display:flex; gap:14px; font-size:17px; font-weight:900; line-height:1; color:var(--lavender-ink); margin-right:42px; }
   .ct-gasdir span{ visibility:hidden; }
   .ct-gasdir span.on{ visibility:visible; animation:ctBlink 1s ease-in-out infinite; }
@@ -488,6 +519,7 @@ style.textContent = `
   .ct-flash-cust{ font-size:20px; font-weight:700; margin-top:8px; color:var(--ink); overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .ct-flash-gas{ font-size:20px; font-weight:700; margin-top:4px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ct-flash.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+  .ct-flash, .ct-flash.show{ transform:translateX(-50%); transition:opacity .15s; }      /* 上の端を決まった位置に合わせる(高さが変わっても、上下に動かない) */
 
   /* 顧客の管理 */
   .cm-top{ display:flex; align-items:center; gap:10px; margin:6px 0 10px; }
@@ -518,19 +550,16 @@ const tabColors = document.createElement("style");
 tabColors.id = "tabColors";
 tabColors.textContent = `
   /* 容器：区分に合わせて、全体の基本色を替える(出庫=水色は上の既定。空受=ピーチ、他の区分=ラベンダー) */
-  #containerScreen[data-sc="in"] .dt-frame.ctin{ background:#FFF3EA; border-color:var(--peach-dark); }
-  #containerScreen[data-sc="in"] .dt-frame.ctin .dt-head{ background:var(--peach); color:var(--peach-ink); }
-  #containerScreen[data-sc="in"] .dt-frame.ctlist{ background:#FFF9F4; border-color:#EE8A57; }
-  #containerScreen[data-sc="in"] .dt-frame.ctlist .dt-head{ background:var(--peach-dark); color:var(--peach-ink); }
-  #containerScreen[data-sc="in"] #ctSaveButton{ background:var(--peach); color:var(--peach-ink); }
-  #containerScreen[data-sc="oth"] .dt-frame.ctin{ background:#F3EFFC; border-color:var(--lavender-dark); }
-  #containerScreen[data-sc="oth"] .dt-frame.ctin .dt-head{ background:var(--lavender); color:var(--lavender-ink); }
-  #containerScreen[data-sc="oth"] .dt-frame.ctlist{ background:#F8F5FD; border-color:#9A84DD; }
-  #containerScreen[data-sc="oth"] .dt-frame.ctlist .dt-head{ background:var(--lavender-dark); color:var(--lavender-ink); }
-  #containerScreen[data-sc="oth"] #ctSaveButton{ background:var(--lavender); color:var(--lavender-ink); }
   .ct-flash[data-sc="in"]{ color:var(--peach-ink); border-color:var(--peach-dark); }
   .ct-flash[data-sc="oth"]{ color:var(--lavender-ink); border-color:var(--lavender-dark); }
   /* 容器の入力のカードを低くする(キーボードが出ても、収まりやすいように) */
+  /* 容器タブの「選択」と一覧：白地で落ち着いた色。区分の色は「選択」の見出しの下の線と文字だけ */
+  .dt-frame.ctin{ background:#fff; border-color:var(--line); }
+  .dt-frame.ctin .dt-head{ background:#fff; color:var(--sky-ink); border-bottom:2px solid var(--sky); }
+  #containerScreen[data-sc="in"] .dt-frame.ctin .dt-head{ color:var(--peach-ink); border-bottom-color:var(--peach); }
+  #containerScreen[data-sc="oth"] .dt-frame.ctin .dt-head{ color:var(--lavender-ink); border-bottom-color:var(--lavender); }
+  .dt-frame.ctlist{ background:#fff; border-color:var(--line); }
+  .dt-frame.ctlist .dt-head{ background:#F3EFE8; color:var(--ink); }
   #containerScreen .dt-frame.ctin input[type=text], #containerScreen .dt-frame.ctin input[type=date], #containerScreen .dt-frame.ctin select{ padding-top:8px; padding-bottom:8px; }
   #containerScreen .dt-frame.ctin .field{ margin-bottom:8px; }
   #containerScreen .dt-frame.ctin .ct-lbrow{ margin-bottom:2px; }
@@ -549,10 +578,6 @@ tabColors.textContent = `
   .dt-frame.veh3{ background:#F8F5FD; border-color:#D6CBF3; }
   .dt-frame.veh3 .dt-head{ background:#E6DDF9; color:var(--lavender-ink); }
   /* 容器＝スカイの濃淡 */
-  .dt-frame.ctin{ background:#EDF6FB; border-color:var(--sky-dark); }
-  .dt-frame.ctin .dt-head{ background:var(--sky); color:var(--sky-ink); }
-  .dt-frame.ctlist{ background:#F4FAFD; border-color:#5FAFD6; }
-  .dt-frame.ctlist .dt-head{ background:var(--sky-dark); color:#08384F; }
   /* データ＝ラベンダーの濃淡(「消す」は、ピンクのまま) */
   .dt-frame.send{ background:#F3EFFC; border-color:var(--lavender-dark); }
   .dt-frame.send .dt-head{ background:var(--lavender); color:var(--lavender-ink); }
@@ -572,9 +597,9 @@ const section = document.createElement("section");
 section.id = "containerScreen";
 section.className = "screen";
 section.innerHTML = `
-  <section class="dt-frame compact ctin"><div class="dt-head"><span id="ctTitle">容器ログ</span></div><div class="dt-body">
-    <div class="ct-topsum" id="ctTopSum" role="button" tabindex="0" aria-label="日付・区分・顧客名を直す" style="display:none;"><span class="ct-topsum-date" id="ctTopSumDate"></span><span class="ct-topsum-st" id="ctTopSumSt"></span><span class="ct-topsum-cust" id="ctTopSumCust"></span><span class="ct-gassum-arrow" aria-hidden="true">▼</span></div>
-    <div id="ctTopArea">
+  <section class="dt-frame compact ctin"><div class="dt-head"><span id="ctTitle">選択</span></div><div class="dt-body">
+    <div class="ct-sec-hint" id="ctSecHint">上のカードの項目を押すと、ここに選べるものが出ます</div>
+    <div class="ct-sec" data-sec="date">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
       <div class="ct-datefield">
         <span class="ct-inlab">日付</span>
@@ -586,15 +611,18 @@ section.innerHTML = `
         <input type="time" id="ctTime">
       </div>
     </div>
+    </div>
 
+    <div class="ct-sec" data-sec="status">
     <div style="display:flex;gap:8px;align-items:stretch;">
       <div class="ct-seg" id="ctStatusSeg" style="flex:2;"></div>
       <select id="ctStatusSel" style="flex:1.2;min-width:0;padding:8px 6px;" aria-label="他の区分"></select>
     </div>
-    <div style="height:6px;"></div>
+    </div>
 
+    <div class="ct-sec" data-sec="cust">
     <div class="field" style="margin-bottom:6px;">
-      <input type="text" id="ctCustomer" placeholder="顧客名" aria-label="顧客名" autocomplete="off">
+      <input type="text" id="ctCustomer" placeholder="顧客名" aria-label="顧客名" enterkeyhint="next" autocomplete="off">
     </div>
     <div id="ctKanaArea" style="display:none;">
       <div class="kana-grid" id="ctKanaGrid"></div>
@@ -602,19 +630,24 @@ section.innerHTML = `
     <div class="customer-list" id="ctCustomerList" style="display:none;"></div>
     </div>
 
+    <div class="ct-sec" data-sec="gas">
     <div class="field">
-      <div class="ct-gashead" id="ctGasHead"><label>ガス種</label><span class="ct-gassum" id="ctGasSum" role="button" tabindex="0" aria-label="ガス種を選び直す" style="display:none;"><span class="ct-gassum-chip" id="ctGasSumChip"></span><span class="ct-gassum-cap" id="ctGasSumCap"></span><span class="ct-gassum-arrow" aria-hidden="true">▼</span></span><span class="ct-gasdir" aria-hidden="true"><span id="ctGasL">←</span><span id="ctGasR">→</span></span></div>
+      <div class="ct-gashead" id="ctGasHead"><label>ガス種</label><span class="ct-gasdir" aria-hidden="true"><span id="ctGasL">←</span><span id="ctGasR">→</span></span></div>
       <div class="ct-gas-area" id="ctGasArea">
         <div class="ct-gascol">
           <div class="ct-gasbar-wrap" id="ctGasWrap"><div class="ct-chip-row ct-gasbar" id="ctGasChips"></div></div>
         </div>
         <div class="ct-gas-vert" id="ctGasVert"><span></span></div>
       </div>
-      <input type="text" id="ctGasOther" placeholder="ガス種を入力" style="margin-top:8px;display:none;" autocomplete="off">
+      <input type="text" id="ctGasOther" placeholder="ガス種を入力" enterkeyhint="next" style="margin-top:8px;display:none;" autocomplete="off">
+    </div>
     </div>
 
-    <div class="field">
-      <div style="display:flex;gap:10px;align-items:center;">
+    <div class="ct-sec" data-sec="cap">
+    <div class="ct-cappre" id="ctCapPre" style="display:none;"></div>
+
+    <div class="field" id="ctCapField">
+      <div id="ctCapBox" style="display:flex;gap:10px;align-items:center;">
         <input type="text" id="ctCapacity" enterkeyhint="next" inputmode="decimal" maxlength="5" placeholder="容量" aria-label="容量(最大5桁)" autocomplete="off" style="width:7em;flex:none;text-align:right;">
         <div class="ct-seg" id="ctUnitSeg" style="flex:none;width:140px;"></div>
       </div>
@@ -624,20 +657,15 @@ section.innerHTML = `
       <label id="ctAdjLabel">容量の増減</label>
       <div class="ct-adj-row" id="ctAdjRow"></div>
     </div>
-
-    <div class="row-gap" style="margin-top:6px;">
-      <div class="field" style="flex:1;">
-        <div class="ct-lbrow"><label for="ctSymbol">記号(英数字)</label></div>
-        <input type="text" id="ctSymbol" enterkeyhint="next" inputmode="email" lang="en" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="例：AB1">
-      </div>
-      <div class="field" style="flex:2;">
-        <div class="ct-lbrow"><label for="ctNumber">番号(数字)</label><button type="button" class="btn-mini" id="ctNumKb" aria-label="キーボードの切り替え">ABC</button></div>
-        <input type="text" id="ctNumber" enterkeyhint="go" inputmode="numeric" autocomplete="off" placeholder="例：12345">
-      </div>
     </div>
 
-    <button class="btn btn-sky" id="ctSaveButton">記録する</button>
-    <button class="btn btn-outline-mint" id="ctCancelEdit" style="display:none;margin-top:8px;">更新をやめる</button>
+    <div id="ctTopParts" hidden>
+      <input type="text" id="ctSymbol" enterkeyhint="next" inputmode="email" lang="en" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="記号" aria-label="記号(英数字)">
+      <input type="text" id="ctNumber" enterkeyhint="go" inputmode="numeric" autocomplete="off" placeholder="番号" aria-label="番号(数字)">
+      <button type="button" class="btn-mini" id="ctNumKb" aria-label="キーボードの切り替え">ABC</button>
+      <button class="btn btn-sky" id="ctSaveButton">記録する</button>
+      <button type="button" class="btn-mini" id="ctCancelEdit" style="display:none;">更新をやめる</button>
+    </div>
   </div></section>
 
   <section class="dt-frame compact ctlist"><div class="dt-head"><span>容器ログ(<span id="ctCount">0</span>本)</span><span class="ct-fs" id="ctFsSeg"></span></div><div class="dt-body">
@@ -671,33 +699,46 @@ let flashTimer = null;
 function flashText(t, cust, gas, scls){
   flashEl.setAttribute("data-sc", scls || "out");
   flashEl.innerHTML = `<div class="ct-flash-main">${escapeHtml(t)}</div>` + (cust ? `<div class="ct-flash-cust">${escapeHtml(cust)}</div>` : "") + (gas ? `<div class="ct-flash-gas">${escapeHtml(gas)}</div>` : "");
+  const vv = window.visualViewport, bar = $("ctConfirmBar");
+  const viewTop = vv ? vv.offsetTop : 0;
+  const barBottom = (bar && !bar.hidden) ? bar.getBoundingClientRect().bottom : 0;
+  flashEl.style.top = Math.round(Math.max(viewTop, barBottom) + 12) + "px";   // 上のカードのすぐ下
   flashEl.classList.add("show");
   clearTimeout(flashTimer);
   flashTimer = setTimeout(() => flashEl.classList.remove("show"), 1200);
 }
 
-/* ---------- 日付・区分・顧客名を、1行のまとめに縮める ----------
-   1本を記録したら縮める(同じ顧客で続けて入れるとき、記号・番号だけを見せる)。
-   まとめの行を押す・顧客名が変わる・消す・記録を直すときは、全部を出す */
-let ctTopFor = "";             // 縮めたときの顧客名(空なら、縮めない)
-function renderTopCollapse(){
-  const sum = $("ctTopSum"), area = $("ctTopArea");
-  if(!sum || !area) return;
-  const cust = $("ctCustomer").value.trim();
-  const collapsed = !!ctTopFor && cust === ctTopFor && !ctEditId;
-  if(!collapsed) ctTopFor = "";
-  area.style.display = collapsed ? "none" : "";
-  sum.style.display = collapsed ? "flex" : "none";
-  if(collapsed){
-    const m = /^\d{4}-(\d{1,2})-(\d{1,2})/.exec($("ctDate").value || "");
-    $("ctTopSumDate").textContent = m ? `${+m[1]}/${+m[2]}` : "--/--";
-    $("ctTopSumSt").textContent = statusName(ctStatus);
-    $("ctTopSumCust").textContent = cust;
+/* ---------- 今の項目：上のカードの項目を押すと、下の「選択」に、その項目の選択肢だけを出す ----------
+   選んだら、次の項目へ自動で進む(区分 → 顧客名 → ガス種 → 容量 → 記号)。入っている項目は飛ばす */
+let ctSlot = null;              // "date" / "status" / "cust" / "gas" / "cap" / "sym"(記号・番号) / null
+const SLOT_NAMES = { date:"日付", status:"区分", cust:"顧客名", gas:"ガス種", cap:"容量" };
+function setSlot(name, focusSym){
+  ctSlot = name || null;
+  document.querySelectorAll("#containerScreen .ct-sec").forEach(sec => sec.classList.toggle("on", sec.getAttribute("data-sec") === ctSlot));
+  $("ctSecHint").hidden = !!SLOT_NAMES[ctSlot];
+  $("ctTitle").textContent = "選択" + (SLOT_NAMES[ctSlot] ? ` ▸ ${SLOT_NAMES[ctSlot]}` : "");
+  if(SLOT_NAMES[ctSlot]){                     // 選択肢を選ぶ間は、記号・番号のキーボードを閉じる
+    const a = document.activeElement, bar = $("ctConfirmBar");
+    if(a && a.blur && bar && bar.contains(a)) a.blur();
   }
+  if(ctSlot === "gas") setTimeout(updateGasShadows, 0);
+  if(ctSlot === "sym" && focusSym) $("ctSymbol").focus();
+  if(typeof window.ctRenderBar === "function") window.ctRenderBar();
 }
-function openTopArea(){ ctTopFor = ""; renderTopCollapse(); }
-$("ctTopSum").addEventListener("click", openTopArea);                       // 1行のどこを押しても、開く
-$("ctTopSum").addEventListener("keydown", e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); openTopArea(); } });
+function nextSlot(from){
+  const cust = $("ctCustomer").value.trim();
+  if(from === "status" || from === "date") return !cust ? "cust" : (ctGasSel === null ? "gas" : "sym");
+  if(from === "cust") return ctGasSel === null ? "gas" : "sym";
+  if(from === "gas") return "cap";
+  return "sym";
+}
+function advanceSlot(from){ if(ctSlot !== from) return; const n = nextSlot(from); setSlot(n, n === "sym"); }
+function startSlot(){                         // 容器タブを開いたときの、最初の項目
+  if(ctEditId) return;
+  setSlot(!$("ctCustomer").value.trim() ? "status" : (ctGasSel === null ? "gas" : "sym"), false);
+}
+window.ctSetSlot = setSlot;
+window.ctSlotNow = () => ctSlot;
 
 /* ---------- 部品の描画 ---------- */
 function renderStatus(){
@@ -730,7 +771,6 @@ function renderStatus(){
   sel.classList.toggle("sel-on", inSelect);
   $("containerScreen").setAttribute("data-sc", ctStatus === 2 ? "out" : (ctStatus === 3 ? "in" : "oth"));   // 出庫=水色・空受=ピーチ・他の区分=ラベンダー
   if(typeof window.ctRenderBar === "function") window.ctRenderBar();
-  renderTopCollapse();
 }
 
 function renderModeAndUnit(){
@@ -738,6 +778,7 @@ function renderModeAndUnit(){
   renderStatus();
 
   const seg = $("ctUnitSeg");
+  seg.style.display = ctGasSel === "other" ? "" : "none";   // 単位は、ガス種で決まる。「その他」のときだけ選ぶ
   seg.innerHTML = "";
   UNITS.forEach(u => {
     const b = document.createElement("button");
@@ -786,32 +827,13 @@ function renderGasChips(){
   renderGasCollapse();
 }
 
-// ガス種を選んだら、2行のボタンを、1行(名前・容量・[変更])に縮める。入力の画面が低くなり、キーボードで隠れにくい
-let ctGasExpanded = false;
+// ガス種・容量が変わったら、ボタンの影と、上のカード(入力確認)を合わせる。ガス種のボタンは、選んだあとも2行のまま
 function renderGasCollapse(){
-  const g = curGas();
-  const collapsed = !!g && ctGasSel !== "other" && !ctGasExpanded;
-  const head = $("ctGasHead"), area = $("ctGasArea"), sum = $("ctGasSum"), dir = head ? head.querySelector(".ct-gasdir") : null;
-  if(!head || !area || !sum) return;
-  head.classList.toggle("collapsed", collapsed);
-  area.style.display = collapsed ? "none" : "";
-  if(dir) dir.style.display = collapsed ? "none" : "";
-  sum.style.display = collapsed ? "flex" : "none";
-  if(collapsed){
-    const chip = $("ctGasSumChip");
-    chip.textContent = `${nfkc(g.name)}　${g.label || ""}`.trim();
-    chip.style.background = g.bg;
-    chip.style.color = g.fg;
-    chip.style.textShadow = g.outline ? GAS_OUTLINE : (g.shadow ? "0 0 3px rgba(0,0,0,0.6)" : "");
-    const cap = $("ctCapacity").value.trim();
-    $("ctGasSumCap").textContent = cap ? `${cap} ${ctUnit || ""}`.trim() : "";
-  }else{
-    updateGasShadows();
-  }
+  updateGasShadows();
+  if(typeof window.ctRenderBar === "function") window.ctRenderBar();
 }
-$("ctGasSum").addEventListener("click", () => { ctGasExpanded = true; renderGasCollapse(); });          // 1行のどこを押しても、ガス種の一覧が開く
-$("ctGasSum").addEventListener("keydown", e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); ctGasExpanded = true; renderGasCollapse(); } });
 $("ctCapacity").addEventListener("input", renderGasCollapse);
+$("ctCapacity").addEventListener("blur", () => setTimeout(renderAdj, 0));   // 初期値に戻ったときも、ボタンの色を合わせる
 
 // バーの左右に、続きがあることを示す薄い影を出す
 function updateGasShadows(){
@@ -860,13 +882,12 @@ function renderGasSelected(){
 // ガス種を選ぶと、決めておいた容量と単位が自動で入る
 function pickGas(sel){
   ctGasSel = sel;
-  ctGasExpanded = false;
   if(sel === "other"){
     $("ctCapacity").value = "";
     ctUnit = OTHER_GAS_UNIT;
     renderModeAndUnit();
     renderGasChips();
-    $("ctGasOther").focus();
+    $("ctGasOther").focus();               // 名前を打つ(決定キーで、容量へ)
     return;
   }
   const g = curGas();
@@ -876,15 +897,43 @@ function pickGas(sel){
   }
   renderModeAndUnit();
   renderGasChips();
+  advanceSlot("gas");                      // 次は、容量
 }
 
 // ｱｾﾁﾚﾝ：基準の容量に -0.2/-0.1/0.0/+0.1/+0.2 を足し引きする5つのボタン(0.0 を押すと基準に戻る)
 function round1(x){ return Math.round(x * 10) / 10; }
 
+// 基本の容量のボタン。今の容量と同じボタンに色を付ける
+function renderCapPresets(){
+  const box = $("ctCapPre");
+  if(!box) return;
+  const g = curGas(), caps = g ? CAP_PRESETS[g.code] : null;
+  if(!caps || ctGasSel === "other"){ box.style.display = "none"; box.innerHTML = ""; return; }
+  box.style.display = "flex";
+  const v = normNum($("ctCapacity").value), cur = Number(v);
+  box.innerHTML = "";
+  caps.forEach(c => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip" + (v !== "" && Math.abs(cur - c) < 1e-9 ? " on" : "");
+    b.textContent = String(c);
+    b.addEventListener("click", () => {
+      $("ctCapacity").value = String(c);
+      ctCapSaved = null;
+      renderGasCollapse();
+      renderAdj();
+      advanceSlot("cap");                  // 次は、記号
+    });
+    box.appendChild(b);
+  });
+}
 function renderAdj(){
   const g = curGas();
   const field = $("ctAdjField");
-  if(!g || !g.adj){ field.style.display = "none"; return; }
+  renderCapPresets();
+  const capV = normNum($("ctCapacity").value);
+  const nearBase = g && (capV === "" || Math.abs(Number(capV) - g.cap) <= 0.2 + 1e-9);   // 増減のボタンは、基準(7)の近くのときだけ(空欄は、打っている途中なので、出したまま)
+  if(!g || !g.adj || !nearBase){ field.style.display = "none"; return; }
   field.style.display = "block";
   $("ctAdjLabel").textContent = `${g.name}の容量の増減(基準 ${g.cap}${g.unit})`;
 
@@ -1108,7 +1157,8 @@ function showCustomerList(items){
         renderKana();
         showCustomerList(null);
         $("ctCustomer").blur();                                                   // キーボードを閉じる。次は、ガス種を選ぶ
-        if(ctGasSel !== null && ctGasSel !== "other") $("ctSymbol").focus();      // ガス種が選んである(続けての入力)ときだけ、記号へ
+        if(ctSlot === "cust") advanceSlot("cust");                               // 次の項目へ(ガス種が選んであれば、記号へ)
+        else if(ctGasSel !== null && ctGasSel !== "other") $("ctSymbol").focus(); // ガス種が選んである(続けての入力)ときだけ、記号へ
       });
       box.appendChild(b);
     });
@@ -1122,7 +1172,6 @@ function syncCtKana(){
   const area = $("ctKanaArea");
   if(!area) return;
   area.style.display = (hasMaster() && !$("ctCustomer").value.trim()) ? "block" : "none";
-  renderTopCollapse();          // 顧客名が変わったり、消えたりしたら、全部を出す
 }
 function renderKana(){
   const area = $("ctKanaArea");
@@ -1175,9 +1224,8 @@ function updateFormMode(){
   const cancel = $("ctCancelEdit");
   cancel.style.display = (editing || adding) ? "block" : "none";
   cancel.textContent = editing ? "更新をやめる" : "追加をやめる";
-  $("ctTitle").textContent = editing ? "容器ログ(変更中)" : (adding ? "容器ログ(追加中)" : "容器ログ");
   $("ctTimeField").style.display = editing ? "block" : "none";
-  renderTopCollapse();
+  if(typeof window.ctRenderBar === "function") window.ctRenderBar();
 }
 function setFormEditing(){ updateFormMode(); }
 
@@ -1269,12 +1317,11 @@ function saveFromForm(){
     ctAdding = false;
     resetDateToToday();
     clearRecordFields();
-  }else{
-    ctTopFor = f.customer;           // 新しく記録したら、日付・区分・顧客名を1行に縮める
   }
   updateFormMode();
   renderList();
-  $("ctSymbol").focus();
+  if(wasEditing) setSlot("status", false);   // 直し終えたら、次の記録は区分から
+  else $("ctSymbol").focus();
 }
 
 function startEdit(id){
@@ -1306,6 +1353,7 @@ function startEdit(id){
   renderModeAndUnit();
   renderGasChips();
   updateFormMode();
+  setSlot(null);                             // 直すときは、上のカードの項目を押して直す
   window.scrollTo({ top:0, behavior:"auto" });
 }
 
@@ -1335,7 +1383,7 @@ function fmtDateWeek(iso){
   const y = +m[1], mo = +m[2], d = +m[3];
   return `${y}/${mo}/${d}　(${WEEK[new Date(y, mo - 1, d).getDay()]})`;
 }
-function syncDateText(){ $("ctDateText").textContent = $("ctDate").value ? fmtDateWeek($("ctDate").value) : "----/--/--"; renderTopCollapse(); }
+function syncDateText(){ $("ctDateText").textContent = $("ctDate").value ? fmtDateWeek($("ctDate").value) : "----/--/--"; if(typeof window.ctRenderBar === "function") window.ctRenderBar(); }
 function setDate(v){ $("ctDate").value = v; syncDateText(); }
 
 function resetDateToToday(){
@@ -1360,6 +1408,7 @@ function cancelEdit(){
   $("ctNumber").value = "";
   $("ctTime").value = "";
   updateFormMode();
+  setSlot("status", false);
 }
 
 /* =========================================================
@@ -2464,6 +2513,8 @@ if(typeof origSetMasterMessage === "function"){
 // ホームのToDoリストの帯の真ん中に、未実行の件数「(3件)」を出す
 function addTodoCount(){
   const n = todoItems.filter(t => t && !t.done).length;
+  const hc = $("homeTodoCount");
+  if(hc){ hc.textContent = `(${n}件)`; return; }       // ホームのカードの帯に、件数を出す(重なった見出しは出さない)
   document.querySelectorAll("#reportScreen .todo-list-target > h2").forEach(h => {
     if(h.querySelector(".todo-count")) return;
     const c = document.createElement("span");
@@ -2995,9 +3046,30 @@ if(typeof window.renderMasterUI === "function") window.renderMasterUI();
       const hd = prev && prev.tagName === "H2" ? prev : null;
       if(hd) hd.innerHTML = hd.innerHTML.replace(/TODOリスト/g, "ToDoリスト");
       const frame = mk("hm2", hd, "ToDoリスト", [tgt]);
-      const sync = () => { frame.hidden = !(tgt.children.length > 0) || tgt.style.display === "none"; };   // ToDoが空のときは、カードごと出さない
+      frame.setAttribute("data-add", "1");
+      const fhead = frame.querySelector(":scope > .dt-head");
+      if(fhead && !hd) fhead.innerHTML = '<span>ToDoリスト</span><span class="todo-count" id="homeTodoCount"></span><span class="h2-note">消す=コピー可</span>';
+      // やることを追加(車両タブの欄と同じ追加のしかた)
+      const add = document.createElement("div");
+      add.className = "home-todo-add";
+      add.innerHTML = '<input type="text" id="homeTodoInput" placeholder="やることを追加" aria-label="やることを追加" enterkeyhint="done" autocomplete="off"><button type="button" class="btn btn-lavender" id="homeTodoAddButton">追加</button>';
+      tgt.parentNode.insertBefore(add, tgt);
+      const doAdd = () => {
+        const inp = $("homeTodoInput"), text = inp.value.trim();
+        const vIn = $("todoManualInput"), vBtn = $("todoAddButton");
+        if(!text || !vIn || !vBtn) return;
+        const keep = vIn.value;
+        vIn.value = text;
+        vBtn.click();                       // 車両タブの「追加」と同じ処理で追加する
+        vIn.value = keep;
+        inp.value = "";
+      };
+      $("homeTodoAddButton").addEventListener("click", doAdd);
+      $("homeTodoInput").addEventListener("keydown", e => { if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); doAdd(); } });
+      const sync = () => { frame.hidden = tgt.style.display === "none"; };   // 0件でも、カードを出す(追加の欄を使えるように)
       new MutationObserver(sync).observe(tgt, { childList:true, attributes:true, attributeFilter:["style"] });
       sync();
+      if(typeof addTodoCount === "function") addTodoCount();
     }
     const kids = [...rs.children];
     const foot = kids.find(e => e.classList.contains("footer-actions"));
@@ -3333,6 +3405,7 @@ window.updateNav = function(name){
   }
   navBtn.classList.toggle("active-sky", isContainer);
   navData.classList.toggle("active-lav", isData);
+  if(typeof window.ctApplyTab === "function") window.ctApplyTab();   // タブを替えたら、すぐに上のカードの出し入れを合わせる
 };
 
 function renderContainer(){
@@ -3342,6 +3415,7 @@ function renderContainer(){
   renderKana();
   renderFilter();
   renderList();
+  if(ctSlot === null) startSlot();
 }
 
 function goToData(){
@@ -3404,70 +3478,89 @@ function attachClear(inp){
     (el.tagName === "INPUT" && !["checkbox", "radio", "button", "submit", "file", "range"].includes((el.type || "").toLowerCase())) ||
     el.tagName === "TEXTAREA" || el.tagName === "SELECT"));
 
-  /* ---- 入力確認バー：容器ログの入力中、画面の一番上に、区分・顧客名・ガス種・記号-番号を出し続ける(誤作業を防ぐ) ---- */
+  /* ---- 上のカードの土台(容器タブの間、タブのボタンのすぐ下に固定。中身は、下の「上のカードの作り」) ---- */
+  /* 容器タブの上のカード(画面の一番上に固定)。1行目=区分・顧客名・日付、2行目=ガス種・容量・単位、3行目=記号・番号・記録する。
+     キーボードを使う記号・番号を、いつも見える一番上に置く(画面を動かさない) */
   const bar = document.createElement("div");
   bar.id = "ctConfirmBar";
   bar.className = "ct-confirm cb-out";
   bar.hidden = true;
+  bar.innerHTML = '<em class="cb-tag" id="cbTag">入力中</em><div class="cb-row1"><div class="cb-l1" id="cbL1"></div></div><div class="cb-l2"><span class="cb-l2t" id="cbL2"></span></div><div class="cb-l3"></div>';
   hdr.insertAdjacentElement("afterend", bar);
-  const ctinFocused = () => { const a = document.activeElement; return !!(a && a.closest && a.closest("#containerScreen .dt-frame.ctin") && isInput(a)); };
+  bar.querySelector(".cb-row1").appendChild($("ctCancelEdit"));
+  bar.querySelector(".cb-l2").appendChild($("ctNumKb"));
+  ["ctSymbol", "ctNumber", "ctSaveButton"].forEach(id => bar.querySelector(".cb-l3").appendChild($(id)));
+  $("ctTopParts").remove();
   function renderConfirmBar(){
     const f = readForm(), today = getToday();
     const sc = ctStatus === 2 ? "out" : (ctStatus === 3 ? "in" : "oth");
     bar.className = "ct-confirm cb-" + sc;
     const miss = x => `<span class="cb-miss">${x}</span>`;
-    const gas = f.gas
-      ? `${escapeHtml(nfkc(f.gas))}${f.capacity !== "" ? " " + escapeHtml(f.capacity) + (f.unit ? " " + escapeHtml(f.unit) : "") : (capDefault() !== null ? " " + miss("容量未入力") : "")}`
-      : miss("ガス種未入力");
-    const no = (f.symbol || f.number)
-      ? `${f.symbol ? escapeHtml(f.symbol) : miss("記号?")}-${f.number ? escapeHtml(f.number) : miss("番号?")}`
-      : miss("記号-番号 未入力");
-    const dateHtml = (f.date && f.date !== today) ? `<span class="cb-date">日付 ${escapeHtml(mdOf(f.date))}</span>` : "";   // 今日以外の日付のときだけ(赤字)
-    bar.innerHTML = `<div class="cb-l1"><span class="cb-st">${escapeHtml(statusName(ctStatus))}</span>${dateHtml}<span class="cb-cust">${f.customer ? escapeHtml(f.customer) : miss("顧客名未入力")}</span></div>` +
-                    `<div class="cb-l2"><span class="cb-gas">${gas}</span><span class="cb-no">${no}</span></div>`;
+    const slot = (name, cls, label, html) => `<button type="button" class="cb-slot ${cls}${ctSlot === name ? " on" : ""}" data-slot="${name}" data-label="${label}"><span class="cb-v">${html}</span></button>`;   // 押すと、下の「選択」がその項目になる
+    const g = curGas();
+    const gasText = f.gas ? escapeHtml(nfkc(f.gas)) + (g && g.label && g.label !== nfkc(g.name) ? " " + escapeHtml(g.label) : "") : "";
+    const gasStyle = g ? `background:${g.bg};color:${g.fg};${g.outline ? "text-shadow:" + GAS_OUTLINE + ";" : ""}` : "background:#2D87E3;color:#fff;";
+    const gasHtml = f.gas ? `<span class="cb-gaspill" style="${gasStyle}">${gasText}</span>` : miss("ガス種未入力");
+    const capHtml = f.capacity !== "" ? escapeHtml(f.capacity) + (f.unit ? " " + escapeHtml(f.unit) : "") : (capDefault() !== null ? miss("未入力") : "--");
+    const dateHtml = f.date ? slot("date", f.date !== today ? "cb-date" : "cb-dt", "日付", escapeHtml(mdOf(f.date))) : slot("date", "cb-date", "日付", "?");   // 今日以外の日付は、赤字
+    const tag = $("cbTag");                     // カード全体の状態
+    tag.textContent = ctEditId ? "変更中" : (ctAdding ? "追加中" : "入力中");
+    tag.classList.toggle("ed", !!(ctEditId || ctAdding));
+    $("cbL1").innerHTML = dateHtml + slot("status", "cb-st", "区分", escapeHtml(statusName(ctStatus))) + slot("cust", "cb-cust", "顧客名", f.customer ? escapeHtml(f.customer) : miss("顧客名未入力"));
+    $("cbL2").innerHTML = slot("gas", "cb-gas", "ガス種", gasHtml) + slot("cap", "cb-cap", "容量", capHtml);
   }
+  bar.addEventListener("click", e => {
+    const b = e.target.closest("[data-slot]");
+    if(!b) return;
+    const name = b.getAttribute("data-slot");
+    setSlot(ctSlot === name && name !== "cust" ? null : name);   // もう一度押すと、たたむ
+  });
+  const ctOn = () => !!$("containerScreen") && $("containerScreen").classList.contains("active");
   function syncBar(){
-    const on = hidden && !!$("containerScreen") && $("containerScreen").classList.contains("active") && ctinFocused();
+    const on = ctOn();          // 容器タブの間は、上のカードをずっと出す(出し入れで画面が上下に動かないように)
+    if(!on && !bar.hidden && bar.contains(document.activeElement)) document.activeElement.blur();   // ほかのタブへ移ったら、上のカードの欄のカーソルを外す(キーボードを閉じる)
     if(on) renderConfirmBar();
     bar.hidden = !on;
   }
   window.ctRenderBar = () => { if(!bar.hidden) renderConfirmBar(); };
   ["input", "change", "click"].forEach(ev => $("containerScreen").addEventListener(ev, () => { if(!bar.hidden) renderConfirmBar(); }));
 
-  const hide = () => { clearTimeout(t); if(!hidden){ hidden = true; hdr.classList.add("banner-off"); document.body.classList.add("kb-pad"); } syncBar(); };
+  // 容器タブの間は、タブのボタンと上のカードを出したままにする(入力の前後で、画面が上下に動かない)
+  function apply(){
+    const on = ctOn();
+    // 容器タブの間は、日付・天気を出さず、タブのボタンだけを残す(入力しても、出し入れしない)
+    hdr.classList.toggle("ct-navonly", on);
+    hdr.classList.toggle("banner-off", hidden && !on);
+    document.body.classList.toggle("kb-pad", hidden && !on);   // 容器タブは、上のカードで打つので、下の余白はいらない
+    syncBar();
+    bar.style.top = on ? Math.round(hdr.getBoundingClientRect().height + 14) + "px" : "";   // 上のカードは、タブのボタンの下に、すきまを空けて固定
+  }
+  const hide = () => { clearTimeout(t); hidden = true; apply(); };
   const show = () => {
     clearTimeout(t);
-    t = setTimeout(() => { if(isInput(document.activeElement)) return; hidden = false; hdr.classList.remove("banner-off"); document.body.classList.remove("kb-pad"); syncBar(); }, 200);   // 約0.2秒で戻る
+    t = setTimeout(() => { if(isInput(document.activeElement)) return; hidden = false; apply(); }, 200);   // 約0.2秒で戻る
   };
+  window.ctApplyTab = apply;
+  if($("containerScreen") && typeof MutationObserver === "function")
+    new MutationObserver(apply).observe($("containerScreen"), { attributes:true, attributeFilter:["class"] });
 
   // 入力欄が、画面の見える範囲の上で切れたり、キーボードの下に隠れたときだけ、位置を直す(切れていなければ、何もしない)。動きは、なめらかに
   function ensureVisible(el){
-    if(!el || (el.closest && el.closest(".ct-wxsheet"))) return;
+    if(!el || (el.closest && el.closest(".ct-wxsheet, #ctConfirmBar"))) return;   // 上のカードの欄は、いつも見えている
     const box = el.tagName === "TEXTAREA" ? el : (el.closest(".field") || el);
     const r = box.getBoundingClientRect();
     const vv = window.visualViewport;
-    const barH = bar.hidden ? 0 : bar.offsetHeight;                              // 上の入力確認バーの下から測る
+    const barH = bar.hidden ? 0 : bar.offsetHeight;                              // 上のカードの下から測る
     const top = (vv ? vv.offsetTop : 0) + barH, bottom = (vv ? vv.offsetTop + vv.height : window.innerHeight);
     if(r.top < top + 8) window.scrollBy({ top: r.top - (top + 60), behavior:"smooth" });                  // 上で切れている → 上から約60pxの位置へ
     else if(r.bottom > bottom - 8) window.scrollBy({ top: r.bottom - bottom + 24, behavior:"smooth" });   // キーボードの下 → キーボードの上へ
   }
   window.ctEnsureVisible = ensureVisible;
-  // 容器の入力のカードの上を、入力確認バーの下に合わせる(日付から「記録する」までを、できるだけ一画面に見せる)。キーボードが出る前に、1回だけ
-  function alignCard(el){
-    const card = el.closest && el.closest("#containerScreen .dt-frame.ctin");
-    if(!card) return;
-    const vv = window.visualViewport;
-    const barH = bar.hidden ? 60 : bar.offsetHeight;
-    const target = (vv ? vv.offsetTop : 0) + barH + 4;
-    const dy = card.getBoundingClientRect().top - target;
-    if(Math.abs(dy) > 2) window.scrollBy({ top: dy, behavior:"auto" });
-  }
-  window.ctAlignCard = alignCard;
+  apply();
   document.addEventListener("focusin", e => {
     if(!isInput(e.target)) return;
     hide();
     if(e.target.tagName !== "SELECT"){
-      alignCard(e.target);
       [450, 900].forEach(ms => setTimeout(() => { if(document.activeElement === e.target) ensureVisible(e.target); }, ms));   // iPhoneの動きが落ち着いたあとで確認
     }
   });
@@ -3771,6 +3864,7 @@ $("ctStatusSeg").addEventListener("click", e => {
   if(!b) return;
   ctStatus = Number(b.getAttribute("data-status"));
   renderStatus();
+  advanceSlot("status");
 });
 
 $("ctStatusSel").addEventListener("change", () => {
@@ -3778,6 +3872,7 @@ $("ctStatusSel").addEventListener("change", () => {
   if(v === "") return;
   ctStatus = Number(v);
   renderStatus();
+  advanceSlot("status");
 });
 
 $("ctFilterSeg").addEventListener("click", e => {
@@ -3788,7 +3883,7 @@ $("ctFilterSeg").addEventListener("click", e => {
   renderList();
 });
 
-$("ctDate").addEventListener("change", () => { ctDateTouched = true; syncDateText(); });
+$("ctDate").addEventListener("change", () => { ctDateTouched = true; syncDateText(); advanceSlot("date"); });
 $("ctDate").addEventListener("input", syncDateText);
 $("ctFsSeg").addEventListener("click", e => {
   const b = e.target.closest("button");
@@ -3815,6 +3910,10 @@ $("ctDateBtn").addEventListener("click", () => toggleCombo("ctDateList", renderD
 document.addEventListener("pointerdown", e => { if(!e.target.closest(".ct-combo")) closeCombos(); });
 $("ctCapacity").addEventListener("input", renderAdj);
 $("ctGasOther").addEventListener("input", renderGasSelected);
+$("ctGasOther").addEventListener("keydown", e => { if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); if($("ctGasOther").value.trim()){ $("ctGasOther").blur(); advanceSlot("gas"); } } });
+$("ctCustomer").addEventListener("keydown", e => { if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); if($("ctCustomer").value.trim()){ $("ctCustomer").blur(); showCustomerList(null); advanceSlot("cust"); } } });
+// 記号・番号にカーソルが入ったら、下の「選択」はたたむ
+["ctSymbol", "ctNumber"].forEach(id => $(id).addEventListener("focus", () => { if(ctSlot !== "sym") setSlot("sym", false); }));
 $("ctSaveButton").addEventListener("click", () => saveFromForm());
 
 /* 容量：カーソルを合わせると、ガス種の初期値(7など)は消える(入力する手間を減らす)。
