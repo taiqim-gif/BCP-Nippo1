@@ -1028,7 +1028,7 @@ const tc32=d.getElementById("tabColors").textContent;
 ok(/\.dt-frame\.hm1 \.dt-head\{ background:var\(--mint\)/.test(tc32) && /\.dt-frame\.hm3 \.dt-head\{ background:#C9EFE4/.test(tc32),"ホーム: the 訪問先 and 訪問履歴 cards are shades of mint (the ホーム button color)");
 ok(/\.dt-frame\.hm2\{ background:#F3EFFC; border-color:var\(--lavender-dark\); \}/.test(tc32) && /\.dt-frame\.hm2 \.dt-head, \.dt-frame\.hm2 \.todo-list-target > h2\{ background:var\(--lavender\); color:var\(--lavender-ink\); \}/.test(tc32) && /\.dt-frame\.veh2\{ background:#F3EFFC; border-color:var\(--lavender-dark\); \}/.test(tc32) && /\.dt-frame\.veh2 \.dt-head\{ background:var\(--lavender\); color:var\(--lavender-ink\); \}/.test(tc32),"ToDoリスト cards (ホーム and 車両): the same light-purple (lavender) colors again");
 ok(/\.dt-frame\.veh2 \.dt-head\{ background:var\(--lavender\)/.test(tc32) && /\.dt-frame\.veh3 \.dt-head\{ background:#E6DDF9/.test(tc32) && !/\.dt-frame\.veh1/.test(tc32),"車両: ToDoリスト = lavender, 終了したToDoリスト = lighter lavender; the 車両情報 card keeps 出発=peach / 帰社=sky");
-ok(/\.dt-frame\.ctin \.dt-head\{ background:var\(--sky\)/.test(tc32) && /\.dt-frame\.ctlist \.dt-head\{ background:var\(--sky-dark\)/.test(tc32),"容器: two shades of sky blue (the 容器 button color)");
+ok(/\.dt-frame\.ctin \.dt-head\{ background:#fff; color:var\(--sky-ink\); border-bottom:2px solid var\(--sky\); \}/.test(tc32) && /\.dt-frame\.ctlist \.dt-head\{ background:#F3EFE8; color:var\(--ink\); \}/.test(tc32),"容器: the 選択 card is white with a sky line under its title; the list has a calm grey title");
 ok(/\.dt-frame\.send \.dt-head\{ background:var\(--lavender\)/.test(tc32) && /\.dt-frame\.save \.dt-head\{ background:var\(--lavender-dark\)/.test(tc32) && /\.dt-frame\.master \.dt-head/.test(tc32) && /\.dt-frame\.wx \.dt-head/.test(tc32) && !/\.dt-frame\.del/.test(tc32),"データ: lavender shades; the 消す card stays pink");
 ok(/\.nav-btn\.active-sky\{[^}]*var\(--sky\)/.test(css32) && /\.nav-btn\.active-lav\{[^}]*var\(--lavender\)/.test(css32),"the 容器 and データ tab buttons keep sky and lavender (ホーム=mint and 車両=peach are defined in index.html, unchanged)");
 
@@ -1178,9 +1178,9 @@ d.querySelector('#ctStatusSeg button[data-status="2"]').click();
 ok(scr37.getAttribute("data-sc")==="out","出庫 → the container tab is sky blue (the default)");
 d.querySelector('#ctStatusSeg button[data-status="3"]').click();
 ok(scr37.getAttribute("data-sc")==="in","空受 → the whole container log switches to the 空受 color (peach)");
-ok(/#containerScreen\[data-sc="in"\] \.dt-frame\.ctin\{ background:#FFF3EA; border-color:var\(--peach-dark\); \}/.test(css37) && /#containerScreen\[data-sc="in"\] \.dt-frame\.ctlist \.dt-head\{ background:var\(--peach-dark\)/.test(css37) && /\.ct-confirm\.cb-in #ctSaveButton\{ color:var\(--peach-ink\); border-color:var\(--peach-dark\); \}/.test(css37),"CSS: input card, list card and 記録する button become peach for 空受");
+ok(/#containerScreen\[data-sc="in"\] \.dt-frame\.ctin \.dt-head\{ color:var\(--peach-ink\); border-bottom-color:var\(--peach\); \}/.test(css37) && /\.ct-confirm\.cb-in\{ --c:var\(--peach\); --cd:var\(--peach-dark\); --ci:var\(--peach-ink\);/.test(css37) && /\.cb-l3 #ctSaveButton\{[^}]*background:var\(--cd\); color:var\(--ci\)/.test(css37) && $("ctConfirmBar").classList.contains("cb-in"),"CSS: for 空受 the top card (band, 区分, 記録する) and the 選択 title line become peach");
 $("ctStatusSel").value="1"; ev($("ctStatusSel"),"change");
-ok(scr37.getAttribute("data-sc")==="oth" && /#containerScreen\[data-sc="oth"\] \.dt-frame\.ctin\{ background:#F3EFFC/.test(css37) && /\.ct-confirm\.cb-oth #ctSaveButton\{ color:var\(--lavender-ink\); border-color:var\(--lavender-dark\); \}/.test(css37),"他の区分 (仕入など) → lavender");
+ok(scr37.getAttribute("data-sc")==="oth" && /#containerScreen\[data-sc="oth"\] \.dt-frame\.ctin \.dt-head\{ color:var\(--lavender-ink\)/.test(css37) && /\.ct-confirm\.cb-oth\{ --c:var\(--lavender\)/.test(css37) && $("ctConfirmBar").classList.contains("cb-oth"),"他の区分 (仕入など) → lavender");
 d.querySelector('#ctStatusSeg button[data-status="2"]').click();
 ok(scr37.getAttribute("data-sc")==="out","back to 出庫 → sky blue");
 ok(/\.ct-flash\[data-sc="in"\]\{[^}]*peach/.test(css37) && /\.ct-flash\[data-sc="oth"\]\{[^}]*lavender/.test(css37),"the 登録 display follows the same status color");
@@ -1212,7 +1212,7 @@ set("ctDate","2026-10-01"); ev($("ctDate"),"input");
 ok(bar37.querySelector(".cb-date") && bar37.querySelector(".cb-date").textContent==="10/1","a date other than today is shown in red");
 set("ctDate","2026-10-08"); ev($("ctDate"),"input");
 ok(!bar37.querySelector(".cb-date"),"back to today → the date disappears from the bar");
-ok(/\.ct-confirm\{[^}]*position:sticky; top:0/.test(css37) && /\.cb-l3 input\[type=text\]\{[^}]*font-size:18px/.test(css37) && /\.cb-cust\{[^}]*font-size:16px/.test(css37),"the bar stays at the top (sticky); large letters (18px / 16px)");
+ok(/\.ct-confirm\{[^}]*position:sticky; top:0/.test(css37) && /\.cb-l3 input\[type=text\]\{[^}]*font-size:18px/.test(css37) && /\.cb-slot\{[^}]*font-size:16px/.test(css37),"the bar stays at the top (sticky); large letters (18px / 16px)");
 // 容器カードの位置合わせは、やめた(記号・番号は上のカードにあるので、動かす必要がない)
 ok(typeof w.ctAlignCard==="undefined","the input card is no longer moved into place (nothing to align)");
 // バーは、ほかの画面では出ない／終わると消える
@@ -1282,7 +1282,7 @@ $("navContainerButton").click(); if($("ctCancelEdit").style.display!=="none") $(
 const bar38=$("ctConfirmBar"), hdr38=d.querySelector("header");
 ok(!bar38.hidden && bar38.contains($("ctSymbol")) && bar38.contains($("ctNumber")) && bar38.contains($("ctSaveButton")) && bar38.contains($("ctNumKb")),"the top card holds 記号, 番号, 記録する and ABC");
 ok(!$("containerScreen").contains($("ctSymbol")) && !$("ctTopSum") && !$("ctTopArea"),"the lower part has no 記号/番号 any more, and there is no shrinking summary row");
-ok(/\.ct-confirm\{ position:sticky; top:0;/.test([...d.querySelectorAll("style")].map(x=>x.textContent).join("\n")) && bar38.style.top===Math.round(hdr38.getBoundingClientRect().height)+"px","the top card stays fixed just under the tab buttons");
+ok(/\.ct-confirm\{ position:sticky; top:0;/.test([...d.querySelectorAll("style")].map(x=>x.textContent).join("\n")) && bar38.style.top===Math.round(hdr38.getBoundingClientRect().height+14)+"px","the top card stays fixed under the tab buttons, with a gap");
 d.querySelector('#ctStatusSeg button[data-status="2"]').click(); chip("O2").click();
 set("ctCustomer","上カード商店"); ev($("ctCustomer"),"input");
 ok(bar38.querySelector(".cb-st").textContent==="出庫" && bar38.querySelector(".cb-cust").textContent==="上カード商店" && /^\d{1,2}\/\d{1,2}$/.test(bar38.querySelector(".cb-dt").textContent) && !bar38.querySelector(".cb-date"),"row 1: 区分 / customer / today's date (not red)");
@@ -1297,9 +1297,9 @@ const card38=[...d.querySelectorAll("#ctList .ct-cust")].find(c=>c.querySelector
 if(card38 && !card38.querySelector(".ct-hwrap")) card38.querySelector(".ct-tog").click();
 const row38=[...d.querySelectorAll("#ctList .ct-cust")].find(c=>c.querySelector(".ct-cust-name").textContent==="上カード商店").querySelector(".ct-row");
 await swipe(row38,100);
-ok($("ctSaveButton").textContent==="更新" && bar38.querySelector(".cb-mode").textContent==="変更中" && $("ctCancelEdit").style.display!=="none" && bar38.contains($("ctCancelEdit")),"editing: 更新 in the top card, with 変更中 and the やめる button on row 1");
+ok($("ctSaveButton").textContent==="更新" && bar38.querySelector(".cb-tag").textContent==="変更中" && $("ctCancelEdit").style.display!=="none" && bar38.contains($("ctCancelEdit")),"editing: 更新 in the top card, with 変更中 and the やめる button on row 1");
 $("ctCancelEdit").click();
-ok($("ctSaveButton").textContent==="記録する" && !bar38.querySelector(".cb-mode"),"after やめる: back to 記録する");
+ok($("ctSaveButton").textContent==="記録する" && bar38.querySelector(".cb-tag").textContent==="入力中" && !bar38.querySelector(".cb-tag").classList.contains("ed"),"after やめる: back to 記録する (the card says 入力中 again)");
 set("ctDate","2026-10-01"); ev($("ctDate"),"input");
 ok(bar38.querySelector(".cb-date") && bar38.querySelector(".cb-date").textContent==="10/1","a date other than today is shown in red");
 set("ctDate","2026-10-08"); ev($("ctDate"),"input");
@@ -1376,7 +1376,7 @@ w.ctSetSlot(null); w.eval("0");
 ok(secOn41()==="" && !$("ctSecHint").hidden && $("ctTitle").textContent==="選択","no item chosen: the 選択 card only shows a hint");
 ok(["date","status","cust","gas","cap"].every(n=>!!slotBtn41(n)),"the top card items 日付・区分・顧客名・ガス種・容量 are buttons");
 slotBtn41("status").click();
-ok(secOn41()==="status" && $("ctTitle").textContent==="選択(区分)" && slotBtn41("status").classList.contains("on"),"pressing 区分: only the 区分 choices are shown; the item has a thick frame; the title says 選択(区分)");
+ok(secOn41()==="status" && $("ctTitle").textContent==="選択 ▸ 区分" && slotBtn41("status").classList.contains("on"),"pressing 区分: only the 区分 choices are shown; the item has a thick frame; the title says 選択 ▸ 区分");
 d.querySelector('#ctStatusSeg button[data-status="3"]').click();
 ok(w.ctSlotNow()==="cust" && secOn41()==="cust" && ctStatusIs41(),"choosing 空受 → moves on to 顧客名 by itself");
 function ctStatusIs41(){ return bar41.querySelector(".cb-st").textContent==="空受"; }
@@ -1412,3 +1412,15 @@ ok(w.ctSlotNow()==="status" && $("ctCustomer").value==="","after やめる: the 
 // ほかのタブから戻ったとき
 w.ctSetSlot(null); $("navHomeButton").click(); $("navContainerButton").click();
 ok(w.ctSlotNow()==="status","opening the 容器 tab with no customer: starts from 区分");
+
+// ---- 42) 見やすさの見直し：上のカードは白地・項目の名前・区分の色の帯・ガス種はボンベの色・カード全体の札 ----
+$("navContainerButton").click(); if($("ctCancelEdit").style.display!=="none") $("ctCancelEdit").click();
+const bar42=$("ctConfirmBar"), css42=[...d.querySelectorAll("style")].map(x=>x.textContent).join("\n");
+ok(/\.ct-confirm\{[^}]*margin:14px 10px 0;[^}]*background:#fff;[^}]*border-left:8px solid var\(--cd\); border-bottom:3px solid var\(--cd\); border-radius:14px/.test(css42),"top card: white, with a thick 区分-colored band on the left and a line at the bottom; rounded, with a gap under the tab buttons");
+const lab42=[...bar42.querySelectorAll(".cb-slot")].map(b=>b.getAttribute("data-label")).join();
+ok(lab42==="日付,区分,顧客名,ガス種,容量" && /\.cb-slot::before\{ content:attr\(data-label\)/.test(css42),"each item has a small name: 日付・区分・顧客名・ガス種・容量");
+d.querySelector('#ctStatusSeg button[data-status="2"]').click(); chip("CO2").click();
+const pill42=bar42.querySelector(".cb-gas .cb-gaspill");
+ok(!!pill42 && pill42.style.background.replace(/\s/g,"").toLowerCase().includes("rgb(63,154,94)") && pill42.textContent==="炭酸 CO2","the gas is shown in the same color as its button (炭酸 = green)");
+ok(bar42.querySelector(".cb-tag").textContent==="入力中" && !bar42.querySelector(".cb-tag").classList.contains("ed"),"the whole card is labelled 入力中 while a new record is being entered");
+chip("O2").click();

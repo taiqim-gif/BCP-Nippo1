@@ -213,35 +213,35 @@ style.textContent = `
   header.ct-navonly .ct-datebox{ display:none; }
   header.ct-navonly{ padding-top:6px; padding-bottom:6px; }
   header.banner-off{ max-height:0; padding-top:0; padding-bottom:0; opacity:0; border-bottom-width:0; transition:none; }     /* 消すときは、すぐ消す(iPhoneが、消えたあとの位置で、見える位置を決められる) */
-  .ct-confirm{ position:sticky; top:0; z-index:9; padding:6px 10px 8px; border-bottom:2px solid var(--line); }
-  .cb-row1{ display:flex; align-items:center; gap:8px; }
-  .cb-slot{ font:inherit; font-weight:700; color:inherit; background:rgba(255,255,255,0.6); border:2px solid transparent; border-radius:8px; padding:3px 8px; min-height:34px; white-space:nowrap; cursor:pointer; flex:none; }
-  .cb-slot.on{ background:#fff; border-color:currentColor; }        /* 今の項目は、太い枠 */
-  .cb-l1 .cb-slot.cb-cust, .cb-l2t .cb-slot.cb-gas{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; text-align:left; }
+  /* 容器タブの上のカード：白地。区分の色は、左の太い帯・下の線・区分の項目・「記録する」だけに使う */
+  .ct-confirm{ position:sticky; top:0; z-index:9; margin:14px 10px 0; padding:12px 8px 8px 10px; background:#fff; color:var(--ink); border:1px solid var(--line); border-left:8px solid var(--cd); border-bottom:3px solid var(--cd); border-radius:14px; box-shadow:0 3px 10px rgba(0,0,0,0.12);
+    --c:var(--sky); --cd:var(--sky-dark); --ci:var(--sky-ink); --cl:#EAF6FC; }
+  .ct-confirm.cb-in{ --c:var(--peach); --cd:var(--peach-dark); --ci:var(--peach-ink); --cl:#FFF3EA; }
+  .ct-confirm.cb-oth{ --c:var(--lavender); --cd:var(--lavender-dark); --ci:var(--lavender-ink); --cl:#F3EFFC; }
+  .ct-confirm[hidden]{ display:none; }
+  .cb-tag{ position:absolute; top:-11px; left:12px; background:var(--cd); color:var(--ci); font-size:12px; font-weight:700; font-style:normal; padding:1px 10px; border-radius:999px; border:2px solid #fff; white-space:nowrap; }   /* カード全体の状態：入力中・変更中・追加中 */
+  .cb-tag.ed{ background:#fff; color:#C0392B; border-color:#C0392B; }
+  .cb-row1{ display:flex; align-items:center; gap:6px; }
+  .cb-l1{ display:flex; align-items:stretch; gap:6px; min-width:0; flex:1; }
+  .ct-confirm .cb-l2{ display:flex; align-items:center; gap:6px; margin-top:5px; }
   .cb-l2t{ display:flex; gap:6px; flex:1; min-width:0; }
-  .cb-row1 .cb-l1{ flex:1; }
-  .cb-dt{ font-size:14px; font-weight:700; white-space:nowrap; }
-  .cb-mode{ font-size:13px; font-weight:700; background:#fff; color:#C0392B; padding:1px 8px; border-radius:999px; white-space:nowrap; }
+  .cb-slot{ font:inherit; font-size:16px; font-weight:700; line-height:1.25; text-align:left; color:var(--ink); background:#fff; border:2px solid var(--line); border-radius:10px; padding:2px 8px 3px; min-height:44px; white-space:nowrap; cursor:pointer; flex:none; min-width:0; }
+  .cb-slot::before{ content:attr(data-label); display:block; font-size:10px; font-weight:400; color:var(--ink-soft); line-height:1.2; }   /* 項目の小さな名前 */
+  .cb-v{ display:block; overflow:hidden; text-overflow:ellipsis; }
+  .cb-slot.on{ border-color:var(--cd); background:var(--cl); box-shadow:0 0 0 2px var(--c); }   /* 今の項目は、区分の色の太い枠 */
+  .cb-slot.cb-st{ background:var(--c); border-color:var(--cd); color:var(--ci); }
+  .cb-slot.cb-st::before{ color:var(--ci); }
+  .cb-l1 .cb-cust, .cb-l2t .cb-gas{ flex:1 1 auto; }
+  .cb-gaspill{ display:inline-block; padding:1px 10px; border-radius:999px; font-size:15px; }   /* ガス種は、ボンベ(ボタン)と同じ色 */
+  .cb-miss{ color:#C0392B; font-size:14px; font-weight:700; }
+  .cb-slot.cb-date{ color:#C0392B; }
   .ct-confirm #ctCancelEdit{ flex:none; }
-  .ct-confirm .cb-l2{ align-items:center; }
   .cb-l3{ display:flex; gap:6px; align-items:stretch; margin-top:6px; }
-  .cb-l3 input[type=text]{ min-width:0; margin:0; font-size:18px; font-weight:700; padding:8px 10px; }
+  .cb-l3 input[type=text]{ min-width:0; margin:0; font-size:18px; font-weight:700; padding:8px 10px; border:2px solid var(--line); border-radius:10px; }
+  .cb-l3 input[type=text]:focus{ border-color:var(--cd); box-shadow:0 0 0 2px var(--c); outline:none; }
   .cb-l3 #ctSymbol{ flex:1 1 0; }
   .cb-l3 #ctNumber{ flex:1.7 1 0; }
-  .cb-l3 #ctSaveButton{ flex:none; width:auto; margin:0; padding:8px 14px; font-size:16px; font-weight:700; background:#fff; color:var(--sky-ink); border:2px solid var(--sky-dark); }
-  .ct-confirm.cb-in #ctSaveButton{ color:var(--peach-ink); border-color:var(--peach-dark); }
-  .ct-confirm.cb-oth #ctSaveButton{ color:var(--lavender-ink); border-color:var(--lavender-dark); }
-  .ct-confirm[hidden]{ display:none; }
-  .cb-out{ background:var(--sky); color:var(--sky-ink); }
-  .cb-in{ background:var(--peach); color:var(--peach-ink); }
-  .cb-oth{ background:var(--lavender); color:var(--lavender-ink); }
-  .cb-l1{ display:flex; align-items:center; gap:8px; min-width:0; }
-  .cb-st{ font-weight:700; font-size:15px; background:rgba(255,255,255,0.65); padding:1px 10px; border-radius:999px; white-space:nowrap; }
-  .cb-cust{ font-size:16px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-  .cb-l2{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-top:3px; }
-  .cb-gas{ font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-  .cb-miss, .cb-date{ color:#C0392B; font-weight:700; }
-  .cb-date{ font-size:14px; white-space:nowrap; }
+  .cb-l3 #ctSaveButton{ flex:none; width:auto; margin:0; padding:8px 16px; font-size:17px; font-weight:700; background:var(--cd); color:var(--ci); border:none; border-radius:10px; }
   .ct-clr{ position:relative; }
   .ct-clr > input{ padding-right:34px !important; }
   .ct-clrbtn{ position:absolute; top:3px; right:4px; width:32px; height:26px; border:none; background:transparent; color:#B9B1A8; font-size:11px; line-height:1; cursor:pointer; padding:0; font-family:inherit; }
@@ -550,17 +550,16 @@ const tabColors = document.createElement("style");
 tabColors.id = "tabColors";
 tabColors.textContent = `
   /* 容器：区分に合わせて、全体の基本色を替える(出庫=水色は上の既定。空受=ピーチ、他の区分=ラベンダー) */
-  #containerScreen[data-sc="in"] .dt-frame.ctin{ background:#FFF3EA; border-color:var(--peach-dark); }
-  #containerScreen[data-sc="in"] .dt-frame.ctin .dt-head{ background:var(--peach); color:var(--peach-ink); }
-  #containerScreen[data-sc="in"] .dt-frame.ctlist{ background:#FFF9F4; border-color:#EE8A57; }
-  #containerScreen[data-sc="in"] .dt-frame.ctlist .dt-head{ background:var(--peach-dark); color:var(--peach-ink); }
-  #containerScreen[data-sc="oth"] .dt-frame.ctin{ background:#F3EFFC; border-color:var(--lavender-dark); }
-  #containerScreen[data-sc="oth"] .dt-frame.ctin .dt-head{ background:var(--lavender); color:var(--lavender-ink); }
-  #containerScreen[data-sc="oth"] .dt-frame.ctlist{ background:#F8F5FD; border-color:#9A84DD; }
-  #containerScreen[data-sc="oth"] .dt-frame.ctlist .dt-head{ background:var(--lavender-dark); color:var(--lavender-ink); }
   .ct-flash[data-sc="in"]{ color:var(--peach-ink); border-color:var(--peach-dark); }
   .ct-flash[data-sc="oth"]{ color:var(--lavender-ink); border-color:var(--lavender-dark); }
   /* 容器の入力のカードを低くする(キーボードが出ても、収まりやすいように) */
+  /* 容器タブの「選択」と一覧：白地で落ち着いた色。区分の色は「選択」の見出しの下の線と文字だけ */
+  .dt-frame.ctin{ background:#fff; border-color:var(--line); }
+  .dt-frame.ctin .dt-head{ background:#fff; color:var(--sky-ink); border-bottom:2px solid var(--sky); }
+  #containerScreen[data-sc="in"] .dt-frame.ctin .dt-head{ color:var(--peach-ink); border-bottom-color:var(--peach); }
+  #containerScreen[data-sc="oth"] .dt-frame.ctin .dt-head{ color:var(--lavender-ink); border-bottom-color:var(--lavender); }
+  .dt-frame.ctlist{ background:#fff; border-color:var(--line); }
+  .dt-frame.ctlist .dt-head{ background:#F3EFE8; color:var(--ink); }
   #containerScreen .dt-frame.ctin input[type=text], #containerScreen .dt-frame.ctin input[type=date], #containerScreen .dt-frame.ctin select{ padding-top:8px; padding-bottom:8px; }
   #containerScreen .dt-frame.ctin .field{ margin-bottom:8px; }
   #containerScreen .dt-frame.ctin .ct-lbrow{ margin-bottom:2px; }
@@ -579,10 +578,6 @@ tabColors.textContent = `
   .dt-frame.veh3{ background:#F8F5FD; border-color:#D6CBF3; }
   .dt-frame.veh3 .dt-head{ background:#E6DDF9; color:var(--lavender-ink); }
   /* 容器＝スカイの濃淡 */
-  .dt-frame.ctin{ background:#EDF6FB; border-color:var(--sky-dark); }
-  .dt-frame.ctin .dt-head{ background:var(--sky); color:var(--sky-ink); }
-  .dt-frame.ctlist{ background:#F4FAFD; border-color:#5FAFD6; }
-  .dt-frame.ctlist .dt-head{ background:var(--sky-dark); color:#08384F; }
   /* データ＝ラベンダーの濃淡(「消す」は、ピンクのまま) */
   .dt-frame.send{ background:#F3EFFC; border-color:var(--lavender-dark); }
   .dt-frame.send .dt-head{ background:var(--lavender); color:var(--lavender-ink); }
@@ -721,7 +716,7 @@ function setSlot(name, focusSym){
   ctSlot = name || null;
   document.querySelectorAll("#containerScreen .ct-sec").forEach(sec => sec.classList.toggle("on", sec.getAttribute("data-sec") === ctSlot));
   $("ctSecHint").hidden = !!SLOT_NAMES[ctSlot];
-  $("ctTitle").textContent = "選択" + (SLOT_NAMES[ctSlot] ? `(${SLOT_NAMES[ctSlot]})` : "");
+  $("ctTitle").textContent = "選択" + (SLOT_NAMES[ctSlot] ? ` ▸ ${SLOT_NAMES[ctSlot]}` : "");
   if(SLOT_NAMES[ctSlot]){                     // 選択肢を選ぶ間は、記号・番号のキーボードを閉じる
     const a = document.activeElement, bar = $("ctConfirmBar");
     if(a && a.blur && bar && bar.contains(a)) a.blur();
@@ -3490,7 +3485,7 @@ function attachClear(inp){
   bar.id = "ctConfirmBar";
   bar.className = "ct-confirm cb-out";
   bar.hidden = true;
-  bar.innerHTML = '<div class="cb-row1"><div class="cb-l1" id="cbL1"></div></div><div class="cb-l2"><span class="cb-l2t" id="cbL2"></span></div><div class="cb-l3"></div>';
+  bar.innerHTML = '<em class="cb-tag" id="cbTag">入力中</em><div class="cb-row1"><div class="cb-l1" id="cbL1"></div></div><div class="cb-l2"><span class="cb-l2t" id="cbL2"></span></div><div class="cb-l3"></div>';
   hdr.insertAdjacentElement("afterend", bar);
   bar.querySelector(".cb-row1").appendChild($("ctCancelEdit"));
   bar.querySelector(".cb-l2").appendChild($("ctNumKb"));
@@ -3501,14 +3496,18 @@ function attachClear(inp){
     const sc = ctStatus === 2 ? "out" : (ctStatus === 3 ? "in" : "oth");
     bar.className = "ct-confirm cb-" + sc;
     const miss = x => `<span class="cb-miss">${x}</span>`;
-    const slot = (name, cls, html) => `<button type="button" class="cb-slot ${cls}${ctSlot === name ? " on" : ""}" data-slot="${name}">${html}</button>`;   // 押すと、下の「選択」がその項目になる
+    const slot = (name, cls, label, html) => `<button type="button" class="cb-slot ${cls}${ctSlot === name ? " on" : ""}" data-slot="${name}" data-label="${label}"><span class="cb-v">${html}</span></button>`;   // 押すと、下の「選択」がその項目になる
     const g = curGas();
-    const gasHtml = f.gas ? escapeHtml(nfkc(f.gas)) + (g && g.label && g.label !== nfkc(g.name) ? " " + escapeHtml(g.label) : "") : miss("ガス種未入力");
-    const capHtml = f.capacity !== "" ? escapeHtml(f.capacity) + (f.unit ? " " + escapeHtml(f.unit) : "") : (capDefault() !== null ? miss("容量未入力") : "--");
-    const dateHtml = f.date ? slot("date", f.date !== today ? "cb-date" : "cb-dt", escapeHtml(mdOf(f.date))) : slot("date", "cb-date", "日付?");   // 今日以外の日付は、赤字
-    const mode = ctEditId ? '<span class="cb-mode">変更中</span>' : (ctAdding ? '<span class="cb-mode">追加中</span>' : "");
-    $("cbL1").innerHTML = mode + dateHtml + slot("status", "cb-st", escapeHtml(statusName(ctStatus))) + slot("cust", "cb-cust", f.customer ? escapeHtml(f.customer) : miss("顧客名未入力"));
-    $("cbL2").innerHTML = slot("gas", "cb-gas", gasHtml) + slot("cap", "cb-cap", capHtml);
+    const gasText = f.gas ? escapeHtml(nfkc(f.gas)) + (g && g.label && g.label !== nfkc(g.name) ? " " + escapeHtml(g.label) : "") : "";
+    const gasStyle = g ? `background:${g.bg};color:${g.fg};${g.outline ? "text-shadow:" + GAS_OUTLINE + ";" : ""}` : "background:#2D87E3;color:#fff;";
+    const gasHtml = f.gas ? `<span class="cb-gaspill" style="${gasStyle}">${gasText}</span>` : miss("ガス種未入力");
+    const capHtml = f.capacity !== "" ? escapeHtml(f.capacity) + (f.unit ? " " + escapeHtml(f.unit) : "") : (capDefault() !== null ? miss("未入力") : "--");
+    const dateHtml = f.date ? slot("date", f.date !== today ? "cb-date" : "cb-dt", "日付", escapeHtml(mdOf(f.date))) : slot("date", "cb-date", "日付", "?");   // 今日以外の日付は、赤字
+    const tag = $("cbTag");                     // カード全体の状態
+    tag.textContent = ctEditId ? "変更中" : (ctAdding ? "追加中" : "入力中");
+    tag.classList.toggle("ed", !!(ctEditId || ctAdding));
+    $("cbL1").innerHTML = dateHtml + slot("status", "cb-st", "区分", escapeHtml(statusName(ctStatus))) + slot("cust", "cb-cust", "顧客名", f.customer ? escapeHtml(f.customer) : miss("顧客名未入力"));
+    $("cbL2").innerHTML = slot("gas", "cb-gas", "ガス種", gasHtml) + slot("cap", "cb-cap", "容量", capHtml);
   }
   bar.addEventListener("click", e => {
     const b = e.target.closest("[data-slot]");
@@ -3534,7 +3533,7 @@ function attachClear(inp){
     hdr.classList.toggle("banner-off", hidden && !on);
     document.body.classList.toggle("kb-pad", hidden && !on);   // 容器タブは、上のカードで打つので、下の余白はいらない
     syncBar();
-    bar.style.top = on ? Math.round(hdr.getBoundingClientRect().height) + "px" : "";   // 上のカードは、タブのボタンのすぐ下に固定
+    bar.style.top = on ? Math.round(hdr.getBoundingClientRect().height + 14) + "px" : "";   // 上のカードは、タブのボタンの下に、すきまを空けて固定
   }
   const hide = () => { clearTimeout(t); hidden = true; apply(); };
   const show = () => {
