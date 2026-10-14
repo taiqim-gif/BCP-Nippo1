@@ -144,7 +144,8 @@ style.textContent = `
   .wx-stale{ font-size:10px; color:var(--ink-soft); }
   .wx-stale[hidden]{ display:none; }
   .wx-grid{ display:grid; grid-template-columns:repeat(3, 52px); row-gap:1px; text-align:center; }
-  .wx-r1{ color:#0B7A7A; font-size:13px; font-weight:700; white-space:pre; overflow:hidden; line-height:1.3; }
+  .wx-r1{ color:#0B7A7A; font-size:15px; font-weight:700; white-space:pre; overflow:hidden; line-height:22px; height:22px; }
+  .wx-grid.icons .wx-r1{ font-size:17px; }
   .wx-r2{ color:#5B4A9E; font-size:11px; font-weight:700; line-height:1.2; }
   .wx-grid.flip .wx-r1{ animation:ctWxFlip .4s ease-out; }
   @keyframes ctWxFlip{ from{ transform:perspective(220px) rotateX(-80deg); opacity:0; } to{ transform:perspective(220px) rotateX(0); opacity:1; } }
@@ -155,8 +156,8 @@ style.textContent = `
   .dt-frame.compact .dt-body{ padding:8px 8px 2px; }
   .dt-frame.compact .h2-note{ font-size:11px; font-weight:400; }
   #vehicleScreen .dt-frame .card, #containerScreen .dt-frame .card{ background:transparent; border:none; box-shadow:none; padding:0; margin-bottom:8px; }
-  .dt-frame.veh1{ background:#EDF6FB; border-color:var(--sky-dark); }
-  .dt-frame.veh1 .dt-head{ background:var(--sky); color:var(--sky-ink); justify-content:flex-start; gap:10px; }
+  .dt-frame.veh1{ background:var(--vc-tint, #EDF6FB); border-color:var(--vc, var(--sky-dark)); }
+  .dt-frame.veh1 .dt-head{ background:var(--vc, var(--sky)); color:var(--vc-ink, var(--sky-ink)); justify-content:flex-start; gap:10px; }
   .dt-frame.veh2{ background:#F3EFFC; border-color:var(--lavender-dark); margin-top:28px; }
   .dt-frame.veh2 .dt-head{ background:var(--lavender); color:var(--lavender-ink); }
   .dt-frame.veh3{ background:#F2EEE4; border-color:#CFC8BB; }
@@ -165,7 +166,19 @@ style.textContent = `
   .dt-frame.ctin .dt-head{ background:var(--mint); color:var(--mint-ink); }
   .dt-frame.ctlist{ background:#FFF3EA; border-color:var(--peach-dark); margin-top:14px; }
   .dt-frame.ctlist .dt-head{ background:var(--peach); color:var(--peach-ink); }
-  #vehicleScreen .todo-line{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* 長押しで、文字の選択やメニューが出ないように */
+  #vehicleScreen .todo-line, #reportScreen .todo-line{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* 長押しで、文字の選択やメニューが出ないように */
+  .dt-frame.hm1{ background:#EEF9F5; border-color:var(--mint-dark); }
+  .dt-frame.hm1 .dt-head{ background:var(--mint); color:var(--mint-ink); }
+  .dt-frame.hm2{ background:#F3EFFC; border-color:var(--lavender-dark); }
+  .dt-frame.hm2 .dt-head, .dt-frame.hm2 .todo-list-target > h2{ background:var(--lavender); color:var(--lavender-ink); }
+  .dt-frame.hm2 .todo-list-target > h2{ margin:0; padding:5px 12px; font-size:15px; display:flex; justify-content:space-between; align-items:center; }
+  .dt-frame.hm2 .dt-body{ padding:0 0 8px; }
+  .dt-frame.hm2 .dt-head + .dt-body{ padding:8px 8px 2px; }
+  .dt-frame.hm2 .todo-list-target > .todo-item{ margin:8px 8px 0; }
+  .dt-frame.hm3{ background:#FFF3EA; border-color:var(--peach-dark); }
+  .dt-frame.hm3 .dt-head{ background:var(--peach); color:var(--peach-ink); }
+  #reportScreen .dt-frame .card{ background:transparent; border:none; box-shadow:none; padding:0; margin-bottom:8px; }
+  .dt-frame[hidden]{ display:none; }
   .ct-clr{ position:relative; }
   .ct-clr > input{ padding-right:34px !important; }
   .ct-clrbtn{ position:absolute; top:3px; right:4px; width:26px; height:26px; border:none; background:transparent; color:#9C948C; font-size:18px; line-height:1; cursor:pointer; padding:0; }
@@ -841,7 +854,10 @@ let ctAutoCust = "";            // 自動で入れた顧客名(自分で書き�
 let lastCust = null;
 try{ lastCust = JSON.parse(localStorage.getItem("lastCustomer") || "null"); }catch(e){ lastCust = null; }
 // 「（株）」「）」のような、会社の種類や記号だけの文字は、顧客名として扱わない
-function isNameLike(n){ return String(n || "").replace(CORP_RE, "").replace(/[\s\u3000()（）\-・.,、。]+/g, "").length > 0; }
+function isNameLike(n){
+  const rest = String(n || "").replace(CORP_RE, "").replace(/[\s\u3000()（）\-・.,、。]+/g, "");
+  return rest.length > 0 && !/^[株式会社有限合同資名一般財団法人公益福祉医療学校]+$/.test(rest);   // 「株式会」「（株」のような、会社種別の途中までの文字も、顧客名にしない
+}
 function trackCustomer(name, src){
   const n = String(name || "").trim();
   if(!n || !isNameLike(n)) return;
@@ -872,11 +888,15 @@ function captureHomeCustomerRaw(){
 // 容器タブを開くとき、顧客名の欄に初期入力する(修正はできる)
 //   ・ホームで作業中の顧客があれば、それを入れる(変更中・追加中は触らない)
 //   ・なければ、直近に作業した顧客を、欄が空か、自動で入れたままのときだけ入れる
-function fillContainerCustomer(strong){
+function fillContainerCustomer(strong, fromHome){
   if(ctEditId || ctAdding) return;
   const inp = $("ctCustomer"), cur = inp.value.trim();
   let name = "";
   if(strong) name = strong;
+  else if(fromHome){                      // ホームから開いて、ホームの訪問先が空 → 前に自動で入れた名前も消す(自分で入力した名前は、そのまま)
+    if(cur && cur === ctAutoCust){ inp.value = ""; ctAutoCust = ""; ctPicked = null; showCustomerList(null); }
+    return;
+  }
   else if(!cur || cur === ctAutoCust) name = recentCustomer();
   if(!name || name === cur) return;
   inp.value = name;
@@ -1939,6 +1959,7 @@ function wxRender(flip){
   btn.querySelectorAll(".wx-r2").forEach((el, i) => { el.textContent = v.r2[i]; });
   const st = btn.querySelector(".wx-stale");
   if(st) st.hidden = !v.stale;
+  btn.querySelector(".wx-grid").classList.toggle("icons", v.mode === 0);      // アイコンのときだけ、大きい文字
   if(flip && !wxReduced()){ const g = btn.querySelector(".wx-grid"); g.classList.remove("flip"); void g.offsetWidth; g.classList.add("flip"); }   // ページが返るように切り替える
 }
 function wxStep(dir){ wxMode = ((wxMode + dir) % 3 + 3) % 3; wxRender(true); }
@@ -2268,7 +2289,7 @@ todoEdit.addEventListener("click", e => {
   }
 });
 document.addEventListener("pointerdown", e => { if(!todoEdit.hidden && !e.target.closest("#todoEditSheet")) todoEdit.hidden = true; });
-const vehScr = $("vehicleScreen");
+function bindTodoEdit(vehScr){
 if(vehScr){
   vehScr.addEventListener("pointerdown", e => {
     const line = e.target.closest(".todo-list-target .todo-line");
@@ -2287,6 +2308,9 @@ if(vehScr){
     if(todoLP && e.target.closest(".todo-line")){ e.preventDefault(); e.stopPropagation(); todoLP = false; }
   }, true);
 }
+}
+bindTodoEdit($("vehicleScreen"));
+bindTodoEdit($("reportScreen"));                  // ホーム
 
 /* ---------- 訪問入力：面談者の欄を狭く、敬称の欄を広く／敬称に「係長」を足す ---------- */
 (function widenTitle(){
@@ -2557,6 +2581,48 @@ if(typeof window.renderMasterUI === "function") window.renderMasterUI();
     }
     const lab = $("vehicleModeLabel");
     if(lab && lab.parentNode) lab.parentNode.style.display = "none";
+  }
+  // ---- ホーム：見つかった部分だけ、カードにする(見つからない部分は、元のまま) ----
+  const rs = $("reportScreen");
+  if(rs){
+    const mk = (cls, headNode, headText, nodes) => {            // 見出しの要素は、そのまま帯にする(元の見出しを書き換える処理が、そのまま効く)
+      const frame = document.createElement("section");
+      frame.className = "dt-frame compact " + cls;
+      const anchor = headNode || nodes[0];
+      anchor.parentNode.insertBefore(frame, anchor);
+      let head;
+      if(headNode){ head = headNode; head.classList.add("dt-head"); head.style.margin = "0"; }
+      else{ head = document.createElement("div"); head.className = "dt-head"; head.textContent = headText; }
+      const body = document.createElement("div");
+      body.className = "dt-body";
+      frame.appendChild(head);
+      frame.appendChild(body);
+      nodes.forEach(n => body.appendChild(n));
+      return frame;
+    };
+    const hv = $("homeVisitTarget"), card1 = hv && hv.closest(".card");
+    if(card1 && card1.parentNode === rs) mk("hm1", null, "訪問先", [card1]);
+    const tgt = rs.querySelector(":scope > .todo-list-target");
+    if(tgt){
+      const prev = tgt.previousElementSibling;
+      const hd = prev && prev.tagName === "H2" ? prev : null;
+      if(hd) hd.innerHTML = hd.innerHTML.replace(/TODOリスト/g, "ToDoリスト");
+      const frame = mk("hm2", hd, "ToDoリスト", [tgt]);
+      const sync = () => { frame.hidden = !(tgt.children.length > 0) || tgt.style.display === "none"; };   // ToDoが空のときは、カードごと出さない
+      new MutationObserver(sync).observe(tgt, { childList:true, attributes:true, attributeFilter:["style"] });
+      sync();
+    }
+    const kids = [...rs.children];
+    const foot = kids.find(e => e.classList.contains("footer-actions"));
+    const h3 = kids.find(e => e.tagName === "H2" && /訪問|履歴|記録/.test(e.textContent));
+    if(h3){
+      const nodes = [];
+      for(let n = h3.nextElementSibling; n && n !== foot && n.tagName !== "H2" && !n.classList.contains("dt-frame"); n = n.nextElementSibling) nodes.push(n);
+      mk("hm3", h3, "訪問履歴", nodes);
+    }else{
+      const list = kids.find(e => /list|history|log|record/i.test(e.id || "") && e !== tgt && !e.classList.contains("dt-frame"));
+      if(list) mk("hm3", null, "訪問履歴", [list]);
+    }
   }
 })();
 
@@ -2900,9 +2966,9 @@ function goToData(){
   updateNav("data");
 }
 
-function goToContainer(strong){
+function goToContainer(strong, fromHome){
   vehicleViewMode = null;
-  fillContainerCustomer(strong);
+  fillContainerCustomer(strong, fromHome);
   renderContainer();
   showScreen("container");
   updateNav("container");
@@ -2949,6 +3015,31 @@ if($("homeVisitTarget")){
 if($("homeStartButton")) $("homeStartButton").addEventListener("click", () => trackCustomer($("homeVisitTarget") ? $("homeVisitTarget").value : "", "home"));
 if($("endButton")) $("endButton").addEventListener("click", () => trackCustomer($("visitTarget") ? $("visitTarget").value : "", "home"));
 
+/* ---------- 車両情報のカードの色：いまの登録(出発／帰社)のボタンと同じ色 ---------- */
+function vehicleModeButton(mode){
+  const word = mode === "return" ? "帰社" : "出発";
+  const c = [...document.querySelectorAll("#vehicleScreen button")].filter(b => !b.closest("#doneTodoBox") && b.textContent.trim().startsWith(word));
+  return c.find(b => b.classList.contains("mode-switch-btn")) || c[0] || null;
+}
+function parseRgb(str){
+  const m = /rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)(?:[ ,/]+([\d.]+))?/.exec(String(str || ""));
+  return m ? { r:+m[1], g:+m[2], b:+m[3], a:m[4] === undefined ? 1 : +m[4] } : null;
+}
+function applyVehicleCardColor(){
+  const fr = document.querySelector("#vehicleScreen .dt-frame.veh1");
+  if(!fr) return;
+  const btn = vehicleModeButton(vehicleViewMode === "return" ? "return" : "departure");
+  const c = btn ? parseRgb(window.getComputedStyle(btn).backgroundColor) : null;
+  if(!c || c.a === 0){ ["--vc", "--vc-tint", "--vc-ink"].forEach(p => fr.style.removeProperty(p)); return; }   // ボタンが見つからないときは、元の水色
+  const mix = k => Math.round(c[k] + (255 - c[k]) * 0.82);
+  const lum = (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255;
+  fr.style.setProperty("--vc", `rgb(${c.r}, ${c.g}, ${c.b})`);
+  fr.style.setProperty("--vc-tint", `rgb(${mix("r")}, ${mix("g")}, ${mix("b")})`);
+  fr.style.setProperty("--vc-ink", lum > 0.6 ? "#4A4340" : "#fff");
+}
+window.ctVehicleCardColor = applyVehicleCardColor;
+if($("vehicleScreen")) $("vehicleScreen").addEventListener("click", e => { if(e.target.closest(".mode-switch-btn")) setTimeout(applyVehicleCardColor, 0); });
+
 /* ---------- 車両の走行距離の初期値 ---------- */
 function prevDayKey(key){
   const p = String(key).split("-").map(Number);
@@ -2984,6 +3075,7 @@ if(typeof origRenderVehicleScreen === "function"){
       }
     }catch(e){ /* 初期値を入れられなくても、画面は表示する */ }
     origRenderVehicleScreen();
+    applyVehicleCardColor();
   };
 }
 if($("vehicleDistance")){
@@ -3166,9 +3258,10 @@ document.querySelectorAll(".dial-hint").forEach(el => {
 
 navBtn.addEventListener("click", () => {
   const strong = captureHomeCustomer();         // 訪問の状態を消す前に、ホームの顧客名を控える
+  const fromHome = !!($("reportScreen") && $("reportScreen").classList.contains("active"));
   if(!confirmLeaveVisitIfNeeded()) return;
   currentVisit = null;
-  goToContainer(strong);
+  goToContainer(strong, fromHome);
 });
 
 navData.addEventListener("click", () => {
