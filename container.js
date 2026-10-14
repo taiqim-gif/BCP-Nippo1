@@ -191,7 +191,7 @@ style.textContent = `
   .todo-count{ position:absolute; left:50%; transform:translateX(-50%); font-size:14px; font-weight:700; white-space:nowrap; pointer-events:none; }
   body.kb-pad{ padding-bottom:60vh !important; }     /* 入力中だけ、画面の高さの約6割の余白を下に足す。iPhoneが画面を動かす余地になる */
   header{ overflow:hidden; max-height:240px; transition:max-height .2s ease, padding .2s ease, opacity .2s ease, border-width .2s ease; }
-  header.banner-off{ max-height:0; padding-top:0; padding-bottom:0; opacity:0; border-bottom-width:0; }
+  header.banner-off{ max-height:0; padding-top:0; padding-bottom:0; opacity:0; border-bottom-width:0; transition:none; }     /* 消すときは、すぐ消す(iPhoneが、消えたあとの位置で、見える位置を決められる) */
   .ct-clr{ position:relative; }
   .ct-clr > input{ padding-right:34px !important; }
   .ct-clrbtn{ position:absolute; top:3px; right:4px; width:32px; height:26px; border:none; background:transparent; color:#B9B1A8; font-size:11px; line-height:1; cursor:pointer; padding:0; font-family:inherit; }
@@ -1130,6 +1130,11 @@ function saveFromForm(){
   }
   if(ctGasSel === null){ showToast("ガス種を選んでください"); return; }
   if(!f.gas){ showToast("ガス種を入力してください"); $("ctGasOther").focus(); return; }
+  if(f.capacity === "" && capDefault() !== null && !window.confirm("容量が空です。\nこのまま登録しますか？")){     // 空のまま登録するときは、注意を出す(OKなら、そのまま登録)
+    ctCapSaved = capDefault();
+    $("ctCapacity").focus();
+    return;
+  }
   if(f.capacity !== "" && (!/^\d+(\.\d+)?$/.test(f.capacity) || f.capacity.replace(".", "").length > 5)){ showToast("容量は5桁までの数字で入力してください"); $("ctCapacity").focus(); return; }
 
   const dup = ctLogs.find(l => l.id !== targetId && l.date === f.date && l.status === f.status &&
@@ -3202,7 +3207,22 @@ function attachClear(inp){
     clearTimeout(t);
     t = setTimeout(() => { if(isInput(document.activeElement)) return; hidden = false; hdr.classList.remove("banner-off"); document.body.classList.remove("kb-pad"); }, 300);
   };
-  document.addEventListener("focusin", e => { if(isInput(e.target)) hide(); });
+  // 入力欄が、画面の見える範囲の上で切れたり、キーボードの下に隠れたときだけ、位置を直す(切れていなければ、何もしない)
+  function ensureVisible(el){
+    if(!el || (el.closest && el.closest(".ct-wxsheet"))) return;
+    const box = el.tagName === "TEXTAREA" ? el : (el.closest(".field") || el);
+    const r = box.getBoundingClientRect();
+    const vv = window.visualViewport;
+    const top = vv ? vv.offsetTop : 0, bottom = top + (vv ? vv.height : window.innerHeight);
+    if(r.top < top + 8) window.scrollBy(0, r.top - (top + 60));                // 上で切れている → 見える範囲の上から約60pxの位置へ
+    else if(r.bottom > bottom - 8) window.scrollBy(0, r.bottom - bottom + 24);  // キーボードの下 → キーボードの上へ
+  }
+  window.ctEnsureVisible = ensureVisible;
+  document.addEventListener("focusin", e => {
+    if(!isInput(e.target)) return;
+    hide();
+    if(e.target.tagName !== "SELECT") [450, 900].forEach(ms => setTimeout(() => { if(document.activeElement === e.target) ensureVisible(e.target); }, ms));   // iPhoneの動きが落ち着いたあとで確認
+  });
   document.addEventListener("focusout", e => { if(isInput(e.target)) show(); });
   // iPhoneは、入力欄の外を押しても、カーソルが外れない。何もない所を押したときは、入力を終える
   document.addEventListener("pointerdown", e => {
@@ -3548,6 +3568,21 @@ document.addEventListener("pointerdown", e => { if(!e.target.closest(".ct-combo"
 $("ctCapacity").addEventListener("input", renderAdj);
 $("ctGasOther").addEventListener("input", renderGasSelected);
 $("ctSaveButton").addEventListener("click", () => saveFromForm());
+
+/* 容量：カーソルを合わせると、ガス種の初期値(7など)は消える(入力する手間を減らす)。
+   カーソルを合わせなければ、初期値のまま。入力しないで外れたときは、初期値に戻す。
+   直す記録(変更中)と、自分で変えた値(増減ボタンなど)は、消さない */
+let ctCapSaved = null;
+function capDefault(){ const g = curGas(); return (g && g.cap !== "" && g.cap != null) ? String(g.cap) : null; }
+$("ctCapacity").addEventListener("focus", () => {
+  const def = capDefault();
+  if(ctEditId || def === null) return;
+  if($("ctCapacity").value.trim() === def){ ctCapSaved = def; $("ctCapacity").value = ""; renderGasCollapse(); }
+});
+$("ctCapacity").addEventListener("blur", () => {
+  if(ctCapSaved !== null && $("ctCapacity").value.trim() === ""){ $("ctCapacity").value = ctCapSaved; renderGasCollapse(); }
+  ctCapSaved = null;
+});
 // キーボードの決定キー：容量 →(次へ)→ 記号 →(次へ)→ 番号 →(移動)→ 記録する。記録のあとは、記号欄にカーソルが戻る
 $("ctSymbol").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("ctNumber").focus(); } });
 $("ctNumber").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); saveFromForm(); } });
