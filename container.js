@@ -147,7 +147,6 @@ style.textContent = `
   .wx-r1{ color:#0B7A7A; font-size:15px; font-weight:700; white-space:pre; overflow:hidden; line-height:22px; height:22px; }
   .wx-grid.icons .wx-r1{ font-size:17px; }
   .wx-grid.temp .wx-r1{ font-size:13px; }
-  .wx-grid.pop .wx-r1{ color:#5B4A9E; }
   .wx-pc{ font-size:13px; }
   .wx-r2{ color:#5B4A9E; font-size:11px; font-weight:700; line-height:1.2; }
   .wx-grid.flip .wx-r1{ animation:ctWxFlip .4s ease-out; }
@@ -190,7 +189,8 @@ style.textContent = `
   #homeStartButton{ background:#3F9A5E; color:#fff; }
   .dt-frame.hm2 .todo-list-target > h2{ position:relative; }
   .todo-count{ position:absolute; left:50%; transform:translateX(-50%); font-size:14px; font-weight:700; white-space:nowrap; pointer-events:none; }
-  body.ct-locked{ overflow:hidden; }
+  header{ overflow:hidden; max-height:240px; transition:max-height .2s ease, padding .2s ease, opacity .2s ease, border-width .2s ease; }
+  header.banner-off{ max-height:0; padding-top:0; padding-bottom:0; opacity:0; border-bottom-width:0; }
   .ct-clr{ position:relative; }
   .ct-clr > input{ padding-right:34px !important; }
   .ct-clrbtn{ position:absolute; top:3px; right:4px; width:32px; height:26px; border:none; background:transparent; color:#B9B1A8; font-size:11px; line-height:1; cursor:pointer; padding:0; font-family:inherit; }
@@ -206,6 +206,11 @@ style.textContent = `
   .ct-wxsheet h3{ margin:0 0 8px; font-size:16px; }
   .ct-wxsheet .wx-row{ display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid var(--line); font-size:14px; }
   .ct-wxsheet .wx-row span:first-child{ color:var(--ink-soft); flex:none; }
+  .wx-tbl{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:13px; margin-top:6px; }
+  .wx-tbl th, .wx-tbl td{ border:1px solid var(--line); padding:6px 4px; text-align:center; vertical-align:middle; overflow-wrap:anywhere; }
+  .wx-tbl thead th{ background:#F3EFFC; color:#5B4A9E; }
+  .wx-tbl tbody th{ background:#FAF6EF; color:var(--ink-soft); font-weight:400; width:26%; }
+  .wx-sub{ font-size:12px; color:var(--ink-soft); margin-top:12px; }
   .ct-wxsheet .wx-note{ font-size:11.5px; color:var(--ink-soft); margin-top:8px; }
   .ct-wxsheet .wx-btns{ display:flex; gap:10px; margin-top:12px; }
   .ct-datebox #dateDisplay{ display:block; white-space:nowrap; line-height:1.25; }
@@ -435,6 +440,9 @@ style.textContent = `
   .ct-lbrow .btn-mini{ padding:2px 10px; line-height:1.2; }
 
   .ct-flash{ position:fixed; left:50%; top:40%; transform:translate(-50%,-50%) scale(.9); font-size:64px; font-weight:700; color:var(--mint-ink); background:rgba(255,255,255,0.95); border:3px solid var(--mint-dark); border-radius:24px; padding:14px 44px; z-index:200; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; }
+  .ct-flash{ writing-mode:horizontal-tb; text-align:center; max-width:92vw; }
+  .ct-flash-main{ font-size:64px; line-height:1.1; font-weight:700; white-space:nowrap; }
+  .ct-flash-sub{ font-size:17px; font-weight:700; margin-top:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:84vw; color:var(--ink); }
   .ct-flash.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
 
   /* 顧客の管理 */
@@ -462,6 +470,37 @@ style.textContent = `
   .ct-gasbar-wrap.has-left::before, .ct-gasbar-wrap.has-right::after{ opacity:1; }
 `;
 document.head.appendChild(style);
+const tabColors = document.createElement("style");
+tabColors.id = "tabColors";
+tabColors.textContent = `
+  /* ホーム＝ミントグリーン(ボタンと同じ色)の濃淡 */
+  .dt-frame.hm1{ background:#EEF9F5; border-color:var(--mint-dark); }
+  .dt-frame.hm1 .dt-head{ background:var(--mint); color:var(--mint-ink); }
+  .dt-frame.hm2{ background:#EEF9F5; border-color:#4FAF95; }
+  .dt-frame.hm2 .dt-head, .dt-frame.hm2 .todo-list-target > h2{ background:var(--mint-dark); color:#0B3A2E; }
+  .dt-frame.hm3{ background:#F6FCFA; border-color:#B6E5D6; }
+  .dt-frame.hm3 .dt-head{ background:#C9EFE4; color:var(--mint-ink); }
+  /* 車両＝ピーチの濃淡(車両情報は、出発=ピーチ・帰社=スカイのまま) */
+  .dt-frame.veh2{ background:#FFF3EA; border-color:#EE8A57; }
+  .dt-frame.veh2 .dt-head{ background:var(--peach-dark); color:var(--peach-ink); }
+  .dt-frame.veh3{ background:#FFF9F4; border-color:#F6D2BB; }
+  .dt-frame.veh3 .dt-head{ background:#FFE3D0; color:var(--peach-ink); }
+  /* 容器＝スカイの濃淡 */
+  .dt-frame.ctin{ background:#EDF6FB; border-color:var(--sky-dark); }
+  .dt-frame.ctin .dt-head{ background:var(--sky); color:var(--sky-ink); }
+  .dt-frame.ctlist{ background:#F4FAFD; border-color:#5FAFD6; }
+  .dt-frame.ctlist .dt-head{ background:var(--sky-dark); color:#08384F; }
+  /* データ＝ラベンダーの濃淡(「消す」は、ピンクのまま) */
+  .dt-frame.send{ background:#F3EFFC; border-color:var(--lavender-dark); }
+  .dt-frame.send .dt-head{ background:var(--lavender); color:var(--lavender-ink); }
+  .dt-frame.save{ background:#F3EFFC; border-color:#9A84DD; }
+  .dt-frame.save .dt-head{ background:var(--lavender-dark); color:var(--lavender-ink); }
+  .dt-frame.master{ background:#F8F5FD; border-color:#D6CBF3; }
+  .dt-frame.master .dt-head{ background:#E6DDF9; color:var(--lavender-ink); }
+  .dt-frame.wx{ background:#FAF8FE; border-color:#DDD3F4; }
+  .dt-frame.wx .dt-head{ background:#EFE9FB; color:var(--lavender-ink); }
+`;
+document.head.appendChild(tabColors);
 
 /* =========================================================
    「容器」画面の組み立て
@@ -531,7 +570,7 @@ section.innerHTML = `
       <div class="ct-adj-row" id="ctAdjRow"></div>
     </div>
 
-    <button class="btn btn-lavender" id="ctSaveButton">記録する</button>
+    <button class="btn btn-sky" id="ctSaveButton">記録する</button>
     <button class="btn btn-outline-mint" id="ctCancelEdit" style="display:none;margin-top:8px;">更新をやめる</button>
   </div></section>
 
@@ -563,11 +602,11 @@ flashEl.className = "ct-flash";
 flashEl.id = "ctFlash";
 document.body.appendChild(flashEl);
 let flashTimer = null;
-function flashText(t){
-  flashEl.textContent = t;
+function flashText(t, sub){
+  flashEl.innerHTML = `<div class="ct-flash-main">${escapeHtml(t)}</div>` + (sub ? `<div class="ct-flash-sub">${escapeHtml(sub)}</div>` : "");
   flashEl.classList.add("show");
   clearTimeout(flashTimer);
-  flashTimer = setTimeout(() => flashEl.classList.remove("show"), 800);
+  flashTimer = setTimeout(() => flashEl.classList.remove("show"), 1200);
 }
 
 /* ---------- 部品の描画 ---------- */
@@ -704,7 +743,7 @@ function pickGas(sel){
     ctUnit = OTHER_GAS_UNIT;
     renderModeAndUnit();
     renderGasChips();
-    $("ctGasOther").focus({ preventScroll:true });
+    $("ctGasOther").focus();
     return;
   }
   const g = curGas();
@@ -945,7 +984,7 @@ function showCustomerList(items){
         ctKana = null;
         renderKana();
         showCustomerList(null);
-        $("ctSymbol").focus({ preventScroll:true });
+        $("ctSymbol").focus();
       });
       box.appendChild(b);
     });
@@ -954,10 +993,16 @@ function showCustomerList(items){
   box.scrollTop = 0;
 }
 
+// 「あ〜わ他」のボタンは、顧客名が空のときだけ出す(入力されたら隠し、(X)で全部消すと、また出す)
+function syncCtKana(){
+  const area = $("ctKanaArea");
+  if(!area) return;
+  area.style.display = (hasMaster() && !$("ctCustomer").value.trim()) ? "block" : "none";
+}
 function renderKana(){
   const area = $("ctKanaArea");
   if(!hasMaster()){ area.style.display = "none"; return; }
-  area.style.display = "block";
+  area.style.display = $("ctCustomer").value.trim() ? "none" : "block";
 
   const grid = $("ctKanaGrid");
   grid.innerHTML = "";
@@ -981,6 +1026,7 @@ function renderKana(){
 
 // 文字を打つと候補が出る(客先名リストがあるときだけ)
 $("ctCustomer").addEventListener("input", () => {
+  syncCtKana();
   ctAutoCust = "";
   const v = $("ctCustomer").value.trim();
   if(ctPicked && ctPicked.name !== v) ctPicked = null;
@@ -1029,26 +1075,26 @@ function saveFromForm(){
   const targetId = ctEditId;                      // 変更中ならその記録を更新、そうでなければ新しい記録
 
   if(!f.date){ showToast("日付を入力してください"); return; }
-  if(!f.customer){ showToast("顧客名を入力してください"); $("ctCustomer").focus({ preventScroll:true }); return; }
-  if(!/^[A-Z0-9]+$/.test(f.symbol)){ showToast("記号は半角の英数字で入力してください"); $("ctSymbol").focus({ preventScroll:true }); return; }
+  if(!f.customer){ showToast("顧客名を入力してください"); $("ctCustomer").focus(); return; }
+  if(!/^[A-Z0-9]+$/.test(f.symbol)){ showToast("記号は半角の英数字で入力してください"); $("ctSymbol").focus(); return; }
   if(!/^[0-9]+$/.test(f.number)){
     // 番号は数字のみ。英字が入っているときは、本当に英字かを確認してから入力できる
     const letters = f.number.match(/[A-Z]/g);
     if(letters && /^[A-Z0-9]+$/.test(f.number)){
       const list = [...new Set(letters)].join("");
       if(!window.confirm(`番号に英字入力しますか？\n(入力された英字：${list})`)){
-        $("ctNumber").focus({ preventScroll:true });
+        $("ctNumber").focus();
         return;
       }
     }else{
       showToast("番号は半角の数字で入力してください(英字は確認のうえ入力できます)");
-      $("ctNumber").focus({ preventScroll:true });
+      $("ctNumber").focus();
       return;
     }
   }
   if(ctGasSel === null){ showToast("ガス種を選んでください"); return; }
-  if(!f.gas){ showToast("ガス種を入力してください"); $("ctGasOther").focus({ preventScroll:true }); return; }
-  if(f.capacity !== "" && (!/^\d+(\.\d+)?$/.test(f.capacity) || f.capacity.replace(".", "").length > 5)){ showToast("容量は5桁までの数字で入力してください"); $("ctCapacity").focus({ preventScroll:true }); return; }
+  if(!f.gas){ showToast("ガス種を入力してください"); $("ctGasOther").focus(); return; }
+  if(f.capacity !== "" && (!/^\d+(\.\d+)?$/.test(f.capacity) || f.capacity.replace(".", "").length > 5)){ showToast("容量は5桁までの数字で入力してください"); $("ctCapacity").focus(); return; }
 
   const dup = ctLogs.find(l => l.id !== targetId && l.date === f.date && l.status === f.status &&
                                l.symbol === f.symbol && l.number === f.number);
@@ -1078,7 +1124,7 @@ function saveFromForm(){
   }
   ctSave();
   trackCustomer(f.customer);
-  flashText(wasEditing ? "更新" : "登録");
+  flashText(wasEditing ? "更新" : "登録", [f.customer, f.gas, f.capacity !== "" ? `${f.capacity}${f.unit ? " " + f.unit : ""}` : ""].filter(Boolean).join("　"));
 
   // 記号・番号は、記録のたびに空白(初期状態)へ戻す。区分・顧客・ガス種・容量は残す
   $("ctSymbol").value = "";
@@ -1090,7 +1136,7 @@ function saveFromForm(){
   }
   updateFormMode();
   renderList();
-  $("ctSymbol").focus({ preventScroll:true });
+  $("ctSymbol").focus();
 }
 
 function startEdit(id){
@@ -1140,7 +1186,7 @@ function startAddTo(name, date){
   showCustomerList(null);
   updateFormMode();
   window.scrollTo({ top:0, behavior:"auto" });
-  $("ctSymbol").focus({ preventScroll:true });
+  $("ctSymbol").focus();
   showToast(`「${name}」に追加します`);
 }
 
@@ -1498,9 +1544,9 @@ async function mailAllCsv(){
     visits.map(l => [l.date, l.number, l.customerCode, l.target, formatTimeOnly(l.startTime), formatTimeOnly(l.endTime), l.attendee, l.attendeeTitle, l.content, l.notes,
       posText(l.startLat, l.startLng, l.startLocation), posText(l.endLat, l.endLng, l.endLocation)])) });
   if(vdays.length) files.push({ name:`車両_${ymd}.csv`, content:csvRows(
-    ["日付","出発時刻","出発距離","帰社時刻","帰社距離","給油量","出発位置","帰社位置","天気","最高","最低"],
+    ["日付","出発時刻","出発距離","帰社時刻","帰社距離","給油量","出発位置","帰社位置","天気"],
     vdays.map(k => { const v = dailyVehicleInfo[k], d = v.departure || {}, r = v.return || {}, w = wx[k] || {};
-      return [k, formatTimeOnly(d.time), d.distance, formatTimeOnly(r.time), r.distance, r.fuel, posText(d.lat, d.lng, d.location), posText(r.lat, r.lng, r.location), w.text, w.max, w.min]; })) });
+      return [k, formatTimeOnly(d.time), d.distance, formatTimeOnly(r.time), r.distance, r.fuel, posText(d.lat, d.lng, d.location), posText(r.lat, r.lng, r.location), wxFirstWord(w.text)]; })) });
   if(todos.length) files.push({ name:`ToDo_${ymd}.csv`, content:csvRows(
     ["状態","日付","顧客名","内容","対応日"],
     todos.map(t => [t.done ? "済" : "未対応", formatMonthDay(t.date), t.target, t.content, t.done ? formatCompletedDay(t.completedAt) : ""])) });
@@ -1582,7 +1628,7 @@ if(typeof origBuildReportMail === "function"){
         let wxLine = "";
         try{
           const w = (JSON.parse(localStorage.getItem(WX_DAILY_KEY) || "{}") || {})[k];
-          if(w && w.text) wxLine = `\n天気：${w.text}${w.max != null ? "　最高" + w.max : ""}${w.min != null ? "　最低" + w.min : ""}`;
+          if(w && w.text) wxLine = `\n天気：${wxFirstWord(w.text)}`;
         }catch(e){ wxLine = ""; }
         return `\n出発位置：${posText(d.lat, d.lng, d.location)}\n帰社位置：${posText(rt.lat, rt.lng, rt.location)}${wxLine}`;
       });
@@ -1863,6 +1909,7 @@ function wxNearest(lat, lng){
   WX_AREAS.forEach(a => { const d = wxDist(lat, lng, a.lat, a.lng); if(d < bd){ bd = d; best = a; } });
   return bd <= 3.0 ? best : null;              // 北海道から離れすぎているときは出さない
 }
+const wxFirstWord = t => String(t || "").trim().split(/[\s\u3000]+/)[0] || "";
 const wxClean = t => String(t || "").replace(/[\u3000\s]+/g, " ").trim();
 const wxJstDate = ms => new Date(ms + 9 * 3600 * 1000).toISOString().slice(0, 10);
 
@@ -2014,7 +2061,7 @@ function wxCols(){
 function wxCellText(c, mode){
   if(mode === 0) return c.icons || "--";
   if(mode === 1) return c.pop != null ? c.pop + "%" : "--";
-  return `${c.max != null ? c.max : "--"} / ${c.min != null ? c.min : "--"}`;
+  return `${c.max != null ? c.max : "--"}/${c.min != null ? c.min : "--"}`;
 }
 let wxMode = 0;                                   // 0=アイコン 1=降水確率 2=気温
 function wxView(){
@@ -2089,8 +2136,7 @@ function wxRecordDaily(d){
     const day = getToday();
     const all = JSON.parse(localStorage.getItem(WX_DAILY_KEY) || "{}");
     if(all[day]) return;                          // その日の最初に取れたものを残す
-    const tm = wxTemps(d, Date.now());
-    all[day] = { text: d.weathers[0] || "", max: tm.max != null ? tm.max : null, min: tm.min != null ? tm.min : null, area: d.areaName, at: d.fetchedAt };
+    all[day] = { text: wxFirstWord(d.weathers[0]) };            // 保存するのは、予報の最初の言葉だけ(くもり・雨など)
     localStorage.setItem(WX_DAILY_KEY, JSON.stringify(all));
   }catch(e){ /* 記録できなくても、表示は続ける */ }
 }
@@ -2138,20 +2184,18 @@ document.body.appendChild(wxSheet);
 function wxShowSheet(){
   const d = wxLoad();
   if(!d){ return; }
-  const now = Date.now(), days = wxDays(d, now), p = wxPops(d, now), tm = days[0];
+  const now = Date.now(), days = wxDays(d, now), p = wxPops(d, now);
   const hm = iso => { const x = new Date(iso); return isNaN(x.getTime()) ? "" : `${x.getMonth() + 1}/${x.getDate()} ${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`; };
-  const row = (a, b) => `<div class="wx-row"><span>${escapeHtml(a)}</span><span>${escapeHtml(b)}</span></div>`;
   const nn = v => v != null ? v : "--";
-  const sub = day => `最高 ${nn(day.max)}℃　最低 ${nn(day.min)}℃　降水 ${day.pop != null ? day.pop + "%" : "--"}`;
-  const later = wxLater(d, now, days);
-  wxSheet.innerHTML = `<h3>天気(気象庁) ${escapeHtml(d.areaName)}</h3>` +
-    row("今日", days[0].text || "") +
-    row("気温", `最高 ${nn(tm.max)}℃　最低 ${nn(tm.min)}℃${d.tempName ? "(" + d.tempName + ")" : ""}`) +
-    row("降水確率", p.length ? p.map(x => `${x.label} ${x.v}%`).join("　") : "--") +
-    row("この後", later ? `${later.disp.replace("この後 ", "")}　${later.text}　${later.pop}%` : "--") +
-    row("明日", `${days[1].text || "--"}　${sub(days[1])}`) +
-    row("明後日", `${days[2].text || "--"}　${sub(days[2])}`) +
-    `<div class="wx-note">発表 ${escapeHtml(hm(d.report))}　取得 ${escapeHtml(hm(d.fetchedAt))}　出典: 気象庁ホームページ(予報区ごとの予報で、地点の天気とは異なる場合があります。明後日は週間予報から補うため、天気は短い言葉です)</div>` +
+  const popOf = day => (day.popsNow && day.popsNow[0]) ? day.popsNow[0].v + "%" : (day.pop != null ? day.pop + "%" : "--");
+  const tr = (label, f) => `<tr><th>${escapeHtml(label)}</th>${days.map(day => `<td>${escapeHtml(f(day))}</td>`).join("")}</tr>`;
+  const table1 = `<table class="wx-tbl"><thead><tr><th></th>${days.map(day => `<th>${escapeHtml(wxDayLabel(day.key))}</th>`).join("")}</tr></thead><tbody>` +
+    tr("天気", day => day.text || "--") + tr("最高(℃)", day => nn(day.max)) + tr("最低(℃)", day => nn(day.min)) + tr("降水確率", popOf) + `</tbody></table>`;
+  const table2 = p.length
+    ? `<div class="wx-sub">${escapeHtml(wxDayLabel(days[0].key))} 6時間ごとの降水確率</div><table class="wx-tbl"><thead><tr>${p.map(x => `<th>${escapeHtml(x.label)}</th>`).join("")}</tr></thead><tbody><tr>${p.map(x => `<td>${escapeHtml(x.v === "" || x.v == null ? "--" : x.v + "%")}</td>`).join("")}</tr></tbody></table>`
+    : "";
+  wxSheet.innerHTML = `<h3>天気(気象庁) ${escapeHtml(d.areaName)}</h3>` + table1 + table2 +
+    `<div class="wx-note">発表 ${escapeHtml(hm(d.report))}　取得 ${escapeHtml(hm(d.fetchedAt))}　出典: 気象庁ホームページ(予報区ごとの予報で、地点の天気とは異なる場合があります。週間予報から補う日は、天気が短い言葉になります)</div>` +
     `<div class="wx-btns"><button type="button" class="btn btn-outline-mint" id="wxRefresh">更新</button><button type="button" class="btn btn-mint" id="wxClose">閉じる</button></div>`;
   wxSheet.hidden = false;
 }
@@ -3086,7 +3130,7 @@ function attachClear(inp){
   b.setAttribute("aria-label", "全消去");
   b.hidden = true;
   wrap.appendChild(b);
-  const sync = () => { b.hidden = !inp.value || inp.disabled; };
+  const sync = () => { b.hidden = !inp.value || inp.disabled; if(inp.id === "ctCustomer" && typeof syncCtKana === "function") syncCtKana(); };
   [["value"], ["disabled"]].forEach(([prop]) => {   // 画面の外から値を入れても(候補の選択・入力後のリセットなど)、ボタンの表示を合わせる
     const pd = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, prop);
     if(pd && pd.get && pd.set) Object.defineProperty(inp, prop, { configurable:true, get(){ return pd.get.call(inp); }, set(v){ pd.set.call(inp, v); sync(); } });
@@ -3104,26 +3148,31 @@ function attachClear(inp){
 }
 ["homeVisitTarget", "visitTarget", "ctCustomer", "ctSearch", "cmSearch", "cmAddName"].forEach(id => attachClear($(id)));
 
-/* ---------- 容器ログの入力中は、画面を動かさない ----------
-   アプリからの自動の画面移動はしない。iPhoneがキーボードに合わせて画面を動かしたときは、すぐ元の位置に戻す */
-(function ctScrollLock(){
-  const scr = $("containerScreen");
-  if(!scr) return;
-  let lockY = null, active = false, t = null;
-  const isField = el => !!(el && el.closest && el.closest("#containerScreen .dt-frame.ctin") && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName));
-  const back = () => { if(active && lockY !== null && Math.abs((window.scrollY || 0) - lockY) > 1) window.scrollTo(0, lockY); };
-  scr.addEventListener("focusin", e => {
-    if(!isField(e.target)) return;
+/* ---------- 入力中は基本バナーを隠し、入力を終えたら出す ----------
+   入力欄にカーソルが入ったら隠す。外れて約0.3秒たったら戻す(欄から欄へ移るときは、出し入れしない) */
+(function bannerHide(){
+  const hdr = document.querySelector("header");
+  if(!hdr) return;
+  let hidden = false, t = null;
+  const isInput = el => !!(el && el.tagName && (
+    (el.tagName === "INPUT" && !["checkbox", "radio", "button", "submit", "file", "range"].includes((el.type || "").toLowerCase())) ||
+    el.tagName === "TEXTAREA" || el.tagName === "SELECT"));
+  const hide = () => { clearTimeout(t); if(!hidden){ hidden = true; hdr.classList.add("banner-off"); } };
+  const show = () => {
     clearTimeout(t);
-    if(!active){ active = true; lockY = window.scrollY || 0; document.body.classList.add("ct-locked"); }
-    [0, 60, 200, 450, 800].forEach(ms => setTimeout(back, ms));       // iPhoneの自動移動が終わるまで、何度か戻す
+    t = setTimeout(() => { if(isInput(document.activeElement)) return; hidden = false; hdr.classList.remove("banner-off"); }, 300);
+  };
+  document.addEventListener("focusin", e => { if(isInput(e.target)) hide(); });
+  document.addEventListener("focusout", e => { if(isInput(e.target)) show(); });
+  // iPhoneは、入力欄の外を押しても、カーソルが外れない。何もない所を押したときは、入力を終える
+  document.addEventListener("pointerdown", e => {
+    const a = document.activeElement;
+    if(!isInput(a)) return;
+    if(e.target.closest("button, a, label, input, select, textarea, .customer-list, .honorific-dropdown, .ct-seg, .kana-grid, .ct-clr, .ct-wxsheet, [role=button]")) return;
+    a.blur();
   });
-  scr.addEventListener("focusout", () => {
-    clearTimeout(t);
-    t = setTimeout(() => { if(!isField(document.activeElement)){ active = false; lockY = null; document.body.classList.remove("ct-locked"); } }, 300);
-  });
-  window.addEventListener("scroll", back, { passive:true });
-  if(window.visualViewport){ ["scroll", "resize"].forEach(ev => window.visualViewport.addEventListener(ev, back)); }
+  // 画面が切り替わって、入力欄が見えなくなったときの保険
+  setInterval(() => { if(hidden && !isInput(document.activeElement)) show(); }, 500);
 })();
 
 /* ---------- 画面の左右の端のなぞりで、隣のタブへ(ホーム → 車両 → 容器 → データ) ---------- */
@@ -3152,8 +3201,10 @@ function attachClear(inp){
     let j = null;
     if(s0.side === "L" && dx > 0) j = i - 1;                                    // 左の端から右へ → 前のタブ
     else if(s0.side === "R" && dx < 0) j = i + 1;                               // 右の端から左へ → 次のタブ
-    if(j === null || j < 0 || j >= TABS.length) return;
+    if(j === null) return;
+    j = (j + TABS.length) % TABS.length;                                        // ホームの左端 → データ、データの右端 → ホーム
     const b = $(TABS[j][1]);
+    if(document.activeElement && document.activeElement.blur) document.activeElement.blur();   // 入力を終える(基本バナーが戻る)
     if(b) b.click();                                                            // タブを押したときと同じ(訪問中の確認も出る)
   }, { passive:true });
 })();
