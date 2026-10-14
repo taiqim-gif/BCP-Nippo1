@@ -553,6 +553,18 @@ section.innerHTML = `
       <input type="text" id="ctGasOther" placeholder="ガス種を入力" style="margin-top:8px;display:none;" autocomplete="off">
     </div>
 
+    <div class="field">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <input type="text" id="ctCapacity" enterkeyhint="next" inputmode="decimal" maxlength="5" placeholder="容量" aria-label="容量(最大5桁)" autocomplete="off" style="width:7em;flex:none;text-align:right;">
+        <div class="ct-seg" id="ctUnitSeg" style="flex:none;width:140px;"></div>
+      </div>
+    </div>
+
+    <div class="field" id="ctAdjField" style="display:none;">
+      <label id="ctAdjLabel">容量の増減</label>
+      <div class="ct-adj-row" id="ctAdjRow"></div>
+    </div>
+
     <div class="row-gap" style="margin-top:6px;">
       <div class="field" style="flex:1;">
         <div class="ct-lbrow"><label for="ctSymbol">記号(英数字)</label></div>
@@ -562,18 +574,6 @@ section.innerHTML = `
         <div class="ct-lbrow"><label for="ctNumber">番号(数字)</label><button type="button" class="btn-mini" id="ctNumKb" aria-label="キーボードの切り替え">ABC</button></div>
         <input type="text" id="ctNumber" enterkeyhint="go" inputmode="numeric" autocomplete="off" placeholder="例：12345">
       </div>
-    </div>
-
-    <div class="field">
-      <div style="display:flex;gap:10px;align-items:center;">
-        <input type="text" id="ctCapacity" enterkeyhint="done" inputmode="decimal" maxlength="5" placeholder="容量" aria-label="容量(最大5桁)" autocomplete="off" style="width:7em;flex:none;text-align:right;">
-        <div class="ct-seg" id="ctUnitSeg" style="flex:none;width:140px;"></div>
-      </div>
-    </div>
-
-    <div class="field" id="ctAdjField" style="display:none;">
-      <label id="ctAdjLabel">容量の増減</label>
-      <div class="ct-adj-row" id="ctAdjRow"></div>
     </div>
 
     <button class="btn btn-sky" id="ctSaveButton">記録する</button>
@@ -1019,7 +1019,8 @@ function showCustomerList(items){
         ctKana = null;
         renderKana();
         showCustomerList(null);
-        $("ctSymbol").focus();
+        $("ctCustomer").blur();                                                   // キーボードを閉じる。次は、ガス種を選ぶ
+        if(ctGasSel !== null && ctGasSel !== "other") $("ctSymbol").focus();      // ガス種が選んである(続けての入力)ときだけ、記号へ
       });
       box.appendChild(b);
     });
@@ -3547,10 +3548,10 @@ document.addEventListener("pointerdown", e => { if(!e.target.closest(".ct-combo"
 $("ctCapacity").addEventListener("input", renderAdj);
 $("ctGasOther").addEventListener("input", renderGasSelected);
 $("ctSaveButton").addEventListener("click", () => saveFromForm());
-// キーボードの決定キー：記号 →(次へ)→ 番号 →(移動)→ 記録する。記録のあとは、記号欄にカーソルが戻る
+// キーボードの決定キー：容量 →(次へ)→ 記号 →(次へ)→ 番号 →(移動)→ 記録する。記録のあとは、記号欄にカーソルが戻る
 $("ctSymbol").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("ctNumber").focus(); } });
 $("ctNumber").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); saveFromForm(); } });
-$("ctCapacity").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("ctCapacity").blur(); } });
+$("ctCapacity").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("ctSymbol").focus(); } });
 
 /* 記号・番号・容量は、入力しながら(確定時にも)半角に直す：全角→半角、小文字→大文字 */
 function liveNormalize(el, fn){
