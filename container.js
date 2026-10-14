@@ -190,8 +190,21 @@ style.textContent = `
   .dt-frame.hm2 .todo-list-target > h2{ position:relative; }
   .todo-count{ position:absolute; left:50%; transform:translateX(-50%); font-size:14px; font-weight:700; white-space:nowrap; pointer-events:none; }
   body.kb-pad{ padding-bottom:60vh !important; }     /* 入力中だけ、画面の高さの約6割の余白を下に足す。iPhoneが画面を動かす余地になる */
-  header{ overflow:hidden; max-height:240px; transition:max-height .2s ease, padding .2s ease, opacity .2s ease, border-width .2s ease; }
+  header{ overflow:hidden; max-height:240px; transition:opacity .15s ease; }
   header.banner-off{ max-height:0; padding-top:0; padding-bottom:0; opacity:0; border-bottom-width:0; transition:none; }     /* 消すときは、すぐ消す(iPhoneが、消えたあとの位置で、見える位置を決められる) */
+  .ct-confirm{ position:sticky; top:0; z-index:9; padding:6px 12px 7px; border-bottom:2px solid var(--line); }
+  .ct-confirm[hidden]{ display:none; }
+  .cb-out{ background:var(--sky); color:var(--sky-ink); }
+  .cb-in{ background:var(--peach); color:var(--peach-ink); }
+  .cb-oth{ background:var(--lavender); color:var(--lavender-ink); }
+  .cb-l1{ display:flex; align-items:center; gap:8px; min-width:0; }
+  .cb-st{ font-weight:700; font-size:15px; background:rgba(255,255,255,0.65); padding:1px 10px; border-radius:999px; white-space:nowrap; }
+  .cb-cust{ font-size:16px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .cb-l2{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-top:3px; }
+  .cb-gas{ font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .cb-no{ font-size:18px; font-weight:700; white-space:nowrap; }
+  .cb-miss, .cb-date{ color:#C0392B; font-weight:700; }
+  .cb-date{ font-size:14px; white-space:nowrap; }
   .ct-clr{ position:relative; }
   .ct-clr > input{ padding-right:34px !important; }
   .ct-clrbtn{ position:absolute; top:3px; right:4px; width:32px; height:26px; border:none; background:transparent; color:#B9B1A8; font-size:11px; line-height:1; cursor:pointer; padding:0; font-family:inherit; }
@@ -323,6 +336,22 @@ style.textContent = `
 
   .ct-swrap{ position:relative; overflow:hidden; border-top:1px solid var(--line); }
   .ct-swrap > .ct-row{ border-top:0; position:relative; background:var(--card); touch-action:pan-y; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+  .ct-head-hint{ font-size:var(--fs-hint,13px); color:var(--ink-soft); text-align:center; padding:2px 0 6px; }
+  .ct-hh{ display:inline-flex; align-items:center; gap:26px; }
+  .ct-hh-l, .ct-hh-r{ display:inline-flex; align-items:center; gap:6px; }
+  .ct-hh .word{ font-weight:700; }
+  .ct-hh-l .word{ color:var(--pink-ink); }
+  .ct-hh-r .word{ color:var(--mint-ink); }
+  .ct-hh .arrow{ font-size:1.5em; font-weight:900; line-height:1; -webkit-text-stroke:1px currentColor; animation:ctBlink 1s ease-in-out infinite; }
+  .ct-hh-l .arrow{ color:#D6336C; }
+  .ct-hh-r .arrow{ color:#128F5A; }
+  @media (prefers-reduced-motion: reduce){ .ct-hh .arrow{ animation:none; } }
+  .ct-hwrap{ position:relative; overflow:hidden; margin-bottom:2px; }
+  .ct-hbg{ position:absolute; inset:0; display:flex; font-size:var(--fs-swipe,15px); font-weight:700; }
+  .ct-h-edit, .ct-h-del{ flex:1; display:flex; align-items:center; padding:0 14px; white-space:nowrap; }
+  .ct-h-edit{ background:var(--mint); color:var(--mint-ink); justify-content:flex-start; }
+  .ct-h-del{ background:var(--pink); color:var(--pink-ink); justify-content:flex-end; }
+  .ct-hwrap > .ct-cust-head{ position:relative; background:var(--card); touch-action:pan-y; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; margin-bottom:0; padding:4px 0; }
   .ct-swbg{ position:absolute; inset:0; display:flex; font-size:var(--fs-swipe,15px); font-weight:700; }
   .ct-sw-edit, .ct-sw-del{ flex:1; display:flex; align-items:center; padding:0 18px; }
   .ct-sw-edit{ background:var(--sky); color:var(--sky-ink); justify-content:flex-start; }
@@ -386,8 +415,9 @@ style.textContent = `
   .ct-gascol{ flex:1; min-width:0; }
   .ct-gashead{ display:flex; justify-content:space-between; align-items:center; height:20px; margin-bottom:4px; }
   .ct-gashead label{ margin:0; }
-  .ct-gashead.collapsed{ height:auto; min-height:34px; }
-  .ct-gassum{ flex:1; min-width:0; display:flex; align-items:center; gap:10px; margin:0 8px; }
+  .ct-gashead.collapsed{ height:auto; min-height:42px; }
+  .ct-gassum{ flex:1; min-width:0; display:flex; align-items:center; gap:10px; margin:0 8px; min-height:42px; cursor:pointer; }
+  .ct-gassum-arrow{ font-size:12px; color:var(--ink-soft); flex:none; }
   .ct-gassum-chip{ padding:6px 14px; border-radius:999px; font-weight:700; font-size:14px; white-space:nowrap; }
   .ct-gassum-cap{ flex:1; min-width:0; font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ct-gasdir{ display:flex; gap:14px; font-size:17px; font-weight:900; line-height:1; color:var(--lavender-ink); margin-right:42px; }
@@ -479,6 +509,25 @@ document.head.appendChild(style);
 const tabColors = document.createElement("style");
 tabColors.id = "tabColors";
 tabColors.textContent = `
+  /* 容器：区分に合わせて、全体の基本色を替える(出庫=水色は上の既定。空受=ピーチ、他の区分=ラベンダー) */
+  #containerScreen[data-sc="in"] .dt-frame.ctin{ background:#FFF3EA; border-color:var(--peach-dark); }
+  #containerScreen[data-sc="in"] .dt-frame.ctin .dt-head{ background:var(--peach); color:var(--peach-ink); }
+  #containerScreen[data-sc="in"] .dt-frame.ctlist{ background:#FFF9F4; border-color:#EE8A57; }
+  #containerScreen[data-sc="in"] .dt-frame.ctlist .dt-head{ background:var(--peach-dark); color:var(--peach-ink); }
+  #containerScreen[data-sc="in"] #ctSaveButton{ background:var(--peach); color:var(--peach-ink); }
+  #containerScreen[data-sc="oth"] .dt-frame.ctin{ background:#F3EFFC; border-color:var(--lavender-dark); }
+  #containerScreen[data-sc="oth"] .dt-frame.ctin .dt-head{ background:var(--lavender); color:var(--lavender-ink); }
+  #containerScreen[data-sc="oth"] .dt-frame.ctlist{ background:#F8F5FD; border-color:#9A84DD; }
+  #containerScreen[data-sc="oth"] .dt-frame.ctlist .dt-head{ background:var(--lavender-dark); color:var(--lavender-ink); }
+  #containerScreen[data-sc="oth"] #ctSaveButton{ background:var(--lavender); color:var(--lavender-ink); }
+  .ct-flash[data-sc="in"]{ color:var(--peach-ink); border-color:var(--peach-dark); }
+  .ct-flash[data-sc="oth"]{ color:var(--lavender-ink); border-color:var(--lavender-dark); }
+  /* 容器の入力のカードを低くする(キーボードが出ても、収まりやすいように) */
+  #containerScreen .dt-frame.ctin input[type=text], #containerScreen .dt-frame.ctin input[type=date], #containerScreen .dt-frame.ctin select{ padding-top:8px; padding-bottom:8px; }
+  #containerScreen .dt-frame.ctin .field{ margin-bottom:8px; }
+  #containerScreen .dt-frame.ctin .ct-lbrow{ margin-bottom:2px; }
+  #containerScreen .dt-frame.ctin .btn{ padding:11px; }
+  #containerScreen .dt-frame.ctin .dt-body{ padding:6px 8px 2px; }
   /* ホーム＝ミントグリーン(ボタンと同じ色)の濃淡 */
   .dt-frame.hm1{ background:#EEF9F5; border-color:var(--mint-dark); }
   .dt-frame.hm1 .dt-head{ background:var(--mint); color:var(--mint-ink); }
@@ -543,7 +592,7 @@ section.innerHTML = `
     <div class="customer-list" id="ctCustomerList" style="display:none;"></div>
 
     <div class="field">
-      <div class="ct-gashead" id="ctGasHead"><label>ガス種</label><span class="ct-gassum" id="ctGasSum" style="display:none;"><span class="ct-gassum-chip" id="ctGasSumChip"></span><span class="ct-gassum-cap" id="ctGasSumCap"></span><button type="button" class="btn-mini" id="ctGasChange">変更</button></span><span class="ct-gasdir" aria-hidden="true"><span id="ctGasL">←</span><span id="ctGasR">→</span></span></div>
+      <div class="ct-gashead" id="ctGasHead"><label>ガス種</label><span class="ct-gassum" id="ctGasSum" role="button" tabindex="0" aria-label="ガス種を選び直す" style="display:none;"><span class="ct-gassum-chip" id="ctGasSumChip"></span><span class="ct-gassum-cap" id="ctGasSumCap"></span><span class="ct-gassum-arrow" aria-hidden="true">▼</span></span><span class="ct-gasdir" aria-hidden="true"><span id="ctGasL">←</span><span id="ctGasR">→</span></span></div>
       <div class="ct-gas-area" id="ctGasArea">
         <div class="ct-gascol">
           <div class="ct-gasbar-wrap" id="ctGasWrap"><div class="ct-chip-row ct-gasbar" id="ctGasChips"></div></div>
@@ -608,7 +657,8 @@ flashEl.className = "ct-flash";
 flashEl.id = "ctFlash";
 document.body.appendChild(flashEl);
 let flashTimer = null;
-function flashText(t, cust, gas){
+function flashText(t, cust, gas, scls){
+  flashEl.setAttribute("data-sc", scls || "out");
   flashEl.innerHTML = `<div class="ct-flash-main">${escapeHtml(t)}</div>` + (cust ? `<div class="ct-flash-cust">${escapeHtml(cust)}</div>` : "") + (gas ? `<div class="ct-flash-gas">${escapeHtml(gas)}</div>` : "");
   flashEl.classList.add("show");
   clearTimeout(flashTimer);
@@ -644,6 +694,8 @@ function renderStatus(){
   const inSelect = !STATUS_BUTTONS.includes(ctStatus);
   sel.value = inSelect ? String(ctStatus) : "";
   sel.classList.toggle("sel-on", inSelect);
+  $("containerScreen").setAttribute("data-sc", ctStatus === 2 ? "out" : (ctStatus === 3 ? "in" : "oth"));   // 出庫=水色・空受=ピーチ・他の区分=ラベンダー
+  if(typeof window.ctRenderBar === "function") window.ctRenderBar();
 }
 
 function renderModeAndUnit(){
@@ -722,7 +774,8 @@ function renderGasCollapse(){
     updateGasShadows();
   }
 }
-$("ctGasChange").addEventListener("click", () => { ctGasExpanded = true; renderGasCollapse(); });
+$("ctGasSum").addEventListener("click", () => { ctGasExpanded = true; renderGasCollapse(); });          // 1行のどこを押しても、ガス種の一覧が開く
+$("ctGasSum").addEventListener("keydown", e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); ctGasExpanded = true; renderGasCollapse(); } });
 $("ctCapacity").addEventListener("input", renderGasCollapse);
 
 // バーの左右に、続きがあることを示す薄い影を出す
@@ -1169,7 +1222,8 @@ function saveFromForm(){
   const gname = nfkc(f.gas || "");
   const glabel = fg && fg.label && fg.label !== gname ? fg.label : "";
   flashText(wasEditing ? "更新" : "登録", f.customer,
-    [gname, glabel, f.capacity !== "" ? `${f.capacity}${f.unit ? " " + f.unit : ""}` : ""].filter(Boolean).join("　"));   // 1行目=顧客名(2行まで)、2行目=ガス種・容量・単位
+    [gname, glabel, f.capacity !== "" ? `${f.capacity}${f.unit ? " " + f.unit : ""}` : ""].filter(Boolean).join("　"),   // 1行目=顧客名(2行まで)、2行目=ガス種・容量・単位
+    f.status === 2 ? "out" : (f.status === 3 ? "in" : "oth"));
 
   // 記号・番号は、記録のたびに空白(初期状態)へ戻す。区分・顧客・ガス種・容量は残す
   $("ctSymbol").value = "";
@@ -1381,8 +1435,13 @@ function renderList(){
 
       const badgeW = Math.ceil(Math.max(...Object.keys(byStatus).map(sc => emW(statusName(Number(sc)))), 2) * FS[ctFs].badge + 24);
       card.style.setProperty("--sumw", badgeW + "px");
-      let html = `<div class="ct-cust-head"><span class="ct-cust-name">${escapeHtml(c.name || "(顧客名なし)")}</span>` +
-                 `<span class="ct-cust-sum">合計 ${rows.length}本</span></div>`;
+      const headInner = `<div class="ct-cust-head"><span class="ct-cust-name">${escapeHtml(c.name || "(顧客名なし)")}</span>` +
+                        `<span class="ct-cust-sum">合計 ${rows.length}本</span></div>`;
+      // 明細を開いているときだけ、客先名の行をスライドできる(左=そのカードの全件削除、右=客名・日付だけ変更)
+      let html = open
+        ? `<div class="ct-hwrap" data-ckey="${encodeURIComponent(ckey)}"><div class="ct-hbg"><span class="ct-h-edit">客名・日付を変更</span><span class="ct-h-del">全件削除</span></div>${headInner}</div>` +
+          `<div class="ct-head-hint"><span class="ct-hh"><span class="ct-hh-l"><span class="arrow">←</span><span class="word">全件削除</span></span><span class="ct-hh-r"><span class="word">客名・日付を変更</span><span class="arrow">→</span></span></span></div>`
+        : headInner;
       Object.keys(byStatus).map(Number).sort((x, y) => order(x) - order(y)).forEach(sc => {
         const cls = sc === 2 ? "out" : (sc === 3 ? "in" : "oth");
         const parts = byStatus[sc]
@@ -1463,6 +1522,109 @@ function deleteLog(id){
   renderList();
   showToast("削除しました");
 }
+
+/* 客先名の行のスライド(明細を開いたカードだけ)：左へ＝そのカードの全件削除(確認あり)、右へ＝客名と日付だけ変更(容器の内容は、そのまま) */
+function cardLogs(ckey){
+  const i = ckey.indexOf("|");
+  const date = ckey.slice(0, i), name = ckey.slice(i + 1);
+  return { date, name, logs: ctLogs.filter(l => l.date === date && (l.customer || "") === name) };
+}
+function mdOf(date){ const m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(date || ""); return m ? `${Number(m[2])}/${Number(m[3])}` : (date || ""); }
+function deleteCard(ckey){
+  const { date, name, logs } = cardLogs(ckey);
+  if(logs.length === 0) return;
+  if(!window.confirm(`${name || "(顧客名なし)"}(${mdOf(date)})の${logs.length}件を、すべて削除します。\n\n戻せません。削除しますか？`)) return;
+  const ids = new Set(logs.map(l => l.id));
+  ctLogs = ctLogs.filter(l => !ids.has(l.id));
+  if(ctEditId && ids.has(ctEditId)) cancelEdit();
+  ctOpen.delete(ckey);
+  ctSave();
+  renderList();
+  showToast(`${logs.length}件を削除しました`);
+}
+const cardEdit = document.createElement("div");
+cardEdit.className = "ct-wxsheet";
+cardEdit.id = "ctCardEdit";
+cardEdit.hidden = true;
+document.body.appendChild(cardEdit);
+let ctCardKey = null;
+function openCardEdit(ckey){
+  const { date, name, logs } = cardLogs(ckey);
+  if(logs.length === 0) return;
+  ctCardKey = ckey;
+  cardEdit.innerHTML = `<h3>客名・日付を変更(${logs.length}件)</h3>` +
+    `<div class="field"><input type="text" id="ceName" placeholder="顧客名" aria-label="顧客名" autocomplete="off"></div>` +
+    `<div class="field"><input type="date" id="ceDate" aria-label="日付"></div>` +
+    `<div class="wx-note">容器の内容(区分・ガス種・容量・記号・番号)は、そのままです。</div>` +
+    `<div class="wx-btns"><button type="button" class="btn btn-sky" id="ceSave">更新</button><button type="button" class="btn btn-outline-mint" id="ceCancel">やめる</button></div>`;
+  $("ceName").value = name;
+  $("ceDate").value = date;
+  cardEdit.hidden = false;
+}
+cardEdit.addEventListener("click", e => {
+  if(e.target.closest("#ceCancel")){ cardEdit.hidden = true; return; }
+  if(!e.target.closest("#ceSave")) return;
+  const newName = $("ceName").value.trim(), newDate = $("ceDate").value;
+  if(!newName){ showToast("顧客名を入力してください"); return; }
+  if(!newDate){ showToast("日付を入力してください"); return; }
+  const { name, logs } = cardLogs(ctCardKey);
+  const nameChanged = newName !== name;
+  logs.forEach(l => {
+    l.customer = newName;
+    l.date = newDate;
+    if(nameChanged){                               // 客先リストにある名前なら、顧客コードと読み仮名もそろえる。ない名前なら、前の客先のコードを残さない
+      const mm = masterMaps();
+      const hit = mm && mm.byName.get(newName);
+      l.customerCode = hit ? (hit.c || "") : "";
+      l.customerKana = hit ? (hit.k || "") : "";
+    }
+    delete l.sentAt;                               // 直した記録は、また未送信に戻す
+  });
+  if(ctOpen.has(ctCardKey)){ ctOpen.delete(ctCardKey); ctOpen.add(`${newDate}|${newName}`); }
+  cardEdit.hidden = true;
+  ctSave();
+  renderList();
+  showToast(`${logs.length}件の客名・日付を更新しました`);
+});
+document.addEventListener("pointerdown", e => { if(!cardEdit.hidden && !e.target.closest("#ctCardEdit")) cardEdit.hidden = true; });
+(function setupHeadSwipe(){
+  const list = $("ctList");
+  let sw = null;
+  list.addEventListener("pointerdown", e => {
+    const head = e.target.closest(".ct-hwrap > .ct-cust-head");
+    if(!head) return;
+    if(e.pointerType === "mouse" && e.button !== 0) return;
+    sw = { head, key: decodeURIComponent(head.parentNode.getAttribute("data-ckey")), x:e.clientX, y:e.clientY, dx:0, active:false, pid:e.pointerId };
+  });
+  list.addEventListener("pointermove", e => {
+    if(!sw) return;
+    const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+    if(!sw.active){
+      if(Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5){
+        sw.active = true;
+        try{ sw.head.setPointerCapture(sw.pid); }catch(err){ /* 未対応の環境では無視 */ }
+        sw.head.style.transition = "none";
+      }else if(Math.abs(dy) > 10){ sw = null; return; }
+      else return;
+    }
+    sw.dx = dx;
+    sw.head.style.transform = `translateX(${dx}px)`;
+  });
+  function finish(cancelled){
+    if(!sw) return;
+    const { head, key, dx, active } = sw;
+    sw = null;
+    if(!active) return;
+    head.style.transition = "transform .18s";
+    head.style.transform = "";
+    if(cancelled) return;
+    const threshold = Math.min(90, (head.offsetWidth || 300) * 0.28);
+    if(dx >= threshold) setTimeout(() => openCardEdit(key), 30);
+    else if(dx <= -threshold) setTimeout(() => deleteCard(key), 30);
+  }
+  list.addEventListener("pointerup", () => finish(false));
+  list.addEventListener("pointercancel", () => finish(true));
+})();
 
 /* 行のスワイプ：右へ＝変更(上のフォームで変更状態に)、左へ＝削除(確認あり)。縦スクロールは邪魔しない */
 (function setupSwipe(){
@@ -3202,26 +3364,73 @@ function attachClear(inp){
   const isInput = el => !!(el && el.tagName && (
     (el.tagName === "INPUT" && !["checkbox", "radio", "button", "submit", "file", "range"].includes((el.type || "").toLowerCase())) ||
     el.tagName === "TEXTAREA" || el.tagName === "SELECT"));
-  const hide = () => { clearTimeout(t); if(!hidden){ hidden = true; hdr.classList.add("banner-off"); document.body.classList.add("kb-pad"); } };
+
+  /* ---- 入力確認バー：容器ログの入力中、画面の一番上に、区分・顧客名・ガス種・記号-番号を出し続ける(誤作業を防ぐ) ---- */
+  const bar = document.createElement("div");
+  bar.id = "ctConfirmBar";
+  bar.className = "ct-confirm cb-out";
+  bar.hidden = true;
+  hdr.insertAdjacentElement("afterend", bar);
+  const ctinFocused = () => { const a = document.activeElement; return !!(a && a.closest && a.closest("#containerScreen .dt-frame.ctin") && isInput(a)); };
+  function renderConfirmBar(){
+    const f = readForm(), today = getToday();
+    const sc = ctStatus === 2 ? "out" : (ctStatus === 3 ? "in" : "oth");
+    bar.className = "ct-confirm cb-" + sc;
+    const miss = x => `<span class="cb-miss">${x}</span>`;
+    const gas = f.gas
+      ? `${escapeHtml(nfkc(f.gas))}${f.capacity !== "" ? " " + escapeHtml(f.capacity) + (f.unit ? " " + escapeHtml(f.unit) : "") : (capDefault() !== null ? " " + miss("容量未入力") : "")}`
+      : miss("ガス種未入力");
+    const no = (f.symbol || f.number)
+      ? `${f.symbol ? escapeHtml(f.symbol) : miss("記号?")}-${f.number ? escapeHtml(f.number) : miss("番号?")}`
+      : miss("記号-番号 未入力");
+    const dateHtml = (f.date && f.date !== today) ? `<span class="cb-date">日付 ${escapeHtml(mdOf(f.date))}</span>` : "";   // 今日以外の日付のときだけ(赤字)
+    bar.innerHTML = `<div class="cb-l1"><span class="cb-st">${escapeHtml(statusName(ctStatus))}</span>${dateHtml}<span class="cb-cust">${f.customer ? escapeHtml(f.customer) : miss("顧客名未入力")}</span></div>` +
+                    `<div class="cb-l2"><span class="cb-gas">${gas}</span><span class="cb-no">${no}</span></div>`;
+  }
+  function syncBar(){
+    const on = hidden && !!$("containerScreen") && $("containerScreen").classList.contains("active") && ctinFocused();
+    if(on) renderConfirmBar();
+    bar.hidden = !on;
+  }
+  window.ctRenderBar = () => { if(!bar.hidden) renderConfirmBar(); };
+  ["input", "change", "click"].forEach(ev => $("containerScreen").addEventListener(ev, () => { if(!bar.hidden) renderConfirmBar(); }));
+
+  const hide = () => { clearTimeout(t); if(!hidden){ hidden = true; hdr.classList.add("banner-off"); document.body.classList.add("kb-pad"); } syncBar(); };
   const show = () => {
     clearTimeout(t);
-    t = setTimeout(() => { if(isInput(document.activeElement)) return; hidden = false; hdr.classList.remove("banner-off"); document.body.classList.remove("kb-pad"); }, 300);
+    t = setTimeout(() => { if(isInput(document.activeElement)) return; hidden = false; hdr.classList.remove("banner-off"); document.body.classList.remove("kb-pad"); syncBar(); }, 200);   // 約0.2秒で戻る
   };
-  // 入力欄が、画面の見える範囲の上で切れたり、キーボードの下に隠れたときだけ、位置を直す(切れていなければ、何もしない)
+
+  // 入力欄が、画面の見える範囲の上で切れたり、キーボードの下に隠れたときだけ、位置を直す(切れていなければ、何もしない)。動きは、なめらかに
   function ensureVisible(el){
     if(!el || (el.closest && el.closest(".ct-wxsheet"))) return;
     const box = el.tagName === "TEXTAREA" ? el : (el.closest(".field") || el);
     const r = box.getBoundingClientRect();
     const vv = window.visualViewport;
-    const top = vv ? vv.offsetTop : 0, bottom = top + (vv ? vv.height : window.innerHeight);
-    if(r.top < top + 8) window.scrollBy(0, r.top - (top + 60));                // 上で切れている → 見える範囲の上から約60pxの位置へ
-    else if(r.bottom > bottom - 8) window.scrollBy(0, r.bottom - bottom + 24);  // キーボードの下 → キーボードの上へ
+    const barH = bar.hidden ? 0 : bar.offsetHeight;                              // 上の入力確認バーの下から測る
+    const top = (vv ? vv.offsetTop : 0) + barH, bottom = (vv ? vv.offsetTop + vv.height : window.innerHeight);
+    if(r.top < top + 8) window.scrollBy({ top: r.top - (top + 60), behavior:"smooth" });                  // 上で切れている → 上から約60pxの位置へ
+    else if(r.bottom > bottom - 8) window.scrollBy({ top: r.bottom - bottom + 24, behavior:"smooth" });   // キーボードの下 → キーボードの上へ
   }
   window.ctEnsureVisible = ensureVisible;
+  // 容器の入力のカードの上を、入力確認バーの下に合わせる(日付から「記録する」までを、できるだけ一画面に見せる)。キーボードが出る前に、1回だけ
+  function alignCard(el){
+    const card = el.closest && el.closest("#containerScreen .dt-frame.ctin");
+    if(!card) return;
+    const vv = window.visualViewport;
+    const barH = bar.hidden ? 60 : bar.offsetHeight;
+    const target = (vv ? vv.offsetTop : 0) + barH + 4;
+    const dy = card.getBoundingClientRect().top - target;
+    if(Math.abs(dy) > 2) window.scrollBy({ top: dy, behavior:"auto" });
+  }
+  window.ctAlignCard = alignCard;
   document.addEventListener("focusin", e => {
     if(!isInput(e.target)) return;
     hide();
-    if(e.target.tagName !== "SELECT") [450, 900].forEach(ms => setTimeout(() => { if(document.activeElement === e.target) ensureVisible(e.target); }, ms));   // iPhoneの動きが落ち着いたあとで確認
+    if(e.target.tagName !== "SELECT"){
+      alignCard(e.target);
+      [450, 900].forEach(ms => setTimeout(() => { if(document.activeElement === e.target) ensureVisible(e.target); }, ms));   // iPhoneの動きが落ち着いたあとで確認
+    }
   });
   document.addEventListener("focusout", e => { if(isInput(e.target)) show(); });
   // iPhoneは、入力欄の外を押しても、カーソルが外れない。何もない所を押したときは、入力を終える
