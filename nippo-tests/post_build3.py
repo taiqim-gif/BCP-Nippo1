@@ -1,0 +1,15 @@
+t=open("smoke8.js",encoding="utf-8").read()
+def rep(a,b):
+    global t
+    assert t.count(a)==1,(t.count(a),a[:90])
+    t=t.replace(a,b)
+rep('$("dtMailReport").innerHTML==="全データをメール送信<br>(日報・車両・ToDoリスト・容器ログ)","button 1 (2 lines): "','$("dtMailReport").innerHTML==="全データをメール送信<br>(日報・車両・ToDo・容器)","button 1 (2 lines): "')
+rep('$("dtMailCsv").innerHTML==="容器ログだけメール送信<br>(CSV添付)","button 2 (2 lines): "','$("dtMailCsv").innerHTML==="容器だけメール送信<br>(CSV添付)","button 2 (2 lines): "')
+rep('$("dtCsv").innerHTML==="容器ログだけスマホ保存<br>(CSVファイルを保存)","button 3 (2 lines): "','$("dtCsv").innerHTML==="容器だけスマホ保存<br>(CSV保存)","button 3 (2 lines): "')
+rep('includes("未送信の容器ログはありません")','includes("未送信の容器はありません")')
+rep('/^容器ログ 1本を削除します。\\n\\(未送信 1本\\)/','/^容器 1本を削除します。\\n\\(未送信 1本\\)/')
+rep('ok(parseInt($("editStartTime").style.paddingLeft)>40,','ok(parseInt($("editStartTime").style.paddingLeft)>30,')
+rep('padding:8px/.test(css2),"bar padding leaves room for the selection ring"','padding:4px/.test(css2),"bar padding leaves room for the selection ring"')
+rep('$("masterKeyInput").placeholder==="営業所キー"','$("masterKeyInput").placeholder==="担当キー"')
+open("smoke8.js","w",encoding="utf-8").write(t)
+print("post3")

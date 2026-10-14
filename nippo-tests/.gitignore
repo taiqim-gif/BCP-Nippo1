@@ -1,0 +1,6 @@
+node_modules/
+package-lock.json
+container.js
+harness4.html
+smoke8.js
+smoke8.out
