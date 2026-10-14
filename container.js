@@ -385,6 +385,10 @@ style.textContent = `
   .ct-gascol{ flex:1; min-width:0; }
   .ct-gashead{ display:flex; justify-content:space-between; align-items:center; height:20px; margin-bottom:4px; }
   .ct-gashead label{ margin:0; }
+  .ct-gashead.collapsed{ height:auto; min-height:34px; }
+  .ct-gassum{ flex:1; min-width:0; display:flex; align-items:center; gap:10px; margin:0 8px; }
+  .ct-gassum-chip{ padding:6px 14px; border-radius:999px; font-weight:700; font-size:14px; white-space:nowrap; }
+  .ct-gassum-cap{ flex:1; min-width:0; font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ct-gasdir{ display:flex; gap:14px; font-size:17px; font-weight:900; line-height:1; color:var(--lavender-ink); margin-right:42px; }
   .ct-gasdir span{ visibility:hidden; }
   .ct-gasdir span.on{ visibility:visible; animation:ctBlink 1s ease-in-out infinite; }
@@ -476,8 +480,8 @@ tabColors.textContent = `
   /* ホーム＝ミントグリーン(ボタンと同じ色)の濃淡 */
   .dt-frame.hm1{ background:#EEF9F5; border-color:var(--mint-dark); }
   .dt-frame.hm1 .dt-head{ background:var(--mint); color:var(--mint-ink); }
-  .dt-frame.hm2{ background:#EEF9F5; border-color:#4FAF95; }
-  .dt-frame.hm2 .dt-head, .dt-frame.hm2 .todo-list-target > h2{ background:var(--mint-dark); color:#0B3A2E; }
+  .dt-frame.hm2{ background:#FFF3EA; border-color:#EE8A57; }
+  .dt-frame.hm2 .dt-head, .dt-frame.hm2 .todo-list-target > h2{ background:var(--peach-dark); color:var(--peach-ink); }
   .dt-frame.hm3{ background:#F6FCFA; border-color:#B6E5D6; }
   .dt-frame.hm3 .dt-head{ background:#C9EFE4; color:var(--mint-ink); }
   /* 車両＝ピーチの濃淡(車両情報は、出発=ピーチ・帰社=スカイのまま) */
@@ -537,8 +541,8 @@ section.innerHTML = `
     <div class="customer-list" id="ctCustomerList" style="display:none;"></div>
 
     <div class="field">
-      <div class="ct-gashead"><label>ガス種</label><span class="ct-gasdir" aria-hidden="true"><span id="ctGasL">←</span><span id="ctGasR">→</span></span></div>
-      <div class="ct-gas-area">
+      <div class="ct-gashead" id="ctGasHead"><label>ガス種</label><span class="ct-gassum" id="ctGasSum" style="display:none;"><span class="ct-gassum-chip" id="ctGasSumChip"></span><span class="ct-gassum-cap" id="ctGasSumCap"></span><button type="button" class="btn-mini" id="ctGasChange">変更</button></span><span class="ct-gasdir" aria-hidden="true"><span id="ctGasL">←</span><span id="ctGasR">→</span></span></div>
+      <div class="ct-gas-area" id="ctGasArea">
         <div class="ct-gascol">
           <div class="ct-gasbar-wrap" id="ctGasWrap"><div class="ct-chip-row ct-gasbar" id="ctGasChips"></div></div>
         </div>
@@ -550,17 +554,17 @@ section.innerHTML = `
     <div class="row-gap" style="margin-top:6px;">
       <div class="field" style="flex:1;">
         <div class="ct-lbrow"><label for="ctSymbol">記号(英数字)</label></div>
-        <input type="text" id="ctSymbol" inputmode="email" lang="en" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="例：AB1">
+        <input type="text" id="ctSymbol" enterkeyhint="next" inputmode="email" lang="en" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="例：AB1">
       </div>
       <div class="field" style="flex:2;">
         <div class="ct-lbrow"><label for="ctNumber">番号(数字)</label><button type="button" class="btn-mini" id="ctNumKb" aria-label="キーボードの切り替え">ABC</button></div>
-        <input type="text" id="ctNumber" inputmode="numeric" autocomplete="off" placeholder="例：12345">
+        <input type="text" id="ctNumber" enterkeyhint="go" inputmode="numeric" autocomplete="off" placeholder="例：12345">
       </div>
     </div>
 
     <div class="field">
       <div style="display:flex;gap:10px;align-items:center;">
-        <input type="text" id="ctCapacity" inputmode="decimal" maxlength="5" placeholder="容量" aria-label="容量(最大5桁)" autocomplete="off" style="width:7em;flex:none;text-align:right;">
+        <input type="text" id="ctCapacity" enterkeyhint="done" inputmode="decimal" maxlength="5" placeholder="容量" aria-label="容量(最大5桁)" autocomplete="off" style="width:7em;flex:none;text-align:right;">
         <div class="ct-seg" id="ctUnitSeg" style="flex:none;width:140px;"></div>
       </div>
     </div>
@@ -641,6 +645,7 @@ function renderStatus(){
 }
 
 function renderModeAndUnit(){
+  if(typeof renderGasCollapse === "function") setTimeout(renderGasCollapse, 0);
   renderStatus();
 
   const seg = $("ctUnitSeg");
@@ -689,7 +694,34 @@ function renderGasChips(){
   $("ctGasOther").style.display = (ctGasSel === "other") ? "block" : "none";
   renderGasSelected();
   renderAdj();
+  renderGasCollapse();
 }
+
+// ガス種を選んだら、2行のボタンを、1行(名前・容量・[変更])に縮める。入力の画面が低くなり、キーボードで隠れにくい
+let ctGasExpanded = false;
+function renderGasCollapse(){
+  const g = curGas();
+  const collapsed = !!g && ctGasSel !== "other" && !ctGasExpanded;
+  const head = $("ctGasHead"), area = $("ctGasArea"), sum = $("ctGasSum"), dir = head ? head.querySelector(".ct-gasdir") : null;
+  if(!head || !area || !sum) return;
+  head.classList.toggle("collapsed", collapsed);
+  area.style.display = collapsed ? "none" : "";
+  if(dir) dir.style.display = collapsed ? "none" : "";
+  sum.style.display = collapsed ? "flex" : "none";
+  if(collapsed){
+    const chip = $("ctGasSumChip");
+    chip.textContent = `${nfkc(g.name)}　${g.label || ""}`.trim();
+    chip.style.background = g.bg;
+    chip.style.color = g.fg;
+    chip.style.textShadow = g.outline ? GAS_OUTLINE : (g.shadow ? "0 0 3px rgba(0,0,0,0.6)" : "");
+    const cap = $("ctCapacity").value.trim();
+    $("ctGasSumCap").textContent = cap ? `${cap} ${ctUnit || ""}`.trim() : "";
+  }else{
+    updateGasShadows();
+  }
+}
+$("ctGasChange").addEventListener("click", () => { ctGasExpanded = true; renderGasCollapse(); });
+$("ctCapacity").addEventListener("input", renderGasCollapse);
 
 // バーの左右に、続きがあることを示す薄い影を出す
 function updateGasShadows(){
@@ -738,6 +770,7 @@ function renderGasSelected(){
 // ガス種を選ぶと、決めておいた容量と単位が自動で入る
 function pickGas(sel){
   ctGasSel = sel;
+  ctGasExpanded = false;
   if(sel === "other"){
     $("ctCapacity").value = "";
     ctUnit = OTHER_GAS_UNIT;
@@ -3508,6 +3541,10 @@ document.addEventListener("pointerdown", e => { if(!e.target.closest(".ct-combo"
 $("ctCapacity").addEventListener("input", renderAdj);
 $("ctGasOther").addEventListener("input", renderGasSelected);
 $("ctSaveButton").addEventListener("click", () => saveFromForm());
+// キーボードの決定キー：記号 →(次へ)→ 番号 →(移動)→ 記録する。記録のあとは、記号欄にカーソルが戻る
+$("ctSymbol").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("ctNumber").focus(); } });
+$("ctNumber").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); saveFromForm(); } });
+$("ctCapacity").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("ctCapacity").blur(); } });
 
 /* 記号・番号・容量は、入力しながら(確定時にも)半角に直す：全角→半角、小文字→大文字 */
 function liveNormalize(el, fn){
