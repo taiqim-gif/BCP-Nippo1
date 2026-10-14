@@ -1,0 +1,52 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>
+<header><span class="date" id="dateDisplay"></span><button id="navHomeButton">ホーム</button><button id="navVehicleButton">車両</button></header>
+<main>
+<section id="reportScreen" class="screen active">
+  <div class="card">
+    <div id="masterKeyBox"><label for="masterKeyInput" style="display:block;font-size:12px;">営業所キー</label><input type="password" id="masterKeyInput"></div>
+    <div class="field"><label for="homeVisitTarget">訪問先</label><input type="text" id="homeVisitTarget" placeholder="例：〇〇商店"></div>
+  </div>
+  <div class="footer-actions"><button id="mailButton"></button><div class="row-gap delete-row"></div></div>
+</section>
+<section id="visitScreen" class="screen">
+  <div class="row-gap" id="editTimeRow">
+    <div class="field"><label for="editStartTime">開始時刻</label><input type="time" id="editStartTime"></div>
+    <div class="field"><label for="editEndTime">終了時刻</label><input type="time" id="editEndTime"></div>
+  </div>
+  <div class="row-gap">
+    <div class="field" style="flex:2;"><label for="meetingPerson">面談者</label><input type="text" id="meetingPerson" placeholder="例：山田"></div>
+    <div class="field" style="flex:1; position:relative;"><label for="meetingPersonTitle">敬称</label><input type="text" id="meetingPersonTitle" value="さん"><div class="honorific-dropdown" id="honorificDropdown"></div></div>
+  </div>
+  <div class="field"><label for="meetingContent">内容</label><textarea id="meetingContent"></textarea></div>
+</section>
+<section id="vehicleScreen" class="screen">
+  <div class="row-gap">
+    <div class="field"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;"><label for="vehicleDistance" style="margin-bottom:0;">走行距離</label><span id="vehicleTimeText"></span></div><input type="number" id="vehicleDistance" placeholder="例：12345"></div>
+    <div class="field"><label for="vehicleFuel">給油量（L）</label><input type="number" id="vehicleFuel" placeholder="空欄Ok"></div>
+  </div>
+</section>
+</main>
+<div id="toast"></div>
+<script>
+const toasts=[];
+function showToast(m){toasts.push(m);}
+function escapeHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function getToday(){return "2026-10-08";}
+function formatDayLabel(d,t){return d+(d===t?"・本日":"");}
+function copyToClipboard(){}
+const KANA_ROWS=[["あ","あいうえお"],["か","かきくけこ"]];
+function toHiragana(s){return String(s||"").normalize("NFKC").replace(/[\u30A1-\u30F6]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0x60));}
+function kanaRowOf(r){return String(r||"")[0]==="あ"?"あ":"他";}
+function resolveCustomerCode(n){const m={"〇〇商店":"1001","△△工業":"2002","山田ガス店":"3003"};return m[n]||"";}
+let customerMaster={items:[{n:"〇〇商店",k:"あまる",c:"1001"},{n:"△△工業",k:"かさん",c:"2002"},{n:"山田ガス店",k:"やまだがすてん",c:"3003"}]};
+let currentVisit=null, vehicleViewMode="x";
+let meetingLogs=[1], dailyVehicleInfo={a:1}, todoItems=[1];
+function showScreen(n){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));document.getElementById(n+"Screen").classList.add("active");}
+function updateNav(n){const h=(n==="report"||n==="visit");navHomeButton.classList.toggle("active-mint",h);navVehicleButton.classList.toggle("active-peach",!h);}
+function goToReport(){showScreen("report");updateNav("report");}
+function confirmLeaveVisitIfNeeded(){return true;}
+function buildReportMail(){return {subject:"営業日報",body:"営業日報\n\n"};}
+function deleteData(){ throw new Error("original deleteData should be replaced"); }
+</script>
+<script src="container.js"></script>
+</body></html>
