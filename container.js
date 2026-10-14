@@ -44,6 +44,17 @@ const OTHER_GAS_STYLE = { bg:"#2D87E3", fg:"#fff" };                  // 「そ�
 const OTHER_GAS_UNIT = "㎥";                                           // 「その他」を選んだときの初期の単位
 const ADJ_STEPS = [-0.2, -0.1, 0, 0.1, 0.2];   // ｱｾﾁﾚﾝの容量の増減ボタン(0.0＝基準に戻す)
 const UNITS = ["㎥","kg"];
+// ガス種ごとの基本の容量(ボタンで選べる。欄に手で打つこともできる)
+const SEAMLESS_CAPS = [0.5, 1.5, 3, 7];
+const CAP_PRESETS = {
+  1001: SEAMLESS_CAPS,                          // アセチレン(7のときだけ、増減のボタン)
+  1002: [0.5, 1.5, 3, 7, 42, 132, 140, 175],    // 酸素(カードル 42/140/175、ベッセル 132)
+  1003: [0.5, 1.5, 3, 7, 107, 140],             // 窒素(カードル 140、ベッセル 107)
+  1004: SEAMLESS_CAPS, 1007: SEAMLESS_CAPS, 5001: SEAMLESS_CAPS,
+  1006: [2.5, 5, 7, 30, 160],                   // 炭酸(ベッセル 160)
+  1008: [10, 20],                               // フロン
+  2001: [5, 8, 10, 20, 50]                      // プロパン
+};
 
 const CT_KEY = "containerLogs";
 const BACKUP_KEYS = ["meetingLogs","dailyVehicleInfo","todoItems","containerLogs","customerHidden","customerExtra","dailyWeather"];
@@ -172,7 +183,8 @@ style.textContent = `
   .dt-frame.ctin .dt-head{ background:var(--mint); color:var(--mint-ink); }
   .dt-frame.ctlist{ background:#FFF3EA; border-color:var(--peach-dark); margin-top:14px; }
   .dt-frame.ctlist .dt-head{ background:var(--peach); color:var(--peach-ink); }
-  .todo-item input[type=checkbox]{ transform:scale(1.55); margin:0 9px 0 7px; }
+  .todo-item input[type=checkbox]{ transform:scale(1.2); margin:0 5px 0 3px; }
+  .todo-item .todo-line{ font-size:13px; line-height:1.35; white-space:normal; overflow:hidden; text-overflow:clip; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }   /* 2行まで。3行目からは… */
   #vehicleScreen .todo-line, #reportScreen .todo-line{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* 長押しで、文字の選択やメニューが出ないように */
   .dt-frame.hm1{ background:#EEF9F5; border-color:var(--mint-dark); }
   .dt-frame.hm1 .dt-head{ background:var(--mint); color:var(--mint-ink); }
@@ -188,6 +200,13 @@ style.textContent = `
   .dt-frame[hidden]{ display:none; }
   #homeStartButton{ background:#3F9A5E; color:#fff; }
   .dt-frame.hm2 .todo-list-target > h2{ position:relative; }
+  .dt-frame.hm2[data-add] > .dt-head{ position:relative; display:flex; justify-content:space-between; align-items:center; }
+  .dt-frame.hm2[data-add] .todo-list-target > h2{ display:none; }          /* 見出しは、カードの帯の1つだけにする */
+  .dt-frame.hm2[data-add] .dt-head + .dt-body{ padding:8px 8px 2px; }
+  .home-todo-add{ display:flex; gap:8px; align-items:center; margin:0 0 4px; }
+  .home-todo-add input{ flex:1; min-width:0; }
+  .home-todo-add .btn{ flex:none; width:auto; padding:9px 16px; margin:0; }
+  .dt-frame.hm2[data-add] .todo-list-target > .todo-item{ margin:8px 0 0; }
   .todo-count{ position:absolute; left:50%; transform:translateX(-50%); font-size:14px; font-weight:700; white-space:nowrap; pointer-events:none; }
   body.kb-pad{ padding-bottom:60vh !important; }     /* 入力中だけ、画面の高さの約6割の余白を下に足す。iPhoneが画面を動かす余地になる */
   header{ overflow:hidden; max-height:240px; transition:opacity .15s ease; }
@@ -332,6 +351,9 @@ style.textContent = `
   .ct-numwrap input{ padding-right:60px; }
   .ct-numwrap .ct-numkb{ position:absolute; right:6px; top:50%; transform:translateY(-50%); padding:3px 10px; }
   .ct-adj-row{ display:flex; flex-wrap:nowrap; gap:6px; }
+  .ct-cappre{ display:flex; flex-wrap:nowrap; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; margin:-2px 0 8px; padding-bottom:2px; }
+  .ct-cappre .chip.on{ background:var(--butter); border-color:var(--butter-dark); color:var(--butter-ink); }
+  .ct-cappre .chip{ flex:none; min-width:44px; padding:8px 10px; text-align:center; white-space:nowrap; font-weight:700; }
   .ct-adj-row .chip{ flex:1; min-width:0; padding:9px 0; text-align:center; white-space:nowrap; }
 
   .ct-swrap{ position:relative; overflow:hidden; border-top:1px solid var(--line); }
@@ -495,6 +517,7 @@ style.textContent = `
   .ct-flash-cust{ font-size:20px; font-weight:700; margin-top:8px; color:var(--ink); overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .ct-flash-gas{ font-size:20px; font-weight:700; margin-top:4px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ct-flash.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+  .ct-flash, .ct-flash.show{ transform:translateX(-50%); transition:opacity .15s; }      /* 上の端を決まった位置に合わせる(高さが変わっても、上下に動かない) */
 
   /* 顧客の管理 */
   .cm-top{ display:flex; align-items:center; gap:10px; margin:6px 0 10px; }
@@ -627,6 +650,8 @@ section.innerHTML = `
       </div>
     </div>
 
+    <div class="ct-cappre" id="ctCapPre" style="display:none;"></div>
+
     <div class="field" id="ctAdjField" style="display:none;">
       <label id="ctAdjLabel">容量の増減</label>
       <div class="ct-adj-row" id="ctAdjRow"></div>
@@ -678,6 +703,10 @@ let flashTimer = null;
 function flashText(t, cust, gas, scls){
   flashEl.setAttribute("data-sc", scls || "out");
   flashEl.innerHTML = `<div class="ct-flash-main">${escapeHtml(t)}</div>` + (cust ? `<div class="ct-flash-cust">${escapeHtml(cust)}</div>` : "") + (gas ? `<div class="ct-flash-gas">${escapeHtml(gas)}</div>` : "");
+  const vv = window.visualViewport, bar = $("ctConfirmBar");
+  const viewTop = vv ? vv.offsetTop : 0;
+  const barBottom = (bar && !bar.hidden) ? bar.getBoundingClientRect().bottom : 0;
+  flashEl.style.top = Math.round(Math.max(viewTop, barBottom) + 12) + "px";   // 入力確認バーのすぐ下
   flashEl.classList.add("show");
   clearTimeout(flashTimer);
   flashTimer = setTimeout(() => flashEl.classList.remove("show"), 1200);
@@ -829,6 +858,7 @@ function renderGasCollapse(){
 $("ctGasSum").addEventListener("click", () => { ctGasExpanded = true; renderGasCollapse(); });          // 1行のどこを押しても、ガス種の一覧が開く
 $("ctGasSum").addEventListener("keydown", e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); ctGasExpanded = true; renderGasCollapse(); } });
 $("ctCapacity").addEventListener("input", renderGasCollapse);
+$("ctCapacity").addEventListener("blur", () => setTimeout(renderAdj, 0));   // 初期値に戻ったときも、ボタンの色を合わせる
 
 // バーの左右に、続きがあることを示す薄い影を出す
 function updateGasShadows(){
@@ -898,10 +928,36 @@ function pickGas(sel){
 // ｱｾﾁﾚﾝ：基準の容量に -0.2/-0.1/0.0/+0.1/+0.2 を足し引きする5つのボタン(0.0 を押すと基準に戻る)
 function round1(x){ return Math.round(x * 10) / 10; }
 
+// 基本の容量のボタン。今の容量と同じボタンに色を付ける
+function renderCapPresets(){
+  const box = $("ctCapPre");
+  if(!box) return;
+  const g = curGas(), caps = g ? CAP_PRESETS[g.code] : null;
+  if(!caps || ctGasSel === "other"){ box.style.display = "none"; box.innerHTML = ""; return; }
+  box.style.display = "flex";
+  const v = normNum($("ctCapacity").value), cur = Number(v);
+  box.innerHTML = "";
+  caps.forEach(c => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip" + (v !== "" && Math.abs(cur - c) < 1e-9 ? " on" : "");
+    b.textContent = String(c);
+    b.addEventListener("click", () => {
+      $("ctCapacity").value = String(c);
+      ctCapSaved = null;
+      renderGasCollapse();
+      renderAdj();
+    });
+    box.appendChild(b);
+  });
+}
 function renderAdj(){
   const g = curGas();
   const field = $("ctAdjField");
-  if(!g || !g.adj){ field.style.display = "none"; return; }
+  renderCapPresets();
+  const capV = normNum($("ctCapacity").value);
+  const nearBase = g && (capV === "" || Math.abs(Number(capV) - g.cap) <= 0.2 + 1e-9);   // 増減のボタンは、基準(7)の近くのときだけ(空欄は、打っている途中なので、出したまま)
+  if(!g || !g.adj || !nearBase){ field.style.display = "none"; return; }
   field.style.display = "block";
   $("ctAdjLabel").textContent = `${g.name}の容量の増減(基準 ${g.cap}${g.unit})`;
 
@@ -2481,6 +2537,8 @@ if(typeof origSetMasterMessage === "function"){
 // ホームのToDoリストの帯の真ん中に、未実行の件数「(3件)」を出す
 function addTodoCount(){
   const n = todoItems.filter(t => t && !t.done).length;
+  const hc = $("homeTodoCount");
+  if(hc){ hc.textContent = `(${n}件)`; return; }       // ホームのカードの帯に、件数を出す(重なった見出しは出さない)
   document.querySelectorAll("#reportScreen .todo-list-target > h2").forEach(h => {
     if(h.querySelector(".todo-count")) return;
     const c = document.createElement("span");
@@ -3012,9 +3070,30 @@ if(typeof window.renderMasterUI === "function") window.renderMasterUI();
       const hd = prev && prev.tagName === "H2" ? prev : null;
       if(hd) hd.innerHTML = hd.innerHTML.replace(/TODOリスト/g, "ToDoリスト");
       const frame = mk("hm2", hd, "ToDoリスト", [tgt]);
-      const sync = () => { frame.hidden = !(tgt.children.length > 0) || tgt.style.display === "none"; };   // ToDoが空のときは、カードごと出さない
+      frame.setAttribute("data-add", "1");
+      const fhead = frame.querySelector(":scope > .dt-head");
+      if(fhead && !hd) fhead.innerHTML = '<span>ToDoリスト</span><span class="todo-count" id="homeTodoCount"></span><span class="h2-note">消す=コピー可</span>';
+      // やることを追加(車両タブの欄と同じ追加のしかた)
+      const add = document.createElement("div");
+      add.className = "home-todo-add";
+      add.innerHTML = '<input type="text" id="homeTodoInput" placeholder="やることを追加" aria-label="やることを追加" enterkeyhint="done" autocomplete="off"><button type="button" class="btn btn-lavender" id="homeTodoAddButton">追加</button>';
+      tgt.parentNode.insertBefore(add, tgt);
+      const doAdd = () => {
+        const inp = $("homeTodoInput"), text = inp.value.trim();
+        const vIn = $("todoManualInput"), vBtn = $("todoAddButton");
+        if(!text || !vIn || !vBtn) return;
+        const keep = vIn.value;
+        vIn.value = text;
+        vBtn.click();                       // 車両タブの「追加」と同じ処理で追加する
+        vIn.value = keep;
+        inp.value = "";
+      };
+      $("homeTodoAddButton").addEventListener("click", doAdd);
+      $("homeTodoInput").addEventListener("keydown", e => { if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); doAdd(); } });
+      const sync = () => { frame.hidden = tgt.style.display === "none"; };   // 0件でも、カードを出す(追加の欄を使えるように)
       new MutationObserver(sync).observe(tgt, { childList:true, attributes:true, attributeFilter:["style"] });
       sync();
+      if(typeof addTodoCount === "function") addTodoCount();
     }
     const kids = [...rs.children];
     const foot = kids.find(e => e.classList.contains("footer-actions"));

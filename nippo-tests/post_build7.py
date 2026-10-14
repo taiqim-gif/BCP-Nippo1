@@ -17,5 +17,19 @@ rep('ok(!d.body.classList.contains("kb-pad") && !d.querySelector("header").class
 rep('ok(bar37.hidden,"the confirmation bar is hidden while not typing");','ok(!bar37.hidden,"on the 容器 tab the confirmation bar is shown even while not typing");')
 rep('ok(bar37.hidden,"when the input ends the bar disappears (with the banner coming back)");','ok(!bar37.hidden,"on the 容器 tab the bar stays after the input ends (no up/down movement)");')
 rep('before35($("ctCustomer"),$("ctGasChips")) && before35($("ctGasChips"),$("ctCapacity"))','before35($("ctCustomer"),$("ctGasSum")) && before35($("ctGasSum"),$("ctCapacity"))')
+# 40) ToDo：□を小さく(1.2倍)・ホームは0件でもカードを出す(追加の欄)・件数はカードの帯に
+rep('ok(/\\.todo-item input\\[type=checkbox\\]\\{ transform:scale\\(1\\.55\\); margin:0 9px 0 7px; \\}/.test(css31),"the □ is larger (about 30px)");','ok(/\\.todo-item input\\[type=checkbox\\]\\{ transform:scale\\(1\\.2\\); margin:0 5px 0 3px; \\}/.test(css31),"the □ is a little larger (1.2x), smaller than before so the text has more room");')
+rep('ok(hf[1].hidden,"ToDoリスト card is hidden while there is no ToDo");','ok(!hf[1].hidden && hf[1].contains($("homeTodoInput")),"ToDoリスト card is shown even with no ToDo (so the add field can be used)");')
+rep('const hh31=d.querySelector("#reportScreen .todo-list-target > h2");\nok(!!hh31 && !!hh31.querySelector(".todo-count") && hh31.querySelector(".todo-count").textContent==="(2件)"','const hh31=d.querySelector("#reportScreen .dt-frame.hm2 > .dt-head");\nok(!!hh31 && !!hh31.querySelector(".todo-count") && hh31.querySelector(".todo-count").textContent==="(2件)"')
+rep('ok(d.querySelector("#reportScreen .todo-list-target > h2 .todo-count").textContent==="(3件)"','ok(d.querySelector("#reportScreen .dt-frame.hm2 > .dt-head .todo-count").textContent==="(3件)"')
 open("smoke8.js","w",encoding="utf-8").write(t)
 print("post7")
+
+h=open("harness4.html",encoding="utf-8").read()
+a='<section id="vehicleScreen" class="screen">'
+assert h.count(a)==1
+h=h.replace(a,a+'\n  <div class="card"><div class="field"><input type="text" id="todoManualInput"></div><button id="todoAddButton">追加</button></div>')
+b='</script>\n<script src="container.js"></script>'
+assert h.count(b)==1
+h=h.replace(b,'document.getElementById("todoAddButton").addEventListener("click",()=>{const i=document.getElementById("todoManualInput");const t=i.value.trim();if(!t)return;todoItems.push({id:"m"+Date.now(),date:getToday(),target:"",content:t,done:false,source:"manual",order:9999});i.value="";if(typeof renderTodoList==="function")renderTodoList();});\n'+b)
+open("harness4.html","w",encoding="utf-8").write(h)
