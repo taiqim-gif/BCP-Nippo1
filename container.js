@@ -690,7 +690,7 @@ function flashText(t, cust, gas, scls){
   const vv = window.visualViewport, bar = $("ctConfirmBar");
   const viewTop = vv ? vv.offsetTop : 0;
   const barBottom = (bar && !bar.hidden) ? bar.getBoundingClientRect().bottom : 0;
-  flashEl.style.top = Math.round(Math.max(viewTop, barBottom) + 12) + "px";   // 入力確認バーのすぐ下
+  flashEl.style.top = Math.round(Math.max(viewTop, barBottom) + 12) + "px";   // 上のカードのすぐ下
   flashEl.classList.add("show");
   clearTimeout(flashTimer);
   flashTimer = setTimeout(() => flashEl.classList.remove("show"), 1200);
@@ -3427,7 +3427,7 @@ function attachClear(inp){
     (el.tagName === "INPUT" && !["checkbox", "radio", "button", "submit", "file", "range"].includes((el.type || "").toLowerCase())) ||
     el.tagName === "TEXTAREA" || el.tagName === "SELECT"));
 
-  /* ---- 入力確認バー：容器ログの入力中、画面の一番上に、区分・顧客名・ガス種・記号-番号を出し続ける(誤作業を防ぐ) ---- */
+  /* ---- 上のカードの土台(容器タブの間、タブのボタンのすぐ下に固定。中身は、下の「上のカードの作り」) ---- */
   /* 容器タブの上のカード(画面の一番上に固定)。1行目=区分・顧客名・日付、2行目=ガス種・容量・単位、3行目=記号・番号・記録する。
      キーボードを使う記号・番号を、いつも見える一番上に置く(画面を動かさない) */
   const bar = document.createElement("div");
@@ -3455,7 +3455,7 @@ function attachClear(inp){
   }
   const ctOn = () => !!$("containerScreen") && $("containerScreen").classList.contains("active");
   function syncBar(){
-    const on = ctOn();          // 容器タブの間は、入力確認バーをずっと出す(出し入れで画面が上下に動かないように)
+    const on = ctOn();          // 容器タブの間は、上のカードをずっと出す(出し入れで画面が上下に動かないように)
     if(!on && !bar.hidden && bar.contains(document.activeElement)) document.activeElement.blur();   // ほかのタブへ移ったら、上のカードの欄のカーソルを外す(キーボードを閉じる)
     if(on) renderConfirmBar();
     bar.hidden = !on;
@@ -3488,7 +3488,7 @@ function attachClear(inp){
     const box = el.tagName === "TEXTAREA" ? el : (el.closest(".field") || el);
     const r = box.getBoundingClientRect();
     const vv = window.visualViewport;
-    const barH = bar.hidden ? 0 : bar.offsetHeight;                              // 上の入力確認バーの下から測る
+    const barH = bar.hidden ? 0 : bar.offsetHeight;                              // 上のカードの下から測る
     const top = (vv ? vv.offsetTop : 0) + barH, bottom = (vv ? vv.offsetTop + vv.height : window.innerHeight);
     if(r.top < top + 8) window.scrollBy({ top: r.top - (top + 60), behavior:"smooth" });                  // 上で切れている → 上から約60pxの位置へ
     else if(r.bottom > bottom - 8) window.scrollBy({ top: r.bottom - bottom + 24, behavior:"smooth" });   // キーボードの下 → キーボードの上へ
