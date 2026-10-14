@@ -21,20 +21,21 @@ const STATUS_BUTTONS = [2, 3];   // 画面に並べるボタン(出庫・空受)
    label＝ボタンに表示する略称、cap＝選んだときに自動で入る容量(空文字なら空欄)、unit＝単位、adj＝容量の増減ボタンを出す */
 const AZURE_GRAY = "#6F8CA3";
 const AZURE_GRAY_LIGHT = "#A8BDCB";     // 薄いアズールグレー(Ar と ArCo)
+const GAS_OUTLINE = "0 0 2px #1f2933, 0 0 3px #1f2933, 0 1px 1px #1f2933";   // 白い文字を、明るい灰色の上でも読めるようにする縁取り
 const VIVID_GREEN = "#17B26A";          // 明瞭な緑(ArCo の縞)
 const GAS_TABLE = [
   { code:1001, label:"Ace",      name:"ｱｾﾁﾚﾝ",       cap:7,  unit:"kg", adj:true, bg:"#C2694B", fg:"#fff" },   // 明るめの赤褐色
   { code:1002, label:"O2",       name:"酸素",         cap:7,  unit:"㎥", bg:"#222222", fg:"#fff" },              // 黒
   { code:1003, label:"N2",       name:"窒素",         cap:7,  unit:"㎥", bg:AZURE_GRAY, fg:"#fff" },            // アズールグレー
-  { code:1004, label:"Ar",       name:"アルゴン",     cap:7,  unit:"㎥", bg:AZURE_GRAY_LIGHT, fg:"#1f2933" },   // 薄いアズールグレー
+  { code:1004, label:"Ar",       name:"アルゴン",     cap:7,  unit:"㎥", bg:AZURE_GRAY_LIGHT, fg:"#fff", outline:true },   // 薄いアズールグレー
   { code:1006, label:"CO2",      name:"炭酸",         cap:30, unit:"kg", bg:"#3F9A5E", fg:"#fff" },              // 緑
-  { code:1007, label:"ArCo",     name:"アルコミック", cap:7,  unit:"㎥", fg:"#1f2933",
+  { code:1007, label:"ArCo",     name:"アルコミック", cap:7,  unit:"㎥", fg:"#fff", outline:true,
     // ボタン：横縞(薄いアズールグレー・緑・薄いアズールグレー)。緑は太め(高さの40%)
     bg:"linear-gradient(to bottom, " + AZURE_GRAY_LIGHT + " 0 30%, " + VIVID_GREEN + " 30% 70%, " + AZURE_GRAY_LIGHT + " 70% 100%)",
     // 右側の「選んだガス種」の表示：全体は薄いアズールグレー。縦書きの文字「ルコ」(2〜3文字目)の背景だけ緑
     vertBg:AZURE_GRAY_LIGHT, vertHL:{ from:1, to:3, bg:VIVID_GREEN } },
-  { code:1008, label:"フロン",   name:"フロン",       cap:"", unit:"kg", bg:"#A3A9AF", fg:"#1f1f1f" },           // グレー
-  { code:2001, label:"LP",       name:"プロパン",     cap:"", unit:"kg", bg:"#A3A9AF", fg:"#1f1f1f" },
+  { code:1008, label:"フロン",   name:"フロン",       cap:"", unit:"kg", bg:"#A3A9AF", fg:"#fff", outline:true },           // グレー
+  { code:2001, label:"LP",       name:"プロパン",     cap:"", unit:"kg", bg:"#A3A9AF", fg:"#fff", outline:true },
   { code:5001, label:"医O2",    name:"医療用酸素",   cap:"", unit:"㎥", bg:"#222222", fg:"#fff" }               // 黒
 ];
 // ボタンの並び順(2行に左から右へ並べる)。上段：Ace O2 N2 フロン LP ／ 下段：CO2 Ar ArCo 医O2 その他
@@ -135,17 +136,41 @@ style.textContent = `
   header{ flex-wrap:wrap; gap:6px; padding:8px 12px; }
   header .nav-btn{ flex:1 1 0; min-width:0; padding:9px 4px; font-size:14px; text-align:center; white-space:nowrap; }
   .nav-btn.active-lav{ background:var(--lavender); color:var(--lavender-ink); border-color:var(--lavender-dark); }
-  .ct-datebox{ display:flex; flex:0 0 100%; flex-direction:column; gap:1px; min-width:0; }
+  .ct-datebox{ display:flex; flex:0 0 100%; flex-direction:row; align-items:center; gap:8px; min-width:0; }
   .ct-dleft{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
-  .ct-dline1{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; min-width:0; }
-  .ct-bcpsub{ flex:none; text-align:right; }
-  .ct-wx{ display:block; width:100%; overflow:hidden; border:none; background:transparent; font-family:inherit; font-size:12.5px; font-weight:700; color:#0B7A7A; padding:0; text-align:left; cursor:pointer; }   /* アズールグリーン(濃いめ) */
+  .ct-bcpsub{ text-align:left; }
+  .ct-wx{ flex:none; display:flex; align-items:center; gap:4px; border:none; background:transparent; font-family:inherit; padding:0; cursor:pointer; }
   .ct-wx[hidden]{ display:none; }
-  .ct-wxpage{ display:inline-block; white-space:pre; transform-origin:50% 0; }
-  .wx-d{ color:#5B4A9E; }
-  .ct-wxpage.flip{ animation:ctWxFlip .4s ease-out; }
+  .wx-stale{ font-size:10px; color:var(--ink-soft); }
+  .wx-stale[hidden]{ display:none; }
+  .wx-grid{ display:grid; grid-template-columns:repeat(3, 52px); row-gap:1px; text-align:center; }
+  .wx-r1{ color:#0B7A7A; font-size:13px; font-weight:700; white-space:pre; overflow:hidden; line-height:1.3; }
+  .wx-r2{ color:#5B4A9E; font-size:11px; font-weight:700; line-height:1.2; }
+  .wx-grid.flip .wx-r1{ animation:ctWxFlip .4s ease-out; }
   @keyframes ctWxFlip{ from{ transform:perspective(220px) rotateX(-80deg); opacity:0; } to{ transform:perspective(220px) rotateX(0); opacity:1; } }
-  @media (prefers-reduced-motion: reduce){ .ct-wxpage.flip{ animation:none; } }
+  @media (prefers-reduced-motion: reduce){ .wx-grid.flip .wx-r1{ animation:none; } }
+
+  .dt-frame.compact{ margin-bottom:12px; }
+  .dt-frame.compact .dt-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:5px 12px; font-size:15px; }
+  .dt-frame.compact .dt-body{ padding:8px 8px 2px; }
+  .dt-frame.compact .h2-note{ font-size:11px; font-weight:400; }
+  #vehicleScreen .dt-frame .card, #containerScreen .dt-frame .card{ background:transparent; border:none; box-shadow:none; padding:0; margin-bottom:8px; }
+  .dt-frame.veh1{ background:#EDF6FB; border-color:var(--sky-dark); }
+  .dt-frame.veh1 .dt-head{ background:var(--sky); color:var(--sky-ink); justify-content:flex-start; gap:10px; }
+  .dt-frame.veh2{ background:#F3EFFC; border-color:var(--lavender-dark); margin-top:28px; }
+  .dt-frame.veh2 .dt-head{ background:var(--lavender); color:var(--lavender-ink); }
+  .dt-frame.veh3{ background:#F2EEE4; border-color:#CFC8BB; }
+  .dt-frame.veh3 .dt-head{ background:#E2DCCF; color:var(--ink-soft); }
+  .dt-frame.ctin{ background:#EEF9F5; border-color:var(--mint-dark); }
+  .dt-frame.ctin .dt-head{ background:var(--mint); color:var(--mint-ink); }
+  .dt-frame.ctlist{ background:#FFF3EA; border-color:var(--peach-dark); margin-top:14px; }
+  .dt-frame.ctlist .dt-head{ background:var(--peach); color:var(--peach-ink); }
+  #vehicleScreen .todo-line{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* 長押しで、文字の選択やメニューが出ないように */
+  .ct-clr{ position:relative; }
+  .ct-clr > input{ padding-right:34px !important; }
+  .ct-clrbtn{ position:absolute; top:3px; right:4px; width:26px; height:26px; border:none; background:transparent; color:#9C948C; font-size:18px; line-height:1; cursor:pointer; padding:0; }
+  .ct-clrbtn[hidden]{ display:none; }
+  .ct-combo .ct-clrbtn{ right:34px; }
   .todo-date{ color:#6F8CA3; font-size:11px; font-weight:600; font-family:"Avenir Next Condensed","DIN Condensed","Arial Narrow",sans-serif; font-stretch:condensed; letter-spacing:-0.02em; margin-right:6px; }
   .dt-frame.wx{ background:#E9F6F6; border-color:#7FBFBF; }
   .dt-frame.wx .dt-head{ background:#BFE3E3; color:#0B5F5F; }
@@ -244,8 +269,7 @@ style.textContent = `
   .ct-inwrap{ position:relative; }
   .ct-person-field{ flex:1 1 0 !important; min-width:0; }
   .ct-title-field{ flex:0 0 138px !important; min-width:0; }
-  #doneTodoBox{ margin-top:30px; }
-  #doneTodoBox h2{ color:var(--ink-soft); }
+  #doneTodoBox{ margin-top:14px; }
   .done-item{ background:#F2EEE4 !important; border-left-color:#CFC8BB !important; color:var(--ink-soft); }
   .done-item .line-done{ text-decoration:line-through; text-decoration-color:rgba(214,69,69,0.55); text-decoration-thickness:1.5px; color:var(--ink-soft); }
   .done-item .done-suffix{ color:rgba(214,69,69,0.7); margin-left:4px; }
@@ -331,7 +355,7 @@ style.textContent = `
   .ct-gascol{ flex:1; min-width:0; }
   .ct-gashead{ display:flex; justify-content:space-between; align-items:center; height:20px; margin-bottom:4px; }
   .ct-gashead label{ margin:0; }
-  .ct-gasdir{ display:flex; gap:14px; font-size:17px; font-weight:900; line-height:1; color:var(--lavender-ink); }
+  .ct-gasdir{ display:flex; gap:14px; font-size:17px; font-weight:900; line-height:1; color:var(--lavender-ink); margin-right:42px; }
   .ct-gasdir span{ visibility:hidden; }
   .ct-gasdir span.on{ visibility:visible; animation:ctBlink 1s ease-in-out infinite; }
   @keyframes ctBlink{ 0%,100%{ opacity:1; } 50%{ opacity:.15; } }
@@ -421,12 +445,10 @@ const section = document.createElement("section");
 section.id = "containerScreen";
 section.className = "screen";
 section.innerHTML = `
-  <h2 id="ctTitle">容器ログ</h2>
-
-  <div class="card">
+  <section class="dt-frame compact ctin"><div class="dt-head"><span id="ctTitle">容器ログ</span></div><div class="dt-body">
     <div style="display:flex;gap:8px;align-items:stretch;">
       <div class="ct-seg" id="ctStatusSeg" style="flex:2;"></div>
-      <select id="ctStatusSel" style="flex:1.2;min-width:0;padding:8px 6px;" aria-label="その他の区分"></select>
+      <select id="ctStatusSel" style="flex:1.2;min-width:0;padding:8px 6px;" aria-label="他の区分"></select>
     </div>
     <div style="height:6px;"></div>
 
@@ -486,9 +508,9 @@ section.innerHTML = `
 
     <button class="btn btn-lavender" id="ctSaveButton">記録する</button>
     <button class="btn btn-outline-mint" id="ctCancelEdit" style="display:none;margin-top:8px;">更新をやめる</button>
-  </div>
+  </div></section>
 
-  <h2 class="h2-flex"><span>容器ログ(<span id="ctCount">0</span>本)</span><span class="ct-fs" id="ctFsSeg"></span></h2>
+  <section class="dt-frame compact ctlist"><div class="dt-head"><span>容器ログ(<span id="ctCount">0</span>本)</span><span class="ct-fs" id="ctFsSeg"></span></div><div class="dt-body">
   <div class="ct-seg" id="ctFilterSeg" style="margin-bottom:10px;"></div>
   <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;">
     <div class="ct-combo" id="ctSearchCombo" style="flex:2;min-width:0;">
@@ -504,6 +526,7 @@ section.innerHTML = `
   </div>
   <div class="ct-filter-info" id="ctFilterInfo"></div>
   <div id="ctList"></div>
+  </div></section>
 
   <div class="ct-status ct-offline-status"></div>
 `;
@@ -539,7 +562,7 @@ function renderStatus(){
   if(!sel.options.length){
     const first = document.createElement("option");
     first.value = "";
-    first.textContent = "その他の区分";
+    first.textContent = "他の区分";
     sel.appendChild(first);
     STATUS_TABLE.filter(r => !STATUS_BUTTONS.includes(r[0])).forEach(r => {
       const o = document.createElement("option");
@@ -579,7 +602,7 @@ function renderGasChips(){
     b.innerHTML = escapeHtml(text).replace(/2/g, '<span class="d2">2</span>');   // 数字の「2」は3割小さく
     b.style.background = st.bg;
     b.style.color = st.fg;
-    if(st.shadow) b.style.textShadow = "0 0 3px rgba(0,0,0,0.6)";
+    if(st.outline) b.style.textShadow = GAS_OUTLINE; else if(st.shadow) b.style.textShadow = "0 0 3px rgba(0,0,0,0.6)";
     b.addEventListener("click", onClick);
     box.appendChild(b);
   };
@@ -644,7 +667,7 @@ function renderGasSelected(){
   }
   el.style.background = st ? (st.vertBg || st.bg) : "";
   el.style.color = st ? st.fg : "";
-  el.style.textShadow = (st && st.shadow) ? "0 0 3px rgba(0,0,0,0.6)" : "";
+  el.style.textShadow = (st && st.outline) ? GAS_OUTLINE : ((st && st.shadow) ? "0 0 3px rgba(0,0,0,0.6)" : "");
   el.style.fontSize = text.length > 6 ? "12px" : "";
 }
 
@@ -817,16 +840,28 @@ function updateDatePh(){
 let ctAutoCust = "";            // 自動で入れた顧客名(自分で書き換えたら、空にする)
 let lastCust = null;
 try{ lastCust = JSON.parse(localStorage.getItem("lastCustomer") || "null"); }catch(e){ lastCust = null; }
-function trackCustomer(name){
+// 「（株）」「）」のような、会社の種類や記号だけの文字は、顧客名として扱わない
+function isNameLike(n){ return String(n || "").replace(CORP_RE, "").replace(/[\s\u3000()（）\-・.,、。]+/g, "").length > 0; }
+function trackCustomer(name, src){
   const n = String(name || "").trim();
-  if(!n) return;
-  lastCust = { name:n, date:getToday() };
+  if(!n || !isNameLike(n)) return;
+  lastCust = { name:n, date:getToday(), src:src || "" };
   try{ localStorage.setItem("lastCustomer", JSON.stringify(lastCust)); }catch(e){ /* 保存できなくても動く */ }
 }
-function recentCustomer(){ return (lastCust && lastCust.date === getToday()) ? lastCust.name : ""; }
+function loadLastCust(){ try{ lastCust = JSON.parse(localStorage.getItem("lastCustomer") || "null"); }catch(e){ lastCust = null; } return lastCust; }
+function recentCustomer(){ const l = loadLastCust(); return (l && l.date === getToday() && isNameLike(l.name)) ? l.name : ""; }
+// ホームの訪問先を全部消したときは、そこから控えた名前を忘れる
+function forgetHomeCustomer(){
+  loadLastCust();
+  if(lastCust && lastCust.src === "home"){ lastCust = null; try{ localStorage.removeItem("lastCustomer"); }catch(e){ /* 消せなくても動く */ } }
+}
 
 // ホームで作業中の顧客名(訪問中・訪問の編集中・ホームの訪問先に入力中)。なければ空
 function captureHomeCustomer(){
+  const pick = v => { const t = String(v || "").trim(); return (t && isNameLike(t)) ? t : ""; };
+  return pick(captureHomeCustomerRaw());
+}
+function captureHomeCustomerRaw(){
   if(typeof currentVisit !== "undefined" && currentVisit && currentVisit.target) return String(currentVisit.target).trim();
   const vs = $("visitScreen");
   if(vs && vs.classList.contains("active") && $("visitTarget") && $("visitTarget").value.trim()) return $("visitTarget").value.trim();
@@ -1851,24 +1886,18 @@ function wxLater(d, nowMs, days){
   }
   return null;
 }
-// 1ページの表示を、長い版から短い版の順に作る(1行に入らないときは、後ろの情報から落とす)
-//   日付ページ: 10/14(火)：　☁ くもり　 18/12 ℃ (0%)  →  (降水を落とす)  →  (最低気温を「*」にする)
-//   この後    : この後 12時〜：　☁ くもり　 (10%)      →  (降水を落とす)
-function wxVariants(day){
-  if(!day || !day.text) return [];
-  const icon = wxIcon(day.code);
-  const lead = `　${icon ? icon + " " : ""}${day.word}`;            // 「：」のあとに全角1文字の空き
-  const head = `${day.disp}：`;
-  let bodies;
-  if(day.later){
-    bodies = [`${lead}　 (${day.pop}%)`, lead];
-  }else{
-    const f = v => v != null ? String(v) : "*";
-    const nowP = day.popsNow && day.popsNow[0] ? `(${day.popsNow[0].v}%)` : (day.pop != null ? `(${day.pop}%)` : "");
-    const temps = `${f(day.max)}/${f(day.min)} ℃`;
-    bodies = [`${lead}　 ${temps}${nowP ? " " + nowP : ""}`, `${lead}　 ${temps}`, `${lead}　 ${f(day.max)}/* ℃`];
-  }
-  return bodies.filter((x, i) => i === 0 || x !== bodies[i - 1]).map(body => ({ head, body }));
+// 天気のアイコン：言葉に出てくる順に、最大2つ(例: 晴れ のち くもり → ☀☁)。言葉がなければ、コードの先頭の数字から
+function wxIconsFromText(text, code){
+  const out = [], re = /晴|くもり|曇|雨|雪|雷/g;
+  const map = { "晴":"☀", "くもり":"☁", "曇":"☁", "雨":"☂", "雪":"❄", "雷":"⚡" };
+  let m;
+  while((m = re.exec(String(text || "")))){ const ic = map[m[0]]; if(out[out.length - 1] !== ic) out.push(ic); }
+  return out.length ? out.slice(0, 2).join("") : wxIcon(code);
+}
+// 「14水」の形(JSTの日付から)
+function wxDayLabel(key){
+  const p = String(key).split("-").map(Number);
+  return `${p[2]}${"日月火水木金土"[new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay()]}`;
 }
 function wxIcon(code){ return ({ "1":"☀", "2":"☁", "3":"☂", "4":"❄" })[String(code || "")[0]] || ""; }
 
@@ -1879,31 +1908,40 @@ const WX_SPEEDS = [["3000","速い(3秒)"], ["3500","標準(3.5秒)"], ["4000","
 function wxSpeed(){ const v = localStorage.getItem(WX_SPEED_KEY); return WX_SPEEDS.some(x => x[0] === v) ? v : "3500"; }
 function wxInterval(){ const v = wxSpeed(); return v === "stop" ? 0 : parseInt(v, 10); }
 function wxManual(){ return wxReduced() || wxInterval() === 0; }          // 自動でめくらない(タップで次へ、長押しで詳細)
-let wxPage = 0;
-function wxPageList(){
+// 3日分(今日・明日・明後日)。1段目の表示は、ここから作る
+function wxCols(){
   const d = wxLoad();
-  if(!d || !d.weathers || !d.weathers.length) return [];
-  const now = Date.now(), days = wxDays(d, now), later = wxLater(d, now, days);
-  const mark = (now - Date.parse(d.fetchedAt) > 3 * 3600 * 1000) ? "* " : "";     // 3時間より古いときは「*」
-  return [days[0], later, days[1], days[2]].filter(Boolean)
-    .map(day => wxVariants(day).map(v => ({ head: mark + v.head, body: v.body })))
-    .filter(vs => vs.length);
+  if(!d || !d.weathers || !d.weathers.length) return null;
+  return wxDays(d, Date.now()).map(day => {
+    const pv = (day.popsNow && day.popsNow[0]) ? parseFloat(day.popsNow[0].v) : day.pop;
+    return { icons: day.text ? wxIconsFromText(day.text, day.code) : "", pop: isFinite(pv) ? pv : null, max: day.max, min: day.min, label: wxDayLabel(day.key) };
+  });
 }
-function wxItems(){ return wxPageList().map(vs => vs[0].head + vs[0].body); }
+// 数値がないところは「--」
+function wxCellText(c, mode){
+  if(mode === 0) return c.icons || "--";
+  if(mode === 1) return c.pop != null ? c.pop + "%" : "--";
+  return `${c.max != null ? c.max : "--"}/${c.min != null ? c.min : "--"}`;
+}
+let wxMode = 0;                                   // 0=アイコン 1=降水確率 2=気温
+function wxView(){
+  const cols = wxCols(), d = wxLoad();
+  if(!cols) return null;
+  return { mode: wxMode, r1: cols.map(c => wxCellText(c, wxMode)), r2: cols.map(c => c.label), stale: (Date.now() - Date.parse(d.fetchedAt)) > 3 * 3600 * 1000 };   // 3時間より古いときは、先頭に「--」
+}
 function wxRender(flip){
   const btn = $("ctWx");
   if(!btn) return;
-  const pages = wxPageList(), pg = btn.querySelector(".ct-wxpage");
-  if(pages.length === 0){ btn.hidden = true; pg.textContent = ""; return; }
-  wxPage = ((wxPage % pages.length) + pages.length) % pages.length;
+  const v = wxView();
+  if(!v){ btn.hidden = true; return; }
   btn.hidden = false;
-  for(const v of pages[wxPage]){                   // 1行に収まる、いちばん情報の多い版を選ぶ(途中で切れた文字は出さない)
-    pg.innerHTML = `<span class="wx-d">${escapeHtml(v.head)}</span>${escapeHtml(v.body)}`;
-    if(!(btn.clientWidth > 0 && pg.scrollWidth > btn.clientWidth)) break;
-  }
-  if(flip && !wxReduced()){ pg.classList.remove("flip"); void pg.offsetWidth; pg.classList.add("flip"); }   // ページが返るように切り替える
+  btn.querySelectorAll(".wx-r1").forEach((el, i) => { el.textContent = v.r1[i]; });
+  btn.querySelectorAll(".wx-r2").forEach((el, i) => { el.textContent = v.r2[i]; });
+  const st = btn.querySelector(".wx-stale");
+  if(st) st.hidden = !v.stale;
+  if(flip && !wxReduced()){ const g = btn.querySelector(".wx-grid"); g.classList.remove("flip"); void g.offsetWidth; g.classList.add("flip"); }   // ページが返るように切り替える
 }
-function wxStep(dir){ wxPage += dir; wxRender(true); }
+function wxStep(dir){ wxMode = ((wxMode + dir) % 3 + 3) % 3; wxRender(true); }
 let wxTimer = null;
 function wxRestartTimer(){
   clearInterval(wxTimer);
@@ -1939,10 +1977,10 @@ if($("wxSpeedSeg")){
     wxRestartTimer();
   });
 }
-window.ctWxPages = wxItems;
+window.ctWxView = wxView;
 window.ctWxStep = wxStep;
 window.ctWxInterval = wxInterval;
-window.ctWxPageIndex = () => wxPage;
+window.ctWxPageIndex = () => wxMode;
 window.ctWxRestart = wxRestartTimer;
 function wxReduced(){ try{ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }catch(e){ return false; } }
 function wxRecordDaily(d){
@@ -2002,13 +2040,16 @@ function wxShowSheet(){
   const now = Date.now(), days = wxDays(d, now), p = wxPops(d, now), tm = days[0];
   const hm = iso => { const x = new Date(iso); return isNaN(x.getTime()) ? "" : `${x.getMonth() + 1}/${x.getDate()} ${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`; };
   const row = (a, b) => `<div class="wx-row"><span>${escapeHtml(a)}</span><span>${escapeHtml(b)}</span></div>`;
-  const sub = day => `${day.max != null ? "最高 " + day.max + "℃" : ""}${day.min != null ? "　最低 " + day.min + "℃" : ""}${day.pop != null ? "　降水 " + day.pop + "%" : ""}`.trim();
+  const nn = v => v != null ? v : "--";
+  const sub = day => `最高 ${nn(day.max)}℃　最低 ${nn(day.min)}℃　降水 ${day.pop != null ? day.pop + "%" : "--"}`;
+  const later = wxLater(d, now, days);
   wxSheet.innerHTML = `<h3>天気(気象庁) ${escapeHtml(d.areaName)}</h3>` +
     row("今日", days[0].text || "") +
-    row("気温", `${tm.max != null ? "最高 " + tm.max + "℃" : ""}${tm.min != null ? "　最低 " + tm.min + "℃" : ""}${d.tempName ? "(" + d.tempName + ")" : ""}`) +
-    row("降水確率", p.map(x => `${x.label} ${x.v}%`).join("　")) +
-    row("明日", `${days[1].text || ""}${sub(days[1]) ? "　" + sub(days[1]) : ""}`) +
-    row("明後日", `${days[2].text || ""}${sub(days[2]) ? "　" + sub(days[2]) : ""}`) +
+    row("気温", `最高 ${nn(tm.max)}℃　最低 ${nn(tm.min)}℃${d.tempName ? "(" + d.tempName + ")" : ""}`) +
+    row("降水確率", p.length ? p.map(x => `${x.label} ${x.v}%`).join("　") : "--") +
+    row("この後", later ? `${later.disp.replace("この後 ", "")}　${later.text}　${later.pop}%` : "--") +
+    row("明日", `${days[1].text || "--"}　${sub(days[1])}`) +
+    row("明後日", `${days[2].text || "--"}　${sub(days[2])}`) +
     `<div class="wx-note">発表 ${escapeHtml(hm(d.report))}　取得 ${escapeHtml(hm(d.fetchedAt))}　出典: 気象庁ホームページ(予報区ごとの予報で、地点の天気とは異なる場合があります。明後日は週間予報から補うため、天気は短い言葉です)</div>` +
     `<div class="wx-btns"><button type="button" class="btn btn-outline-mint" id="wxRefresh">更新</button><button type="button" class="btn btn-mint" id="wxClose">閉じる</button></div>`;
   wxSheet.hidden = false;
@@ -2053,6 +2094,7 @@ normalizeTodoHeads();
 
 /* ---------- 車両タブ：終了したToDoリスト。チェックを外すと、実行中へ戻る ---------- */
 const doneBox = document.createElement("div");
+doneBox.className = "dt-frame compact veh3";
 doneBox.id = "doneTodoBox";
 doneBox.hidden = true;
 const vehScreen = $("vehicleScreen");
@@ -2067,10 +2109,13 @@ function renderDoneTodos(){
   box.hidden = done.length === 0;
   box.innerHTML = "";
   if(done.length === 0) return;
-  const h = document.createElement("h2");
-  h.className = "h2-flex";
-  h.innerHTML = '<span>終了したToDoリスト</span><span class="h2-note">チェックを外すと戻る</span>';
-  box.appendChild(h);
+  const head = document.createElement("div");
+  head.className = "dt-head";
+  head.innerHTML = '<span>終了したToDoリスト</span><span class="h2-note">チェックを外すと戻る</span>';
+  const body = document.createElement("div");
+  body.className = "dt-body";
+  box.appendChild(head);
+  box.appendChild(body);
   done.slice(0, doneLimit).forEach(t => {
     const md = typeof formatMonthDay === "function" ? formatMonthDay(t.date) : "";
     const suffix = typeof formatDoneSuffix === "function" ? formatDoneSuffix(t.completedAt) : "(済)";
@@ -2080,7 +2125,7 @@ function renderDoneTodos(){
     div.setAttribute("data-id", t.id);
     div.innerHTML = `<label><input type="checkbox" class="todo-undo" data-id="${escapeHtml(t.id)}" checked>` +
       `<span class="todo-line"><span class="line-done">${md ? `<span class="todo-date">${escapeHtml(md)}</span>` : ""}${escapeHtml(rest)}</span><span class="done-suffix">${escapeHtml(suffix)}</span></span></label>`;
-    box.appendChild(div);
+    body.appendChild(div);
   });
   if(done.length > doneLimit){
     const more = document.createElement("button");
@@ -2088,7 +2133,7 @@ function renderDoneTodos(){
     more.className = "btn btn-outline-mint";
     more.id = "doneMore";
     more.textContent = `さらに表示(残り ${done.length - doneLimit}件)`;
-    box.appendChild(more);
+    body.appendChild(more);
   }
 }
 
@@ -2108,6 +2153,140 @@ doneBox.addEventListener("click", e => {
   if(e.target.closest("#doneMore")){ doneLimit += 20; renderDoneTodos(); }
 });
 renderDoneTodos();
+
+/* ---------- ToDoの並べ替え：「≡」を0.2秒押し続けると、つかめる ---------- */
+window.attachTodoDrag = function(handle, container){
+  const item = handle.closest(".todo-item");
+  let state = "idle", startY = 0, lastY = 0, timer = null, scrollTimer = null;
+  function reposition(y){
+    const siblings = [...container.querySelectorAll(".todo-item")].filter(el => el !== item);
+    let before = null;
+    for(const sib of siblings){
+      const r = sib.getBoundingClientRect();
+      if(y < r.top + r.height / 2){ before = sib; break; }
+    }
+    if(before){ if(item.nextElementSibling !== before) container.insertBefore(item, before); }
+    else if(container.lastElementChild !== item){ container.appendChild(item); }
+  }
+  function stopListening(){
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
+  }
+  function onMove(e){
+    if(state === "pending"){                       // 0.2秒より前に動かしたら、つかまない(スクロールのつもり)
+      if(Math.abs(e.clientY - startY) > 8){ clearTimeout(timer); state = "idle"; stopListening(); }
+      return;
+    }
+    if(state !== "drag") return;
+    lastY = e.clientY;
+    reposition(lastY);
+    e.preventDefault();
+  }
+  function onUp(){
+    clearTimeout(timer);
+    stopListening();
+    if(state !== "drag"){ state = "idle"; return; }
+    state = "idle";
+    clearInterval(scrollTimer);
+    item.classList.remove("dragging");
+    const ids = [...container.querySelectorAll(".todo-item")].map(el => el.getAttribute("data-id"));
+    ids.forEach((id, i) => { const t = todoItems.find(x => x.id === id); if(t) t.order = (i + 1) * 1000; });
+    saveTodos();
+    renderTodoList();
+  }
+  handle.style.touchAction = "pan-y";
+  handle.addEventListener("pointerdown", e => {
+    if(e.button !== undefined && e.button > 0) return;
+    state = "pending";
+    startY = lastY = e.clientY;
+    window.addEventListener("pointermove", onMove, { passive:false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    timer = setTimeout(() => {
+      if(state !== "pending") return;
+      state = "drag";                              // つかんだ合図：行が浮く
+      item.classList.add("dragging");
+      try{ handle.setPointerCapture(e.pointerId); }catch(err){ /* 未対応でも続ける */ }
+      if(navigator.vibrate){ try{ navigator.vibrate(10); }catch(err){ /* 振動できなくても続ける */ } }
+      scrollTimer = setInterval(() => {            // 画面の端では、自動でスクロール
+        const edge = 70;
+        if(lastY < edge) window.scrollBy(0, -14);
+        else if(lastY > window.innerHeight - edge) window.scrollBy(0, 14);
+        else return;
+        reposition(lastY);
+      }, 30);
+    }, 200);
+  });
+};
+window.addEventListener("touchmove", e => { if(document.querySelector(".todo-item.dragging")) e.preventDefault(); }, { passive:false });
+
+/* ---------- 車両タブのToDoリスト：文字を長押し(0.5秒)すると、編集 ---------- */
+const todoEdit = document.createElement("div");
+todoEdit.className = "ct-wxsheet";
+todoEdit.id = "todoEditSheet";
+todoEdit.hidden = true;
+document.body.appendChild(todoEdit);
+let todoEditId = null, todoLP = false, todoPressTimer = null, todoPressX = 0, todoPressY = 0;
+function openTodoEdit(id){
+  const t = todoItems.find(x => x.id === id);
+  if(!t) return;
+  todoEditId = id;
+  todoEdit.innerHTML = `<h3>ToDoを編集</h3>` +
+    `<div class="field"><input type="text" id="teTarget" placeholder="顧客名" autocomplete="off"></div>` +
+    `<div class="field"><input type="text" id="teContent" placeholder="内容" autocomplete="off"></div>` +
+    `<div class="wx-btns"><button type="button" class="btn btn-mint" id="teSave">更新</button><button type="button" class="btn btn-outline-mint" id="teCancel">やめる</button><button type="button" class="btn btn-outline-pink" id="teDelete">削除</button></div>`;
+  $("teTarget").value = t.target || "";
+  $("teContent").value = t.content || "";
+  todoEdit.hidden = false;
+}
+function afterTodoEdit(msg){
+  todoEdit.hidden = true;
+  todoEditId = null;
+  if(typeof saveTodos === "function") saveTodos(); else localStorage.setItem("todoItems", JSON.stringify(todoItems));
+  renderTodoList();
+  if(typeof renderReportScreen === "function") renderReportScreen();
+  showToast(msg);
+}
+todoEdit.addEventListener("click", e => {
+  const t = todoItems.find(x => x.id === todoEditId);
+  if(e.target.closest("#teCancel")){ todoEdit.hidden = true; return; }
+  if(!t) return;
+  if(e.target.closest("#teSave")){
+    const content = $("teContent").value.trim();
+    if(!content){ showToast("内容を入力してください"); return; }
+    t.target = $("teTarget").value.trim();
+    t.content = content;
+    t.shortDone = true;                            // 自分で直した顧客名は、短く変えない
+    afterTodoEdit("更新しました");
+    return;
+  }
+  if(e.target.closest("#teDelete")){
+    if(!window.confirm("このToDoを削除しますか?")) return;
+    todoItems = todoItems.filter(x => x.id !== todoEditId);
+    afterTodoEdit("削除しました");
+  }
+});
+document.addEventListener("pointerdown", e => { if(!todoEdit.hidden && !e.target.closest("#todoEditSheet")) todoEdit.hidden = true; });
+const vehScr = $("vehicleScreen");
+if(vehScr){
+  vehScr.addEventListener("pointerdown", e => {
+    const line = e.target.closest(".todo-list-target .todo-line");
+    if(!line) return;
+    const item = line.closest(".todo-item");
+    todoLP = false;
+    todoPressX = e.clientX || 0; todoPressY = e.clientY || 0;
+    clearTimeout(todoPressTimer);
+    todoPressTimer = setTimeout(() => { if(item){ todoLP = true; openTodoEdit(item.getAttribute("data-id")); } }, 500);
+  });
+  vehScr.addEventListener("pointermove", e => {
+    if(Math.abs((e.clientY || 0) - todoPressY) > 10 || Math.abs((e.clientX || 0) - todoPressX) > 10) clearTimeout(todoPressTimer);
+  });
+  ["pointerup", "pointercancel"].forEach(t => vehScr.addEventListener(t, () => clearTimeout(todoPressTimer)));
+  vehScr.addEventListener("click", e => {          // 長押しのあとの指離しで、終了のチェックが入らないようにする
+    if(todoLP && e.target.closest(".todo-line")){ e.preventDefault(); e.stopPropagation(); todoLP = false; }
+  }, true);
+}
 
 /* ---------- 訪問入力：面談者の欄を狭く、敬称の欄を広く／敬称に「係長」を足す ---------- */
 (function widenTitle(){
@@ -2346,9 +2525,36 @@ if(typeof window.renderMasterUI === "function") window.renderMasterUI();
 (function layoutHostScreens(){
   const vs = $("vehicleScreen");
   if(vs){
-    const h2 = [...vs.children].find(e => e.tagName === "H2");
+    const mkFrame = (cls, h2, nodes) => {                      // 見出し(h2)を色つきの帯にして、続くものをカードの中へ入れる
+      const frame = document.createElement("section");
+      frame.className = "dt-frame compact " + cls;
+      const head = document.createElement("div");
+      head.className = "dt-head";
+      while(h2.firstChild) head.appendChild(h2.firstChild);
+      const body = document.createElement("div");
+      body.className = "dt-body";
+      nodes.forEach(n => body.appendChild(n));
+      frame.appendChild(head);
+      frame.appendChild(body);
+      h2.parentNode.insertBefore(frame, h2);
+      h2.remove();
+      return frame;
+    };
+    const h2s = [...vs.children].filter(e => e.tagName === "H2");
+    const hVeh = h2s[0], hTodo = h2s.find(h => /TODO|ToDo/.test(h.textContent));
     const pill = $("vehicleStatusPill");
-    if(h2 && pill){ h2.classList.add("ct-h2-inline"); h2.appendChild(pill); }      // 「帰社」「帰社済み」を、見出しの右横へ
+    if(hVeh){
+      const nodes = [];
+      for(let n = hVeh.nextElementSibling; n && n !== hTodo; n = n.nextElementSibling) nodes.push(n);
+      if(pill) hVeh.appendChild(pill);                         // 「帰社」「帰社済み」を、見出しの右横へ
+      mkFrame("veh1", hVeh, nodes);
+    }
+    if(hTodo){
+      hTodo.innerHTML = hTodo.innerHTML.replace(/TODOリスト/g, "ToDoリスト");
+      const nodes = [];
+      for(let n = hTodo.nextElementSibling; n; n = n.nextElementSibling) if(n.id !== "doneTodoBox") nodes.push(n);
+      mkFrame("veh2", hTodo, nodes);                           // ToDoリストは、車両情報のカードから一段下げる(上に余白)
+    }
     const lab = $("vehicleModeLabel");
     if(lab && lab.parentNode) lab.parentNode.style.display = "none";
   }
@@ -2607,24 +2813,19 @@ if(dateEl && dateEl.parentNode){
   dateEl.parentNode.insertBefore(box, dateEl);
   const left = document.createElement("div");
   left.className = "ct-dleft";
-  const l1 = document.createElement("div");
-  l1.className = "ct-dline1";
-  l1.appendChild(dateEl);
-  const wx = document.createElement("button");     // 今日〜明後日の天気を、1日1行で、ページをめくるように見せる
+  left.appendChild(dateEl);
+  const sub = document.createElement("div");       // 日付の下の1行
+  sub.className = "ct-bcpsub";
+  sub.textContent = "BCP用オフライン使用可";
+  left.appendChild(sub);
+  const wx = document.createElement("button");     // 右側の2段：1段目=アイコン→降水確率→気温(自動で切り替わる)、2段目=日付
   wx.type = "button";
   wx.id = "ctWx";
   wx.className = "ct-wx";
   wx.hidden = true;
-  const pg = document.createElement("span");
-  pg.className = "ct-wxpage";
-  wx.appendChild(pg);
-  left.appendChild(l1);
-  left.appendChild(wx);
-  const sub = document.createElement("div");       // 日付と同じ行の右端
-  sub.className = "ct-bcpsub";
-  sub.textContent = "BCP用オフライン使用可";
-  l1.appendChild(sub);
+  wx.innerHTML = '<span class="wx-stale" hidden>--</span><span class="wx-grid">' + '<span class="wx-r1"></span>'.repeat(3) + '<span class="wx-r2"></span>'.repeat(3) + '</span>';
   box.appendChild(left);
+  box.appendChild(wx);
 
   let pressTimer = null, longPressed = false, swiped = false, startX = 0;
   wx.addEventListener("pointerdown", e => {         // 触れている間は、めくりが止まる
@@ -2707,13 +2908,46 @@ function goToContainer(strong){
   updateNav("container");
 }
 
+/* ---------- 顧客名の入力欄：右上の全消去ボタン(☒) ---------- */
+function attachClear(inp){
+  if(!inp || inp.getAttribute("data-clr")) return;
+  inp.setAttribute("data-clr", "1");
+  const wrap = document.createElement("div");
+  wrap.className = "ct-clr";
+  inp.parentNode.insertBefore(wrap, inp);
+  wrap.appendChild(inp);
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "ct-clrbtn";
+  b.textContent = "☒";
+  b.setAttribute("aria-label", "全消去");
+  b.hidden = true;
+  wrap.appendChild(b);
+  const sync = () => { b.hidden = !inp.value || inp.disabled; };
+  [["value"], ["disabled"]].forEach(([prop]) => {   // 画面の外から値を入れても(候補の選択・入力後のリセットなど)、ボタンの表示を合わせる
+    const pd = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, prop);
+    if(pd && pd.get && pd.set) Object.defineProperty(inp, prop, { configurable:true, get(){ return pd.get.call(inp); }, set(v){ pd.set.call(inp, v); sync(); } });
+  });
+  inp.addEventListener("input", sync);
+  b.addEventListener("mousedown", e => e.preventDefault());       // 入力欄のカーソルを外さない
+  b.addEventListener("click", () => {
+    if(inp.disabled) return;
+    inp.value = "";
+    inp.dispatchEvent(new Event("input", { bubbles:true }));
+    inp.dispatchEvent(new Event("change", { bubbles:true }));
+    inp.focus();
+  });
+  sync();
+}
+["homeVisitTarget", "visitTarget", "ctCustomer", "ctSearch", "cmSearch", "cmAddName"].forEach(id => attachClear($(id)));
+
 /* ---------- ホームで作業した顧客名を控える ---------- */
 if($("homeVisitTarget")){
-  $("homeVisitTarget").addEventListener("input", () => trackCustomer($("homeVisitTarget").value));
-  $("homeVisitTarget").addEventListener("change", () => trackCustomer($("homeVisitTarget").value));
+  $("homeVisitTarget").addEventListener("input", () => { if(!$("homeVisitTarget").value.trim()) forgetHomeCustomer(); });   // 1文字ごとには控えない
+  $("homeVisitTarget").addEventListener("change", () => trackCustomer($("homeVisitTarget").value, "home"));
 }
-if($("homeStartButton")) $("homeStartButton").addEventListener("click", () => trackCustomer($("homeVisitTarget") ? $("homeVisitTarget").value : ""));
-if($("endButton")) $("endButton").addEventListener("click", () => trackCustomer($("visitTarget") ? $("visitTarget").value : ""));
+if($("homeStartButton")) $("homeStartButton").addEventListener("click", () => trackCustomer($("homeVisitTarget") ? $("homeVisitTarget").value : "", "home"));
+if($("endButton")) $("endButton").addEventListener("click", () => trackCustomer($("visitTarget") ? $("visitTarget").value : "", "home"));
 
 /* ---------- 車両の走行距離の初期値 ---------- */
 function prevDayKey(key){
