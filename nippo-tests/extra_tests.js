@@ -1448,3 +1448,39 @@ w.scrollBy=sbB43; w.scrollTo=stB43;
 const css43=[...d.querySelectorAll("style")].map(x=>x.textContent).join("\n");
 ok(/#containerScreen \.dt-frame\.ctlist\{ margin-top:34px; \}/.test(css43),"there is a gap of about 2 lines before the 容器ログ list");
 ok(/\.wx-ic\[data-ic="☀"\]\{ color:#E8890C; \}/.test(css43) && /\.wx-ic\[data-ic="☂"\]\{ color:#1F6FD1; \}/.test(css43) && /\.wx-ic\[data-ic="☁"\]\{ color:#7D8A96; \}/.test(css43),"weather icons have their own colors: sun orange, rain blue, cloud grey (snow / thunder deeper)");
+
+// ---- 44) 訪問履歴を3行に(右上に小さな編集・削除) ----
+w.eval('meetingLogs=[{createdAt:"vh1",date:"2026-10-08",number:3,target:"オノデラ製作所(株)",startTime:"2026-10-08T10:25",endTime:"2026-10-08T11:20",attendee:"川口",attendeeTitle:"課長",content:"配達"}]');
+$("visitList").innerHTML='<div class="visit-card"><div class="top"><span class="target">No.3　オノデラ製作所(株)</span><span class="time">10:25 ～ 11:20</span></div><div class="meta">川口課長</div><div style="margin-top:6px;"><div class="content-line"><input type="checkbox" class="content-line-checkbox"><span>配達</span></div></div><div class="row-gap"><button class="card-action edit" data-id="vh1">編集</button><button class="card-action delete" data-id="vh1">削除</button></div></div>';
+let edClicks44=0; $("visitList").querySelector(".edit").addEventListener("click",()=>edClicks44++);
+w.ctCompactVisits();
+const vc44=$("visitList").querySelector(".visit-card");
+ok(vc44.getAttribute("data-compact")==="1" && vc44.querySelector(".vc-l1 .vc-no").textContent==="No.3" && vc44.querySelector(".vc-time").textContent==="10:25–11:20","line 1: number and time");
+ok(vc44.querySelector(".vc-name").firstChild.textContent==="オノデラ製作所(株)" && vc44.querySelector(".vc-name .vc-person").textContent==="川口課長","line 2: the customer name in bold, with the person in small grey after it");
+ok(!!vc44.querySelector(".vc-btns .card-action.edit") && !!vc44.querySelector(".vc-btns .card-action.delete") && !vc44.querySelector(".top") && !vc44.querySelector(".meta") && !vc44.querySelector(".row-gap"),"編集・削除 are small buttons at the top right; the old big button row is gone");
+vc44.querySelector(".vc-btns .edit").click();
+ok(edClicks44===1 && !!vc44.querySelector(".content-line"),"the buttons keep working as before; the content lines (□ to ToDo) stay");
+const css44=[...d.querySelectorAll("style")].map(x=>x.textContent).join("\n");
+ok(/\.vc-btns \.card-action\{ flex:none; width:52px; height:32px;/.test(css44),"buttons about 52 x 32 px");
+
+// ---- 45) 顧客リスト：2つ以上の担当のリストを持てる(残して足す/入れ替える。同じ担当は自動で入れ替え) ----
+w.localStorage.setItem("customerHidden",JSON.stringify(["c:2"])); w.eval('0');
+w.localStorage.setItem("customerMaster",JSON.stringify({office:"A営業所",updated:"2026-10-01",items:[{n:"北ガス",k:"きたがす",c:"1"},{n:"山田商店",k:"やまだ",c:"2"}]}));
+w.renderMasterUI();
+w.saveMasterData({office:"B担当",updated:"2026-10-10",items:[{n:"北ガス",k:"きたがす",c:"9"},{n:"川口工業",k:"かわぐち",c:"3"}]});
+ok(!$("ctMasterChoice").hidden && /A営業所/.test($("ctMcText").textContent) && /B担当/.test($("ctMcText").textContent),"a list from another person: asks 残して足す / 入れ替える");
+$("ctMcAdd").click();
+const m45=()=>JSON.parse(w.localStorage.getItem("customerMaster"));
+ok($("ctMasterChoice").hidden && m45().items.map(i=>i.n+":"+i.c).join()==="山田商店:2,北ガス:9,川口工業:3","残して足す: both lists; the same customer (same name) is taken from the newer list");
+ok(m45().sources.map(x=>x.office+x.count).join()==="A営業所1,B担当2" && /A営業所 1件 \+ B担当 2件/.test($("masterStatus").textContent),"the status shows each list: A営業所 1件 + B担当 2件");
+w.saveMasterData({office:"A営業所",updated:"2026-10-12",items:[{n:"山田商店",k:"やまだ",c:"2"},{n:"新規",k:"しんき",c:"5"}]});
+ok($("ctMasterChoice").hidden && m45().items.filter(i=>i.o==="A営業所").map(i=>i.n).join()==="山田商店,新規" && m45().items.filter(i=>i.o==="B担当").length===2,"the same person's list again: only that part is replaced, with no question");
+ok(JSON.parse(w.localStorage.getItem("customerHidden")).includes("c:2"),"the hidden marks are kept separately and are not touched by importing (hidden customers stay hidden)");
+w.saveMasterData({office:"C担当",updated:"2026-10-13",items:[{n:"別会社",k:"べつ",c:"7"}]});
+$("ctMcReplace").click();
+ok(m45().items.map(i=>i.n).join()==="別会社" && m45().sources.length===1,"入れ替える: only the new list remains");
+w.saveMasterData({office:"D担当",updated:"2026-10-14",items:[{n:"D社",k:"でぃー",c:"8"}]});
+$("ctMcCancel").click();
+ok(m45().items.map(i=>i.n).join()==="別会社","やめる: the list stays as it was");
+ok(w.ctMasterMerged({office:"X",items:[{n:"甲",c:"1"},{n:"乙",c:""}]},{office:"Y",items:[{n:"丙",c:"1"},{n:"乙",c:"4"}]},"add").items.map(i=>i.n+":"+i.c).join()==="丙:1,乙:4","a customer whose code or name matches is replaced by the newer list (code 1 → 丙, name 乙 → code 4)");
+w.localStorage.setItem("customerHidden","[]");

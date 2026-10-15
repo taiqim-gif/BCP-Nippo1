@@ -37,3 +37,10 @@ b='</script>\n<script src="container.js"></script>'
 assert h.count(b)==1
 h=h.replace(b,'document.getElementById("todoAddButton").addEventListener("click",()=>{const i=document.getElementById("todoManualInput");const t=i.value.trim();if(!t)return;todoItems.push({id:"m"+Date.now(),date:getToday(),target:"",content:t,done:false,source:"manual",order:9999});i.value="";if(typeof renderTodoList==="function")renderTodoList();});\n'+b)
 open("harness4.html","w",encoding="utf-8").write(h)
+
+# 確認用の画面に、顧客リストの取り込みの最後の処理(saveMasterData)を足す(本物の index.html と同じ働き)
+h=open("harness4.html",encoding="utf-8").read()
+b='</script>\n<script src="container.js"></script>'
+assert h.count(b)==1
+h=h.replace(b,'function saveMasterData(data){ customerMaster={office:data.office||"",updated:data.updated||"",items:data.items}; localStorage.setItem("customerMaster",JSON.stringify(customerMaster)); if(typeof renderMasterUI==="function") renderMasterUI(); showToast("客先名リストを取り込みました"); }\n'+b)
+open("harness4.html","w",encoding="utf-8").write(h)

@@ -297,6 +297,24 @@ style.textContent = `
   .ct-badge.out{ background:var(--sky); color:var(--sky-ink); }
   .ct-badge.in{ background:var(--peach); color:var(--peach-ink); }
   .ct-badge.oth{ background:var(--lavender); color:var(--lavender-ink); }
+  /* 訪問履歴：1件を3行に(1行目=番号・時刻・面談者と小さなボタン、2行目=顧客名、3行目から=内容) */
+  .visit-card[data-compact]{ padding:8px 10px 6px 12px; margin-bottom:8px; }
+  .vc-l1{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-soft); min-width:0; }
+  .vc-no{ font-weight:700; white-space:nowrap; }
+  .vc-time{ white-space:nowrap; }
+  .vc-sp{ flex:1; }
+  .vc-person{ font-size:13px; font-weight:400; color:var(--ink-soft); margin-left:8px; white-space:nowrap; }
+  .vc-btns{ display:flex; gap:6px; flex:none; }
+  .vc-btns .card-action{ flex:none; width:52px; height:32px; padding:0; font-size:13px; }
+  .vc-name{ font-size:16px; font-weight:700; line-height:1.35; margin:2px 0 0; overflow-wrap:anywhere; }
+  .visit-card[data-compact] .content{ margin-bottom:4px; }
+  /* 顧客リストの取り込み：前のリストを残すか、入れ替えるかを選ぶ */
+  .ct-mchoice{ position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; padding:16px; }
+  .ct-mchoice[hidden]{ display:none; }
+  .ct-mchoice-box{ background:#fff; border-radius:16px; padding:16px; width:100%; max-width:360px; display:flex; flex-direction:column; gap:10px; }
+  .ct-mchoice-box h3{ margin:0; font-size:16px; }
+  .ct-mchoice-box p{ margin:0; font-size:14px; line-height:1.6; }
+  .ct-mchoice-box .btn-mini{ align-self:center; }
   .visit-card.ct-out{ border-left-color:var(--sky); }
   .visit-card.ct-in{ border-left-color:var(--peach); }
   .visit-card.ct-oth{ border-left-color:var(--lavender); }
@@ -2191,12 +2209,117 @@ if(typeof origRenderMasterUI === "function"){
     const st = $("masterStatus");
     if(st){
       let t = st.textContent.replace("客先名リスト", "顧客リスト");
+      const srcs = masterSources(rawMaster());
+      if(srcs.length > 1 && srcs.every(x => x.count)) t = "顧客リスト：" + srcs.map(x => `${srcLabel(x.office)} ${x.count.toLocaleString()}件`).join(" + ");
       const hid = allCustomers().filter(i => custHidden.has(custKey(i))).length;
       if(hid > 0) t += `(非表示 ${hid})`;
       st.textContent = t;
     }
   };
 }
+/* ---------- 訪問履歴：1件を3行にまとめる(番号・時刻・面談者 / 顧客名 / 内容)。編集・削除は、右上の小さなボタン ---------- */
+function compactVisitCards(){
+  document.querySelectorAll("#visitList .visit-card").forEach(card => {
+    if(card.getAttribute("data-compact")) return;
+    const ed = card.querySelector(".card-action.edit"), del = card.querySelector(".card-action.delete");
+    const id = ed && ed.getAttribute("data-id");
+    const log = (typeof meetingLogs !== "undefined" && Array.isArray(meetingLogs)) ? meetingLogs.find(l => l.createdAt === id) : null;
+    if(!log) return;
+    card.setAttribute("data-compact", "1");
+    const t1 = typeof formatTimeOnly === "function" ? formatTimeOnly(log.startTime) : "", t2 = typeof formatTimeOnly === "function" ? formatTimeOnly(log.endTime) : "";
+    const person = [log.attendee, log.attendeeTitle].filter(Boolean).join("");
+    const l1 = document.createElement("div");
+    l1.className = "vc-l1";
+    l1.innerHTML = `<span class="vc-no">No.${escapeHtml(String(log.number || "-"))}</span><span class="vc-time">${escapeHtml(t1)}${t2 ? "–" + escapeHtml(t2) : ""}</span><span class="vc-sp"></span><span class="vc-btns"></span>`;
+    const btns = l1.querySelector(".vc-btns");
+    [ed, del].forEach(b => { if(b) btns.appendChild(b); });            // ボタンは、そのまま移す(押したときの動きは、元のまま)
+    const nm = document.createElement("div");
+    nm.className = "vc-name";
+    nm.textContent = log.target || "(訪問先未入力)";
+    if(person){ const ps = document.createElement("span"); ps.className = "vc-person"; ps.textContent = person; nm.appendChild(ps); }   // 面談者は、顧客名の後ろに小さく(1行目が狭いので、切れないように)
+    const top = card.querySelector(".top"), meta = card.querySelector(".meta"), row = card.querySelector(".row-gap");
+    card.insertBefore(nm, card.firstChild);
+    card.insertBefore(l1, nm);
+    [top, meta].forEach(x => x && x.remove());
+    if(row && !row.children.length) row.remove();
+  });
+}
+window.ctCompactVisits = compactVisitCards;
+const origRenderReportScreen = window.renderReportScreen;
+if(typeof origRenderReportScreen === "function"){
+  window.renderReportScreen = function(){ origRenderReportScreen.apply(this, arguments); compactVisitCards(); };
+}
+if($("visitList") && typeof MutationObserver === "function") new MutationObserver(compactVisitCards).observe($("visitList"), { childList:true });
+
+/* ---------- 顧客リスト：2つ以上の担当のリストを持てるようにする ----------
+   保存場所(customerMaster)は、そのまま。中に、リストごとの印(sources と、各顧客の o)を足す。
+   ・同じ担当のリストを取り込み直したときは、その担当の分だけ、自動で新しい版に入れ替える
+   ・別の担当のリストを取り込むときは、[前のリストを残して足す] / [前のリストを消して入れ替える] を選ぶ
+   ・同じ顧客(顧客コードか名前が同じ)は、あとから取り込んだほうにまとめる */
+function masterSources(raw){
+  if(!raw || !Array.isArray(raw.items)) return [];
+  if(Array.isArray(raw.sources) && raw.sources.length) return raw.sources;
+  return [{ office: raw.office || "", updated: raw.updated || "" }];     // 前の版で取り込んだリスト(印なし)は、1つのリストとして扱う
+}
+function srcLabel(o){ return o || "(名前なし)"; }
+// base(前のリストの顧客)に、add(新しいリスト)を足す。コードか名前が同じ顧客は、add のほうにまとめる
+function mergeCustomerItems(base, add){
+  const codes = new Set(add.map(i => i.c).filter(Boolean)), names = new Set(add.map(i => i.n));
+  return base.filter(i => !(i.c && codes.has(i.c)) && !names.has(i.n)).concat(add);
+}
+function buildMaster(sources, items){
+  const cnt = {};
+  items.forEach(i => { cnt[i.o] = (cnt[i.o] || 0) + 1; });
+  const srcs = sources.filter(x => cnt[x.office]).map(x => ({ office:x.office, updated:x.updated, count:cnt[x.office] }));
+  const last = srcs[srcs.length - 1] || { office:"", updated:"" };
+  return { office: srcs.map(x => srcLabel(x.office)).join(" + "), updated: last.updated || "", items, sources: srcs };
+}
+function masterMerged(prev, data, mode){
+  const office = data.office || "", updated = data.updated || "";
+  const add = data.items.map(i => Object.assign({}, i, { o: office }));
+  if(mode === "replace" || !prev || !Array.isArray(prev.items) || !prev.items.length) return buildMaster([{ office, updated }], add);
+  const oldSrc = masterSources(prev), firstOffice = oldSrc[0].office;
+  const base = prev.items.map(i => Object.assign({}, i, { o: i.o != null ? i.o : firstOffice })).filter(i => i.o !== office);   // 同じ担当の古い版は、取り除く
+  const srcs = oldSrc.filter(x => x.office !== office).concat([{ office, updated }]);
+  return buildMaster(srcs, mergeCustomerItems(base, add));
+}
+window.ctMasterMerged = masterMerged;
+// 取り込みの最後に呼ばれる saveMasterData を包む
+const origSaveMasterData = window.saveMasterData;
+function finishMasterSave(full){
+  origSaveMasterData({ office: full.office, updated: full.updated, items: full.items });   // 元の処理(キーの欄を空に・画面の更新・お知らせ)
+  try{ localStorage.setItem("customerMaster", JSON.stringify(full)); }catch(e){ /* 保存できないときは、元の処理の分が残る */ }
+  if(typeof window.renderMasterUI === "function") window.renderMasterUI();
+}
+if(typeof origSaveMasterData === "function"){
+  window.saveMasterData = function(data){
+    const prev = rawMaster(), office = (data && data.office) || "";
+    const has = !!(prev && Array.isArray(prev.items) && prev.items.length);
+    if(!has || masterSources(prev).some(x => x.office === office)){ finishMasterSave(masterMerged(prev, data, "add")); return; }   // 初めて・同じ担当の取り込み直しは、選ばずに進める
+    showMasterChoice(prev, data);
+  };
+}
+function showMasterChoice(prev, data){
+  let sh = $("ctMasterChoice");
+  if(!sh){
+    sh = document.createElement("div");
+    sh.id = "ctMasterChoice";
+    sh.className = "ct-mchoice";
+    sh.innerHTML = '<div class="ct-mchoice-box"><h3>顧客リストの取り込み</h3><p id="ctMcText"></p>' +
+      '<button type="button" class="btn btn-mint" id="ctMcAdd">前のリストを残して足す</button>' +
+      '<button type="button" class="btn btn-outline-pink" id="ctMcReplace">前のリストを消して入れ替える</button>' +
+      '<button type="button" class="btn-mini" id="ctMcCancel">やめる</button></div>';
+    document.body.appendChild(sh);
+  }
+  const now = masterSources(prev).map(x => `「${srcLabel(x.office)}」`).join("・");
+  $("ctMcText").textContent = `今、${now} (${prev.items.length.toLocaleString()}件) が入っています。新しく「${srcLabel(data.office)}」(${data.items.length.toLocaleString()}件) を取り込みます。`;
+  const close = () => { sh.hidden = true; };
+  $("ctMcAdd").onclick = () => { close(); finishMasterSave(masterMerged(prev, data, "add")); };
+  $("ctMcReplace").onclick = () => { close(); finishMasterSave(masterMerged(prev, data, "replace")); };
+  $("ctMcCancel").onclick = () => { close(); if(typeof setMasterMessage === "function") setMasterMessage("取り込みをやめました(前のリストのままです)", false); };
+  sh.hidden = false;
+}
+
 // 表示の言葉をそろえる：「客先名リスト」→「顧客リスト」、「TODO」→「ToDo」
 const origShowToast = window.showToast;
 if(typeof origShowToast === "function"){

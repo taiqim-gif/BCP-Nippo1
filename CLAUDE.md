@@ -16,14 +16,14 @@
 - 推測で作らない。画面の作りが分からないときは、`index.html` を読んで確かめる(このフォルダにある)。
 - 色や文字の大きさなどの数字は、決めた値を、そのまま使う(下の「仕様」を参照)。勝手に変えない。
 - 画面の文言のルール: 括弧は**半角**。「ToDoリスト」(旧: TODOリスト)に統一。データ画面では「容器ログ」を「容器」と書く。
-- 利用者は、現場(電波が弱い・手袋・画面の高さが限られる)での使いやすさから、決める。「起きたら困ること」を先に押さえる。
+- 利用者は、現場(電波が弱い・画面の高さが限られる)での使いやすさから、決める。素手で押しやすいことは大事にする(**手袋での操作までは考えなくてよい**)。「起きたら困ること」を先に押さえる。
 
 ## 2. アプリの全体像
 
 - **目的:** 訪問の記録(訪問先・面談者・内容・特記事項)、車両情報(走行距離・給油量・出発/帰社)、ToDoリスト、**容器ログ**(ガスボンベの出庫・空受などの記録)を、スマホで入力し、メール(日報)とCSVで送る。
 - **公開:** GitHub Pages(公開リポジトリ)。データは、**すべてスマホの中(localStorage)**。サーバーには、保存しない。
 - **端末:** iPhone。「ホーム画面に追加」して使う(オフラインでも起動する。BCP対応)。
-- **顧客リスト:** 暗号化したファイルを、営業所キー(担当キー)で、端末内で復号して使う。**公開リポジトリには、顧客の実データを置かない。**
+- **顧客リスト:** 暗号化したファイルを、営業所キー(担当キー)で、端末内で復号して使う。**2つ以上の担当のリストを持てる**(`saveMasterData` を container.js で包む)。別の担当のリストを取り込むと、[前のリストを残して足す] / [前のリストを消して入れ替える] / やめる を選ぶ。同じ担当のリストを取り込み直したときは、その担当の分だけ自動で入れ替える。顧客コードか名前が同じ顧客は、あとから取り込んだほうにまとめる。保存は `customerMaster` のまま、中に `sources`(リストごとの名前・更新日・件数)と各顧客の `o`(どのリストか)を足す。表示は「顧客リスト：A営業所 1,234件 + B担当 567件」。「消す」は全部を消す。非表示・追加した顧客は別に保存しているので残る(コードが変わった顧客・コードのない顧客で名前が変わったときは、非表示が外れる)。**公開リポジトリには、顧客の実データを置かない。**
 
 ### ファイル
 
@@ -31,7 +31,7 @@
 |---|---|
 | `index.html` | 元のアプリ本体(利用者のもの)。ホーム/訪問入力/車両の画面、客先リスト取り込み、日報メール |
 | `container.js` | 追加機能すべて(約20万文字)。`index.html` の最後で読み込む。容器・データ・顧客の管理・天気・各種の手直し |
-| `sw.js` | オフライン用(Service Worker)。保管の名前は `nippo-cache-v6`。大きく作り替えたら、版を上げる |
+| `sw.js` | オフライン用(Service Worker)。保管の名前は `nippo-cache-v7`。大きく作り替えたら、版を上げる |
 | `manifest.webmanifest`, `icon-180/192/512.png` | ホーム画面に追加するための部品 |
 | `master/` | 暗号化した顧客リスト(GitHub上。保管しない設定) |
 | `nippo-tests/` | パソコン上の自動確認(使い方は `nippo-tests/README.md`) |
@@ -54,7 +54,7 @@
   - 包んでいる関数: `renderTodoList`, `renderVehicleScreen`, `saveTodos`, `buildReportMail`, `getLatestPastReturnDistance`, `attachTodoDrag`(並べ替えを置き換え), `goToVisit`, `updateNav`, `updateDate`, `deleteData`, `renderMasterUI`, `setMasterMessage`, `showToast`, `confirm`。
   - 追加している画面: `containerScreen`(容器)、`dataScreen`(データ)、`custScreen`(顧客の管理)。ヘッダーに `navContainerButton`、`navDataButton` を足している。
 - 画面の色の統一は、`#tabColors` という `<style>`(`container.js` の中で作る)で上書きしている。
-- テスト用に、`window.ctXxx`(`ctMailAllCsv`, `ctRefreshWeather`, `ctWxStep`, `ctWxView`, `ctEnsureVisible`, `ctRenderBar`, `ctApplyTab`, `ctSetSlot`, `ctSlotNow`, `ctStyleTodoDates`, `ctWxInterval`, `ctWxPageIndex`, `ctWxRestart`, `ctVehicleCardColor`)を公開している。
+- テスト用に、`window.ctXxx`(`ctMailAllCsv`, `ctRefreshWeather`, `ctWxStep`, `ctWxView`, `ctEnsureVisible`, `ctRenderBar`, `ctApplyTab`, `ctSetSlot`, `ctSlotNow`, `ctCompactVisits`, `ctMasterMerged`, `ctStyleTodoDates`, `ctWxInterval`, `ctWxPageIndex`, `ctWxRestart`, `ctVehicleCardColor`)を公開している。
 
 ### 保存データ(localStorage のキー)— **名前を変えない・消さない**
 - 元のアプリ: `meetingLogs`, `dailyVehicleInfo`, `todoItems`, `appLastOpenDate`, `customerMaster`
@@ -102,6 +102,7 @@
 - ToDoの行の日付は、アズールグレー(#6F8CA3)・11px・細身のフォント。ToDoに追加する顧客名は、会社の種類の語を除いた先頭3文字(北海道・道内の市町村名で始まるときは、地名の頭文字1文字 + 地名のあとの2文字。例: 北海道ガス → 北ガス)。この版より前に追加した分は、変えない。
 
 ### ホーム/訪問入力
+- 訪問履歴の1件は3行(`compactVisitCards`): 1行目=番号・時刻(10:25–11:20)と、右上の小さな「編集」「削除」(約52×32px。削除は確認あり)、2行目=顧客名(太字)と面談者(小さな灰色)、3行目から=内容(□で ToDo へ)・特記事項。
 - 訪問先を入力して開始。敬称の欄は広く(138px)、リストの最後に「係長」。時刻の欄は、小さな箱(日付と同じ作り。透明な時刻入力を重ねる)。
 - 「内容」「特記事項」は、1行から始まり、行ごとに増える(10行まで)。
 - ホームで訪問先を入力中に容器タブを開くと、その顧客名が容器の顧客名に入る。ホームの訪問先が空なら、容器も空(自動で入れた名前は消す)。ほかのタブから容器を開いたときは、「直近に作業した顧客」(その日だけ)が入る。会社の種類の言葉の途中までの文字(「（株」など)は、顧客名として引き継がない。
@@ -148,6 +149,6 @@
 ## 7. 変更するときの注意
 
 - **保存データを消さない。キー名を変えない。** 変更の前に、データ画面の「バックアップ保存」を押すよう、利用者に伝える。
-- `container.js` を差し替えたら、`sw.js` の `CACHE` の版(今は v6)を、必要に応じて上げる。
+- `container.js` を差し替えたら、`sw.js` の `CACHE` の版(今は v7)を、必要に応じて上げる。
 - 顧客リスト(暗号化)や、顧客の実データを、GitHubに置かない。
 - 変更したら、`node --check container.js` で、文法を確認し、`nippo-tests` を実行する。
