@@ -35,6 +35,7 @@
 | `manifest.webmanifest`, `icon-180/192/512.png` | ホーム画面に追加するための部品 |
 | `master/` | 暗号化した顧客リスト(GitHub上。保管しない設定) |
 | `nippo-tests/` | パソコン上の自動確認(使い方は `nippo-tests/README.md`) |
+| `.claude/skills/nippo-release/` | 作業の手順の skill(作って → 確認 → テスト用ページ → main) |
 
 ### sw.js のしくみ
 - 電波があれば最新を取りに行く(4秒で時間切れ → 保管したものを使う)。`master/` は保管しない。Google Fonts は、別の入れ物(`nippo-fonts-v1`)に保管。
