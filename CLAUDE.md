@@ -35,6 +35,7 @@
 | `manifest.webmanifest`, `icon-180/192/512.png` | ホーム画面に追加するための部品 |
 | `master/` | 暗号化した顧客リスト(GitHub上。保管しない設定) |
 | `nippo-tests/` | パソコン上の自動確認(使い方は `nippo-tests/README.md`) |
+| `.claude/skills/nippo-release/` | 作業の手順の skill(作って → 確認 → テスト用ページ → main) |
 
 ### sw.js のしくみ
 - 電波があれば最新を取りに行く(4秒で時間切れ → 保管したものを使う)。`master/` は保管しない。Google Fonts は、別の入れ物(`nippo-fonts-v1`)に保管。
@@ -141,15 +142,14 @@
 5. 「≡」を0.2秒押し続ける並べ替えと、画面のスクロールが、まぎれないか。
 6. 車両・ホームの、色つきカードの見え方。
 
-## 6. 自動確認(パソコン上の疑似環境)
+## 6. 作業の手順(skill)
 
-- `nippo-tests/` に、約580項目の確認がある。`python run_tests.py` を実行し、最後に `ALL PASS` と出れば、合格。使い方は `nippo-tests/README.md`。
-- 確認用の画面(`harness3.html`)は、本物の `index.html` を真似たもの。`index.html` を変えたときは、これも直す。
-- 新しい確認は、`extra_tests.js` の末尾に、`// ---- 番号) …` で区切って足す。古い確認の期待値を直すときは、`post_build7.py`(最後に実行)に書き足す。
+- アプリを変えるときの手順(文法の確認・自動確認・`sw.js` の版上げ・このメモの書き足し・テスト用ページへの公開・main への合流・報告のしかた)は、**skill `nippo-release`(`.claude/skills/nippo-release/SKILL.md`)** にまとめた。「作って」と言われたら、作り始める前に読む。
+- 自動確認は `nippo-tests/`(使い方は `nippo-tests/README.md`)。`python run_tests.py` で最後に `ALL PASS` なら合格。
 
-## 7. 変更するときの注意
+## 7. 変更するときの注意(いつも守ること)
 
 - **保存データを消さない。キー名を変えない。** 変更の前に、データ画面の「バックアップ保存」を押すよう、利用者に伝える。
-- `container.js` を差し替えたら、`sw.js` の `CACHE` の版(今は v8)を、必要に応じて上げる。
+- `container.js` を差し替えたら、`sw.js` の `CACHE` の版(今は v8)を上げる。
 - 顧客リスト(暗号化)や、顧客の実データを、GitHubに置かない。
-- 変更したら、`node --check container.js` で、文法を確認し、`nippo-tests` を実行する。
+- 「テストで」と言われたら、テスト用のページ(作業用の枝)だけに入れる。**main に入れるのは「main に入れて」と言われたときだけ。**
