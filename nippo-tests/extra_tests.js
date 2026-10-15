@@ -1518,3 +1518,21 @@ const m47=JSON.parse(w.localStorage.getItem("customerMaster"));
 ok(/A営業所/.test(confirms[0]||"") && m47.items.map(i=>i.n).join()==="岡田工業" && m47.sources.map(x=>x.office).join()==="B担当","消す on one list removes only that list (with a confirmation)");
 ok(hb47.hidden,"with one list left, the home list button is hidden");
 w.localStorage.removeItem("customerListUse");
+
+// ---- 48) 容器：「顧客名を選ぶ」でも、使うリストを切り替える ----
+w.localStorage.setItem("customerMaster",JSON.stringify({office:"A営業所 + B担当",updated:"",items:[{n:"オノデラ製作所",k:"おのでら",c:"11",o:"A営業所"},{n:"岡田工業",k:"おかだ",c:"13",o:"B担当"}],sources:[{office:"A営業所",updated:"2026-10-01",count:1},{office:"B担当",updated:"2026-10-10",count:1}]}));
+w.localStorage.removeItem("customerListUse"); w.renderMasterUI();
+$("navContainerButton").click(); if($("ctCancelEdit").style.display!=="none") $("ctCancelEdit").click();
+w.ctSetSlot("gas");
+ok($("ctListBtn").hidden,"the list button is not shown for other items (only on 顧客名を選ぶ)");
+w.ctSetSlot("cust");
+ok(!$("ctListBtn").hidden && $("ctListBtn").textContent==="リスト: すべて ▼","顧客名を選ぶ: a small list button next to the title");
+set("ctCustomer","お"); ev($("ctCustomer"),"input");
+const cand48=()=>[...$("ctCustomerList").querySelectorAll(".customer-item")].map(b=>b.textContent).join();
+ok(cand48()==="オノデラ製作所,岡田工業","(すべて: both lists' customers)");
+$("ctListBtn").click();
+ok(!$("ctListMenu").hidden && [...$("ctListMenu").querySelectorAll(".ct-lopt")].map(b=>b.textContent).join()==="すべて,A営業所,B担当","pressing it shows すべて / A営業所 / B担当 inside the 選択 layer");
+[...$("ctListMenu").querySelectorAll(".ct-lopt")].find(b=>b.textContent==="B担当").click();
+ok($("ctListMenu").hidden && cand48()==="岡田工業" && $("ctListBtn").textContent==="リスト: B担当 ▼" && w.localStorage.getItem("customerListUse")==="B担当","choosing B担当: the candidates are shown again from that list at once; the same setting as home");
+ok(!$("hmListBtn") || $("hmListBtn").textContent==="リスト: B担当 ▼","the home button shows the same list");
+w.ctSetListUse(""); set("ctCustomer",""); ev($("ctCustomer"),"input"); w.ctSetSlot(null); w.localStorage.removeItem("customerListUse");

@@ -317,6 +317,11 @@ style.textContent = `
   .cm-lrow input{ width:20px; height:20px; flex:none; margin:0; }
   .cm-lname{ font-weight:700; }
   .cm-lcnt{ flex:1; color:var(--ink-soft); font-size:12.5px; }
+  .ct-dhead{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .ct-lmenu{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 8px; }
+  .ct-lmenu[hidden]{ display:none; }
+  .ct-lmenu .chip{ padding:8px 14px; font-size:15px; }
+  .ct-lmenu .chip.on{ background:var(--butter); border-color:var(--butter-dark); color:var(--butter-ink); font-weight:700; }
   .hm-head{ position:relative; display:flex; justify-content:space-between; align-items:center; }
   .hm-listbtn{ font-size:12.5px; padding:4px 10px; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .hm-lmenu{ position:absolute; right:8px; top:100%; z-index:30; background:#fff; border:1.5px solid var(--line); border-radius:12px; box-shadow:0 6px 16px rgba(0,0,0,0.15); display:flex; flex-direction:column; min-width:160px; overflow:hidden; }
@@ -640,7 +645,8 @@ const section = document.createElement("section");
 section.id = "containerScreen";
 section.className = "screen";
 section.innerHTML = `
-  <section class="dt-frame compact ctin"><div class="dt-head"><span id="ctTitle">選択</span></div><div class="dt-body">
+  <section class="dt-frame compact ctin"><div class="dt-head ct-dhead"><span id="ctTitle">選択</span><button type="button" class="btn-mini hm-listbtn" id="ctListBtn" hidden></button></div><div class="dt-body">
+    <div class="ct-lmenu" id="ctListMenu" hidden></div>
     <span class="ct-ptr" id="ctPtr" aria-hidden="true"></span>
     <div class="ct-sec" data-sec="date">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
@@ -760,6 +766,8 @@ function setSlot(name, focusSym){
   document.querySelectorAll("#containerScreen .ct-sec").forEach(sec => sec.classList.toggle("on", sec.getAttribute("data-sec") === ctSlot));
   $("ctTitle").textContent = SLOT_NAMES[ctSlot] ? `${SLOT_NAMES[ctSlot]}を選ぶ` : "選択";
   document.querySelector("#containerScreen .dt-frame.ctin").classList.toggle("open", !!SLOT_NAMES[ctSlot]);
+  $("ctListMenu").hidden = true;
+  if(typeof renderListUse === "function") renderListUse();
   if(SLOT_NAMES[ctSlot]){                     // 選択肢を選ぶ間は、記号・番号のキーボードを閉じる
     const a = document.activeElement, bar = $("ctConfirmBar");
     if(a && a.blur && bar && bar.contains(a)) a.blur();
@@ -2383,7 +2391,26 @@ function renderListUse(){
   if(hb){ hb.hidden = srcs.length < 2; hb.textContent = srcs.length < 2 ? "" : `リスト: ${use ? srcLabel(use) : "すべて"} ▼`; }
   const menu = $("hmListMenu");
   if(menu && !menu.hidden) renderHomeListMenu();
+  const cb = $("ctListBtn");
+  if(cb){ const on = srcs.length >= 2 && ctSlot === "cust"; cb.hidden = !on; cb.textContent = on ? `リスト: ${use ? srcLabel(use) : "すべて"} ▼` : ""; }
+  const cm = $("ctListMenu");
+  if(cm && !cm.hidden) renderCtListMenu();
 }
+function renderCtListMenu(){
+  const use = listUse();
+  $("ctListMenu").innerHTML = [["", "すべて"]].concat(masterSources(rawMaster()).map(x => [x.office, srcLabel(x.office)]))
+    .map(([v, t]) => `<button type="button" class="chip ct-lopt${v === use ? " on" : ""}" data-v="${escapeHtml(v)}">${escapeHtml(t)}</button>`).join("");
+}
+// 容器：「顧客名を選ぶ」でリストを切り替える。切り替えたら、候補を選んだリストで出し直す
+$("ctListBtn").addEventListener("click", () => { const m = $("ctListMenu"); m.hidden = !m.hidden; if(!m.hidden) renderCtListMenu(); });
+$("ctListMenu").addEventListener("click", e => {
+  const b = e.target.closest(".ct-lopt");
+  if(!b) return;
+  $("ctListMenu").hidden = true;
+  setListUse(b.getAttribute("data-v"));
+  if($("ctCustomer").value.trim()) $("ctCustomer").dispatchEvent(new Event("input", { bubbles:true }));
+  else{ ctKana = null; renderKana(); showCustomerList(null); }
+});
 function renderHomeListMenu(){
   const menu = $("hmListMenu"), use = listUse();
   menu.innerHTML = [["", "すべて"]].concat(masterSources(rawMaster()).map(x => [x.office, srcLabel(x.office)]))
