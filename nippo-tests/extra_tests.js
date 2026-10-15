@@ -1028,7 +1028,8 @@ const tc32=d.getElementById("tabColors").textContent;
 ok(/\.dt-frame\.hm1 \.dt-head\{ background:var\(--mint\)/.test(tc32) && /\.dt-frame\.hm3 \.dt-head\{ background:#C9EFE4/.test(tc32),"ホーム: the 訪問先 and 訪問履歴 cards are shades of mint (the ホーム button color)");
 ok(/\.dt-frame\.hm2\{ background:#F3EFFC; border-color:var\(--lavender-dark\); \}/.test(tc32) && /\.dt-frame\.hm2 \.dt-head, \.dt-frame\.hm2 \.todo-list-target > h2\{ background:var\(--lavender\); color:var\(--lavender-ink\); \}/.test(tc32) && /\.dt-frame\.veh2\{ background:#F3EFFC; border-color:var\(--lavender-dark\); \}/.test(tc32) && /\.dt-frame\.veh2 \.dt-head\{ background:var\(--lavender\); color:var\(--lavender-ink\); \}/.test(tc32),"ToDoリスト cards (ホーム and 車両): the same light-purple (lavender) colors again");
 ok(/\.dt-frame\.veh2 \.dt-head\{ background:var\(--lavender\)/.test(tc32) && /\.dt-frame\.veh3 \.dt-head\{ background:#E6DDF9/.test(tc32) && !/\.dt-frame\.veh1/.test(tc32),"車両: ToDoリスト = lavender, 終了したToDoリスト = lighter lavender; the 車両情報 card keeps 出発=peach / 帰社=sky");
-ok(/\.dt-frame\.ctin \.dt-head\{ background:#fff; color:var\(--sky-ink\); border-bottom:2px solid var\(--sky\); \}/.test(tc32) && /\.dt-frame\.ctlist \.dt-head\{ background:#F3EFE8; color:var\(--ink\); \}/.test(tc32),"容器: the 選択 card is white with a sky line under its title; the list has a calm grey title");
+const cssAll32=[...d.querySelectorAll("style")].map(x=>x.textContent).join("\n");
+ok(/#containerScreen \.dt-frame\.ctin\{ position:fixed; z-index:8;[^}]*background:var\(--cl\);[^}]*border-left:8px solid var\(--cd\); border-top:2px dashed var\(--cd\)/.test(cssAll32) && /#containerScreen\{ --c:var\(--sky\); --cd:var\(--sky-dark\)/.test(cssAll32) && /\.dt-frame\.ctlist \.dt-head\{ background:#F3EFE8; color:var\(--ink\); \}/.test(cssAll32),"容器: the 選択 layer hangs under the top card in a light sky tint (fixed, over the list); the list has a calm grey title");
 ok(/\.dt-frame\.send \.dt-head\{ background:var\(--lavender\)/.test(tc32) && /\.dt-frame\.save \.dt-head\{ background:var\(--lavender-dark\)/.test(tc32) && /\.dt-frame\.master \.dt-head/.test(tc32) && /\.dt-frame\.wx \.dt-head/.test(tc32) && !/\.dt-frame\.del/.test(tc32),"データ: lavender shades; the 消す card stays pink");
 ok(/\.nav-btn\.active-sky\{[^}]*var\(--sky\)/.test(css32) && /\.nav-btn\.active-lav\{[^}]*var\(--lavender\)/.test(css32),"the 容器 and データ tab buttons keep sky and lavender (ホーム=mint and 車両=peach are defined in index.html, unchanged)");
 
@@ -1147,19 +1148,23 @@ chip("O2").click();
 ok(/header\.banner-off\{[^}]*transition:none/.test(css36),"hiding the banner is immediate (no animation), so the iPhone decides the visible position after it");
 const sb36=[]; w.scrollBy=(o)=>sb36.push([0,o.top,o.behavior]);
 w.visualViewport={offsetTop:0,height:400};
-const fld36=$("ctCapacity").closest(".field");
+const fld36=$("vehicleDistance").closest(".field");   // 位置の手直しは、ほかのタブの欄で確かめる(容器タブの欄は、上のカードと「選択」の板にあり、いつも見えている)
 const mockRect36=(top,bottom)=>{ fld36.getBoundingClientRect=()=>({top,bottom,left:0,right:100,width:100,height:bottom-top}); };
-mockRect36(-30,20); w.ctEnsureVisible($("ctCapacity"));
+mockRect36(-30,20); w.ctEnsureVisible($("vehicleDistance"));
 ok(sb36.length===1 && sb36[0][1]===-90 && sb36[0][2]==="smooth","cut at the top → scrolled so the field sits about 60px below the top of the visible area: "+JSON.stringify(sb36));
-sb36.length=0; mockRect36(100,160); w.ctEnsureVisible($("ctCapacity"));
+sb36.length=0; mockRect36(100,160); w.ctEnsureVisible($("vehicleDistance"));
 ok(sb36.length===0,"fully visible → nothing is done (the iPhone's own behavior stays)");
-mockRect36(380,450); w.ctEnsureVisible($("ctCapacity"));
+mockRect36(380,450); w.ctEnsureVisible($("vehicleDistance"));
 ok(sb36.length===1 && sb36[0][1]===74 && sb36[0][2]==="smooth","hidden under the keyboard → scrolled so it sits just above the keyboard: "+JSON.stringify(sb36));
 sb36.length=0; mockRect36(-40,10);
-w.ctSetSlot("cap"); $("ctCapacity").focus(); $("ctCapacity").dispatchEvent(new w.FocusEvent("focusin",{bubbles:true}));
+$("navVehicleButton").click(); $("vehicleDistance").focus(); $("vehicleDistance").dispatchEvent(new w.FocusEvent("focusin",{bubbles:true}));
 await sleep(600);
-ok(sb36.length>=1,"after focusing a field in the lower part (once the iPhone has settled, about 0.45s) the check runs by itself");
-sb36.length=0; $("ctCapacity").blur();
+ok(sb36.length>=1,"after focusing a field (once the iPhone has settled, about 0.45s) the check runs by itself");
+sb36.length=0; $("vehicleDistance").blur(); $("vehicleDistance").dispatchEvent(new w.FocusEvent("focusout",{bubbles:true})); $("navContainerButton").click();
+const cf36=$("ctCapacity"); const cfR=cf36.closest(".field").getBoundingClientRect; cf36.closest(".field").getBoundingClientRect=()=>({top:-40,bottom:10,left:0,right:100,width:100,height:50});
+w.ctEnsureVisible(cf36);
+ok(sb36.length===0,"容量 in the 選択 layer: no position fix (the layer is always shown under the top card)");
+cf36.closest(".field").getBoundingClientRect=cfR;
 const nf36=$("ctNumber"); const nfR=nf36.getBoundingClientRect; nf36.getBoundingClientRect=()=>({top:-40,bottom:10,left:0,right:100,width:100,height:50});
 w.ctEnsureVisible(nf36);
 $("ctNumber").focus(); $("ctNumber").dispatchEvent(new w.FocusEvent("focusin",{bubbles:true}));
@@ -1178,9 +1183,9 @@ d.querySelector('#ctStatusSeg button[data-status="2"]').click();
 ok(scr37.getAttribute("data-sc")==="out","出庫 → the container tab is sky blue (the default)");
 d.querySelector('#ctStatusSeg button[data-status="3"]').click();
 ok(scr37.getAttribute("data-sc")==="in","空受 → the whole container log switches to the 空受 color (peach)");
-ok(/#containerScreen\[data-sc="in"\] \.dt-frame\.ctin \.dt-head\{ color:var\(--peach-ink\); border-bottom-color:var\(--peach\); \}/.test(css37) && /\.ct-confirm\.cb-in\{ --c:var\(--peach\); --cd:var\(--peach-dark\); --ci:var\(--peach-ink\);/.test(css37) && /\.cb-l3 #ctSaveButton\{[^}]*background:var\(--cd\); color:var\(--ci\)/.test(css37) && $("ctConfirmBar").classList.contains("cb-in"),"CSS: for 空受 the top card (band, 区分, 記録する) and the 選択 title line become peach");
+ok(/#containerScreen\[data-sc="in"\]\{ --c:var\(--peach\); --cd:var\(--peach-dark\)/.test(css37) && /\.ct-confirm\.cb-in\{ --c:var\(--peach\); --cd:var\(--peach-dark\); --ci:var\(--peach-ink\);/.test(css37) && /\.cb-l3 #ctSaveButton\{[^}]*background:var\(--cd\); color:var\(--ci\)/.test(css37) && $("ctConfirmBar").classList.contains("cb-in"),"CSS: for 空受 the top card (band, 区分, 記録する) and the 選択 layer become peach");
 $("ctStatusSel").value="1"; ev($("ctStatusSel"),"change");
-ok(scr37.getAttribute("data-sc")==="oth" && /#containerScreen\[data-sc="oth"\] \.dt-frame\.ctin \.dt-head\{ color:var\(--lavender-ink\)/.test(css37) && /\.ct-confirm\.cb-oth\{ --c:var\(--lavender\)/.test(css37) && $("ctConfirmBar").classList.contains("cb-oth"),"他の区分 (仕入など) → lavender");
+ok(scr37.getAttribute("data-sc")==="oth" && /#containerScreen\[data-sc="oth"\]\{ --c:var\(--lavender\)/.test(css37) && /\.ct-confirm\.cb-oth\{ --c:var\(--lavender\)/.test(css37) && $("ctConfirmBar").classList.contains("cb-oth"),"他の区分 (仕入など) → lavender");
 d.querySelector('#ctStatusSeg button[data-status="2"]').click();
 ok(scr37.getAttribute("data-sc")==="out","back to 出庫 → sky blue");
 ok(/\.ct-flash\[data-sc="in"\]\{[^}]*peach/.test(css37) && /\.ct-flash\[data-sc="oth"\]\{[^}]*lavender/.test(css37),"the 登録 display follows the same status color");
@@ -1373,10 +1378,10 @@ const bar41=$("ctConfirmBar"), secOn41=()=>[...d.querySelectorAll("#containerScr
 const slotBtn41=n=>bar41.querySelector(`[data-slot="${n}"]`);
 set("ctCustomer",""); ev($("ctCustomer"),"input");
 w.ctSetSlot(null); w.eval("0");
-ok(secOn41()==="" && !$("ctSecHint").hidden && $("ctTitle").textContent==="選択","no item chosen: the 選択 card only shows a hint");
+ok(secOn41()==="" && !d.querySelector("#containerScreen .dt-frame.ctin").classList.contains("open"),"no item chosen: the 選択 layer is closed (nothing over the list)");
 ok(["date","status","cust","gas","cap"].every(n=>!!slotBtn41(n)),"the top card items 日付・区分・顧客名・ガス種・容量 are buttons");
 slotBtn41("status").click();
-ok(secOn41()==="status" && $("ctTitle").textContent==="選択 ▸ 区分" && slotBtn41("status").classList.contains("on"),"pressing 区分: only the 区分 choices are shown; the item has a thick frame; the title says 選択 ▸ 区分");
+ok(secOn41()==="status" && $("ctTitle").textContent==="区分を選ぶ" && d.querySelector("#containerScreen .dt-frame.ctin").classList.contains("open") && slotBtn41("status").classList.contains("on"),"pressing 区分: only the 区分 choices are shown; the item has a thick frame; the layer opens with the title 区分を選ぶ");
 d.querySelector('#ctStatusSeg button[data-status="3"]').click();
 ok(w.ctSlotNow()==="cust" && secOn41()==="cust" && ctStatusIs41(),"choosing 空受 → moves on to 顧客名 by itself");
 function ctStatusIs41(){ return bar41.querySelector(".cb-st").textContent==="空受"; }
@@ -1400,7 +1405,8 @@ ok(w.ctSlotNow()===null && secOn41()==="","pressing the same item again folds th
 chip("その他").click(); w.ctSetSlot("gas");
 ok($("ctUnitSeg").style.display!=="none","その他: the unit buttons are shown (no fixed unit)");
 chip("O2").click();
-// 直すとき
+// 直すとき(「選択」の板を閉じてから、一覧を操作する)
+w.ctSetSlot(null);
 const c41=[...d.querySelectorAll("#ctList .ct-cust")].find(c=>c.querySelector(".ct-cust-name").textContent==="自動商店");
 if(c41 && !c41.querySelector(".ct-hwrap")) c41.querySelector(".ct-tog").click();
 await swipe([...d.querySelectorAll("#ctList .ct-cust")].find(c=>c.querySelector(".ct-cust-name").textContent==="自動商店").querySelector(".ct-row"),100);
@@ -1424,3 +1430,21 @@ const pill42=bar42.querySelector(".cb-gas .cb-gaspill");
 ok(!!pill42 && pill42.style.background.replace(/\s/g,"").toLowerCase().includes("rgb(63,154,94)") && pill42.textContent==="炭酸 CO2","the gas is shown in the same color as its button (炭酸 = green)");
 ok(bar42.querySelector(".cb-tag").textContent==="入力中" && !bar42.querySelector(".cb-tag").classList.contains("ed"),"the whole card is labelled 入力中 while a new record is being entered");
 chip("O2").click();
+
+// ---- 43) 「選択」は上のカードの下に重ねる板(画面を動かさない)・一覧の前のすきま・天気のアイコンの色 ----
+$("navContainerButton").click(); if($("ctCancelEdit").style.display!=="none") $("ctCancelEdit").click();
+const dr43=d.querySelector("#containerScreen .dt-frame.ctin");
+w.ctSetSlot(null);
+ok(!dr43.classList.contains("open"),"no item chosen: the 選択 layer is closed");
+const sb43=[]; const sbB43=w.scrollBy, stB43=w.scrollTo; w.scrollBy=o=>sb43.push(o); w.scrollTo=o=>sb43.push(o);
+$("ctConfirmBar").querySelector('[data-slot="gas"]').click();
+ok(dr43.classList.contains("open") && $("ctTitle").textContent==="ガス種を選ぶ" && sb43.length===0,"pressing ガス種: the layer opens under the top card (title ガス種を選ぶ); the page does not move");
+ok(!!$("ctPtr") && dr43.contains($("ctPtr")),"a ▼ mark on the layer points at the chosen item");
+const row43=d.querySelector("#ctList .ct-cust") || d.querySelector("#ctList");
+const pd43=new w.MouseEvent("pointerdown",{bubbles:true,cancelable:true}); row43.dispatchEvent(pd43);
+const ck43=new w.MouseEvent("click",{bubbles:true,cancelable:true}); row43.dispatchEvent(ck43);
+ok(!dr43.classList.contains("open") && pd43.defaultPrevented && ck43.defaultPrevented && sb43.length===0,"pressing the list while the layer is open only closes the layer (the list does not react; nothing moves)");
+w.scrollBy=sbB43; w.scrollTo=stB43;
+const css43=[...d.querySelectorAll("style")].map(x=>x.textContent).join("\n");
+ok(/#containerScreen \.dt-frame\.ctlist\{ margin-top:34px; \}/.test(css43),"there is a gap of about 2 lines before the 容器ログ list");
+ok(/\.wx-ic\[data-ic="☀"\]\{ color:#E8890C; \}/.test(css43) && /\.wx-ic\[data-ic="☂"\]\{ color:#1F6FD1; \}/.test(css43) && /\.wx-ic\[data-ic="☁"\]\{ color:#7D8A96; \}/.test(css43),"weather icons have their own colors: sun orange, rain blue, cloud grey (snow / thunder deeper)");

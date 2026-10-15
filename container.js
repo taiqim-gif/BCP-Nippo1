@@ -157,6 +157,11 @@ style.textContent = `
   .wx-grid{ display:grid; grid-template-columns:repeat(3, 52px); row-gap:1px; text-align:center; }
   .wx-r1{ color:#0B7A7A; font-size:15px; font-weight:700; white-space:pre; overflow:hidden; line-height:22px; height:22px; }
   .wx-grid.icons .wx-r1{ font-size:17px; }
+  .wx-ic[data-ic="☀"]{ color:#E8890C; }   /* 晴れ=だいだい */
+  .wx-ic[data-ic="☁"]{ color:#7D8A96; }   /* くもり=灰色 */
+  .wx-ic[data-ic="☂"]{ color:#1F6FD1; }   /* 雨=青 */
+  .wx-ic[data-ic="❄"]{ color:#2A9FD6; }   /* 雪=水色(外でも見えるよう、濃いめ) */
+  .wx-ic[data-ic="⚡"]{ color:#C99700; }   /* 雷=黄色(濃いめ) */
   .wx-grid.temp .wx-r1{ font-size:13px; }
   .wx-pc{ font-size:13px; }
   .wx-r2{ color:#5B4A9E; font-size:11px; font-weight:700; line-height:1.2; }
@@ -371,8 +376,16 @@ style.textContent = `
   .ct-adj-row{ display:flex; flex-wrap:nowrap; gap:6px; }
   #containerScreen .ct-sec{ display:none; }
   #containerScreen .ct-sec.on{ display:block; }
-  .ct-sec-hint{ font-size:13px; color:var(--ink-soft); padding:4px 2px; }
-  .ct-sec-hint[hidden]{ display:none; }
+  /* 「選択」は、上のカードの下に重ねる板。一覧を押し下げず、画面も動かさない(項目を選んでいる間だけ出す) */
+  #containerScreen{ --c:var(--sky); --cd:var(--sky-dark); --ci:var(--sky-ink); --cl:#EAF6FC; }
+  #containerScreen[data-sc="in"]{ --c:var(--peach); --cd:var(--peach-dark); --ci:var(--peach-ink); --cl:#FFF3EA; }
+  #containerScreen[data-sc="oth"]{ --c:var(--lavender); --cd:var(--lavender-dark); --ci:var(--lavender-ink); --cl:#F3EFFC; }
+  #containerScreen .dt-frame.ctin{ position:fixed; z-index:8; left:10px; right:10px; top:0; margin:0; display:none; max-height:45vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+    background:var(--cl); border:1px solid var(--line); border-left:8px solid var(--cd); border-top:2px dashed var(--cd); border-bottom:3px solid var(--cd); border-radius:0 0 14px 14px; box-shadow:0 8px 18px rgba(0,0,0,0.18); }
+  #containerScreen .dt-frame.ctin.open{ display:block; }
+  #containerScreen .dt-frame.ctin .dt-head{ background:transparent; color:var(--ci); border-bottom:none; font-size:15px; }
+  .ct-ptr{ position:absolute; top:0; left:20px; width:0; height:0; border-left:11px solid transparent; border-right:11px solid transparent; border-top:11px solid var(--cd); }   /* 今の項目を指す ▼ */
+  #containerScreen .dt-frame.ctlist{ margin-top:34px; }   /* 一覧の前に、約2行のすきま */
   .ct-cappre{ display:flex; flex-wrap:nowrap; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; margin:-2px 0 8px; padding-bottom:2px; }
   .ct-cappre .chip.on{ background:var(--butter); border-color:var(--butter-dark); color:var(--butter-ink); }
   .ct-cappre .chip{ flex:none; min-width:44px; padding:8px 10px; text-align:center; white-space:nowrap; font-weight:700; }
@@ -554,10 +567,6 @@ tabColors.textContent = `
   .ct-flash[data-sc="oth"]{ color:var(--lavender-ink); border-color:var(--lavender-dark); }
   /* 容器の入力のカードを低くする(キーボードが出ても、収まりやすいように) */
   /* 容器タブの「選択」と一覧：白地で落ち着いた色。区分の色は「選択」の見出しの下の線と文字だけ */
-  .dt-frame.ctin{ background:#fff; border-color:var(--line); }
-  .dt-frame.ctin .dt-head{ background:#fff; color:var(--sky-ink); border-bottom:2px solid var(--sky); }
-  #containerScreen[data-sc="in"] .dt-frame.ctin .dt-head{ color:var(--peach-ink); border-bottom-color:var(--peach); }
-  #containerScreen[data-sc="oth"] .dt-frame.ctin .dt-head{ color:var(--lavender-ink); border-bottom-color:var(--lavender); }
   .dt-frame.ctlist{ background:#fff; border-color:var(--line); }
   .dt-frame.ctlist .dt-head{ background:#F3EFE8; color:var(--ink); }
   #containerScreen .dt-frame.ctin input[type=text], #containerScreen .dt-frame.ctin input[type=date], #containerScreen .dt-frame.ctin select{ padding-top:8px; padding-bottom:8px; }
@@ -598,7 +607,7 @@ section.id = "containerScreen";
 section.className = "screen";
 section.innerHTML = `
   <section class="dt-frame compact ctin"><div class="dt-head"><span id="ctTitle">選択</span></div><div class="dt-body">
-    <div class="ct-sec-hint" id="ctSecHint">上のカードの項目を押すと、ここに選べるものが出ます</div>
+    <span class="ct-ptr" id="ctPtr" aria-hidden="true"></span>
     <div class="ct-sec" data-sec="date">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
       <div class="ct-datefield">
@@ -715,8 +724,8 @@ const SLOT_NAMES = { date:"日付", status:"区分", cust:"顧客名", gas:"ガ�
 function setSlot(name, focusSym){
   ctSlot = name || null;
   document.querySelectorAll("#containerScreen .ct-sec").forEach(sec => sec.classList.toggle("on", sec.getAttribute("data-sec") === ctSlot));
-  $("ctSecHint").hidden = !!SLOT_NAMES[ctSlot];
-  $("ctTitle").textContent = "選択" + (SLOT_NAMES[ctSlot] ? ` ▸ ${SLOT_NAMES[ctSlot]}` : "");
+  $("ctTitle").textContent = SLOT_NAMES[ctSlot] ? `${SLOT_NAMES[ctSlot]}を選ぶ` : "選択";
+  document.querySelector("#containerScreen .dt-frame.ctin").classList.toggle("open", !!SLOT_NAMES[ctSlot]);
   if(SLOT_NAMES[ctSlot]){                     // 選択肢を選ぶ間は、記号・番号のキーボードを閉じる
     const a = document.activeElement, bar = $("ctConfirmBar");
     if(a && a.blur && bar && bar.contains(a)) a.blur();
@@ -724,7 +733,35 @@ function setSlot(name, focusSym){
   if(ctSlot === "gas") setTimeout(updateGasShadows, 0);
   if(ctSlot === "sym" && focusSym) $("ctSymbol").focus();
   if(typeof window.ctRenderBar === "function") window.ctRenderBar();
+  placeDrawer();
 }
+// 板の位置：上のカードのすぐ下(上のカードは固定なので、板もいつも同じ場所)。▼は、今の項目の真下
+function placeDrawer(){
+  const dr = document.querySelector("#containerScreen .dt-frame.ctin"), bar = $("ctConfirmBar");
+  if(!dr || !dr.classList.contains("open") || !bar || bar.hidden) return;
+  const br = bar.getBoundingClientRect();
+  dr.style.top = Math.round(br.bottom - 1) + "px";
+  const on = bar.querySelector(".cb-slot.on"), ptr = $("ctPtr");
+  if(on && ptr){ const r = on.getBoundingClientRect(), dl = dr.getBoundingClientRect().left; ptr.style.left = Math.max(4, Math.round(r.left + r.width / 2 - dl - 11)) + "px"; }
+}
+window.addEventListener("scroll", placeDrawer, { passive:true });
+window.addEventListener("resize", placeDrawer);
+if(window.visualViewport){ window.visualViewport.addEventListener("resize", placeDrawer); window.visualViewport.addEventListener("scroll", placeDrawer); }
+// 板が開いている間に、一覧の部分を押したら、板を閉じるだけ(一覧の記録は、反応しない)
+let ctDrawerJustClosed = false;
+document.addEventListener("pointerdown", e => {
+  const dr = document.querySelector("#containerScreen .dt-frame.ctin"), bar = $("ctConfirmBar"), t = e.target;
+  ctDrawerJustClosed = false;
+  if(!dr.classList.contains("open") || dr.contains(t) || (bar && bar.contains(t)) || (t.closest && t.closest("header"))) return;
+  setSlot(null);
+  if(t.closest && t.closest("#containerScreen")){ ctDrawerJustClosed = true; e.stopPropagation(); e.preventDefault(); }
+}, true);
+document.addEventListener("click", e => {
+  if(!ctDrawerJustClosed) return;
+  ctDrawerJustClosed = false;
+  e.stopPropagation();
+  e.preventDefault();
+}, true);
 function nextSlot(from){
   const cust = $("ctCustomer").value.trim();
   if(from === "status" || from === "date") return !cust ? "cust" : (ctGasSel === null ? "gas" : "sym");
@@ -2373,6 +2410,7 @@ function wxRender(flip){
   btn.querySelectorAll(".wx-r1").forEach((el, i) => {
     const t = v.r1[i];
     if(v.mode === 1 && /%$/.test(t)) el.innerHTML = `${escapeHtml(t.slice(0, -1))}<span class="wx-pc">%</span>`;     // 数字は15px、「%」だけ13px
+    else if(v.mode === 0 && t !== "--") el.innerHTML = Array.from(t).map(ch => `<span class="wx-ic" data-ic="${escapeHtml(ch)}">${escapeHtml(ch)}</span>`).join("");   // アイコンは、天気ごとの色
     else el.textContent = t;
   });
   btn.querySelectorAll(".wx-r2").forEach((el, i) => { el.textContent = v.r2[i]; });
@@ -3508,6 +3546,7 @@ function attachClear(inp){
     tag.classList.toggle("ed", !!(ctEditId || ctAdding));
     $("cbL1").innerHTML = dateHtml + slot("status", "cb-st", "区分", escapeHtml(statusName(ctStatus))) + slot("cust", "cb-cust", "顧客名", f.customer ? escapeHtml(f.customer) : miss("顧客名未入力"));
     $("cbL2").innerHTML = slot("gas", "cb-gas", "ガス種", gasHtml) + slot("cap", "cb-cap", "容量", capHtml);
+    if(typeof placeDrawer === "function") placeDrawer();
   }
   bar.addEventListener("click", e => {
     const b = e.target.closest("[data-slot]");
@@ -3546,7 +3585,7 @@ function attachClear(inp){
 
   // 入力欄が、画面の見える範囲の上で切れたり、キーボードの下に隠れたときだけ、位置を直す(切れていなければ、何もしない)。動きは、なめらかに
   function ensureVisible(el){
-    if(!el || (el.closest && el.closest(".ct-wxsheet, #ctConfirmBar"))) return;   // 上のカードの欄は、いつも見えている
+    if(!el || (el.closest && el.closest(".ct-wxsheet, #ctConfirmBar, #containerScreen .dt-frame.ctin"))) return;   // 上のカード・選択の板の欄は、いつも見えている
     const box = el.tagName === "TEXTAREA" ? el : (el.closest(".field") || el);
     const r = box.getBoundingClientRect();
     const vv = window.visualViewport;

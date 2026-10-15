@@ -6,7 +6,7 @@
    ・客先名リスト（master フォルダ）は保管せず、常にネットから取得する
    ※ アプリを大きく作り替えたときは、下の CACHE の v1 → v2 に変える
 ========================================================= */
-const CACHE = "nippo-cache-v5";
+const CACHE = "nippo-cache-v6";
 const FONT_CACHE = "nippo-fonts-v1";                    // Google Fonts（見た目用）を保管する入れ物
 const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
 
