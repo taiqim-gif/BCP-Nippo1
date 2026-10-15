@@ -1484,3 +1484,37 @@ $("ctMcCancel").click();
 ok(m45().items.map(i=>i.n).join()==="別会社","やめる: the list stays as it was");
 ok(w.ctMasterMerged({office:"X",items:[{n:"甲",c:"1"},{n:"乙",c:""}]},{office:"Y",items:[{n:"丙",c:"1"},{n:"乙",c:"4"}]},"add").items.map(i=>i.n+":"+i.c).join()==="丙:1,乙:4","a customer whose code or name matches is replaced by the newer list (code 1 → 丙, name 乙 → code 4)");
 w.localStorage.setItem("customerHidden","[]");
+
+// ---- 46) 天気：降水確率(30%以上は赤で大きく、30%未満は小さく)・気温を温度で色分け ----
+const css46=[...d.querySelectorAll("style")].map(x=>x.textContent).join("\n");
+ok(/\.wx-pv\.dry\{ font-size:12px; \}/.test(css46) && /\.wx-pv\.dry \.wx-pc\{ font-size:11px; \}/.test(css46) && /\.wx-pv\.wet, \.wx-pv\.wet \.wx-pc\{ color:#D62E2E; \}/.test(css46),"rain chance: under 30% small (12px / % 11px); 30% or more red at the usual size");
+ok(["#7B3FC4","#1F55C4","#2A9FD6","#2A9FD6","#2E9E5B","#2E9E5B","#E8890C","#E8890C","#D62E2E"].join()===[-3,0,1,9,10,19,20,24,25].map(n=>w.ctWxTempColor(n)).join(),"temperature colors: below 0 purple, 0 deep blue, 1-9 light blue, 10-19 green, 20-24 orange, 25+ red");
+
+// ---- 47) 顧客リスト：候補に出すリストを選ぶ(1つ か すべて)・リストごとに消す・ホームで打った文字で候補 ----
+w.localStorage.setItem("customerMaster",JSON.stringify({office:"A営業所 + B担当",updated:"",items:[{n:"オノデラ製作所",k:"おのでら",c:"11",o:"A営業所"},{n:"大谷商店",k:"おおたに",c:"12",o:"A営業所"},{n:"岡田工業",k:"おかだ",c:"13",o:"B担当"}],sources:[{office:"A営業所",updated:"2026-10-01",count:2},{office:"B担当",updated:"2026-10-10",count:1}]}));
+w.localStorage.removeItem("customerListUse"); w.renderMasterUI();
+const names47=()=>w.eval("customerMaster").items.map(i=>i.n).filter(n=>["オノデラ製作所","大谷商店","岡田工業"].includes(n)).sort().join();   // 追加した顧客(いつも出る)は除いて比べる
+ok(names47()==="オノデラ製作所,大谷商店,岡田工業" && !$("cmLists").hidden && $("cmLists").querySelectorAll(".cm-lrow").length===3,"すべて: all lists are candidates; 顧客の管理 shows すべて + each list");
+w.ctSetListUse("B担当");
+ok(names47()==="岡田工業" && w.localStorage.getItem("customerListUse")==="B担当" && /使用: B担当/.test($("masterStatus").textContent),"choosing B担当: only that list's customers are candidates (saved as customerListUse)");
+const hb47=$("hmListBtn");
+ok(!!hb47 && !hb47.hidden && hb47.textContent==="リスト: B担当 ▼","home 訪問先 has a small button showing the list in use");
+hb47.click(); const opt47=[...$("hmListMenu").querySelectorAll(".hm-lopt")];
+ok(!$("hmListMenu").hidden && opt47.map(b=>b.textContent).join()==="すべて,A営業所,B担当" && opt47[2].classList.contains("on"),"pressing it shows すべて / A営業所 / B担当");
+opt47[0].click();
+ok($("hmListMenu").hidden && names47()==="オノデラ製作所,大谷商店,岡田工業" && hb47.textContent==="リスト: すべて ▼","choosing すべて there switches back for every screen");
+// ホームで「お」と打つ
+$("homeVisitTarget").value="お"; ev($("homeVisitTarget"),"input");
+const sug47=[...$("customerList").querySelectorAll(".customer-item")].map(b=>b.textContent).join();
+ok($("customerList").style.display==="block" && sug47==="大谷商店,岡田工業,オノデラ製作所","typing お in 訪問先 lists customers whose reading starts with お (in reading order): "+sug47);
+$("homeVisitTarget").value="岡田"; ev($("homeVisitTarget"),"input");
+ok([...$("customerList").querySelectorAll(".customer-item")].map(b=>b.textContent).join()==="岡田工業","typing part of the name (kanji) also finds it");
+$("customerList").querySelector(".customer-item").click();
+ok($("homeVisitTarget").value==="岡田工業" && $("customerList").style.display==="none","choosing a candidate fills 訪問先");
+$("homeVisitTarget").value=""; ev($("homeVisitTarget"),"input");
+// リストごとに消す
+confirms.length=0; confirmAnswer=true; w.ctDeleteMasterSource("A営業所");
+const m47=JSON.parse(w.localStorage.getItem("customerMaster"));
+ok(/A営業所/.test(confirms[0]||"") && m47.items.map(i=>i.n).join()==="岡田工業" && m47.sources.map(x=>x.office).join()==="B担当","消す on one list removes only that list (with a confirmation)");
+ok(hb47.hidden,"with one list left, the home list button is hidden");
+w.localStorage.removeItem("customerListUse");

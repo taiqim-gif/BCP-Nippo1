@@ -44,3 +44,10 @@ b='</script>\n<script src="container.js"></script>'
 assert h.count(b)==1
 h=h.replace(b,'function saveMasterData(data){ customerMaster={office:data.office||"",updated:data.updated||"",items:data.items}; localStorage.setItem("customerMaster",JSON.stringify(customerMaster)); if(typeof renderMasterUI==="function") renderMasterUI(); showToast("客先名リストを取り込みました"); }\n'+b)
 open("harness4.html","w",encoding="utf-8").write(h)
+
+# 確認用の画面に、ホームの訪問先の候補の一覧(#customerList)を足す(本物の index.html と同じ部品)
+h=open("harness4.html",encoding="utf-8").read()
+a='<input type="text" id="homeVisitTarget" placeholder="例：〇〇商店"></div>'
+assert h.count(a)==1, h.count(a)
+h=h.replace(a,a+'<div class="customer-list" id="customerList" style="display:none;"></div>')
+open("harness4.html","w",encoding="utf-8").write(h)
