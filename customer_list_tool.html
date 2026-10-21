@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>客先名リスト 暗号化ツール</title>
+<style>
+  :root{ --bg:#FAF6EF; --ink:#4A4340; --soft:#9C948C; --line:#EFE7DA; --mint:#8FD9C4; --mint-ink:#12503F; --lav:#D3C6F5; --lav-ink:#3B2E63; --pink:#FFC1D3; --pink-ink:#A6395E; --butter:#FFE39B; --butter-ink:#6B4E00; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; padding:24px 16px 60px; background:var(--bg); color:var(--ink); font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic Medium",sans-serif; line-height:1.6; }
+  main{ max-width:860px; margin:0 auto; }
+  h1{ font-size:20px; margin:0 0 6px; }
+  h2{ font-size:15px; margin:0 0 10px; }
+  .lead{ color:var(--soft); font-size:13px; margin:0 0 18px; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .note{ font-size:12.5px; color:var(--soft); margin:6px 0 0; }
+  .warn{ background:#FFF5D6; border:1px solid var(--butter); color:var(--butter-ink); border-radius:10px; padding:10px 12px; font-size:13px; margin-top:10px; }
+  .err{ color:var(--pink-ink); font-size:13px; margin-top:8px; white-space:pre-wrap; }
+  .ok{ color:var(--mint-ink); }
+  table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  th,td{ text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th{ color:var(--soft); font-weight:400; font-size:12px; }
+  input[type=text]{ width:100%; padding:9px 10px; border:1.5px solid var(--line); border-radius:8px; font-size:14px; font-family:ui-monospace,Consolas,monospace; }
+  button{ border:none; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; }
+  .b-lav{ background:var(--lav); color:var(--lav-ink); }
+  .b-mint{ background:var(--mint); color:var(--mint-ink); }
+  .b-line{ background:#fff; border:1.5px solid var(--line); color:var(--ink); padding:7px 12px; font-size:12.5px; }
+  button:disabled{ opacity:.45; cursor:not-allowed; }
+  code{ background:#F2EEE4; padding:1px 6px; border-radius:5px; font-size:12.5px; }
+  ol{ margin:6px 0 0 18px; padding:0; font-size:13.5px; }
+  .hidden{ display:none; }
+  .keycell{ min-width:300px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>客先名リスト 暗号化ツール</h1>
+<p class="lead">営業所ごとの客先名リストを暗号化したファイルにします。PCのブラウザで開いて使います。データはこのPCの中だけで処理され、どこにも送信されません。</p>
+
+<div class="card">
+  <h2>手順1　CSVファイルを選ぶ</h2>
+  <input type="file" id="csvFile" accept=".csv,.txt">
+  <div style="margin-top:8px;font-size:13px;">
+    文字コード：
+    <select id="csvEncoding" style="padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;">
+      <option value="auto">自動（おすすめ）</option>
+      <option value="shift_jis">Shift_JIS</option>
+      <option value="utf-8">UTF-8</option>
+      <option value="utf-16le">UTF-16（Accessの「Unicode」）</option>
+    </select>
+    <span class="note">文字が化けて見えるときは、ここを切り替えてください。</span>
+  </div>
+  <p class="note">列は左から「営業所」「顧客コード」「客先名」「ふりがな（またはフリガナ）」。1行目は見出し行にしてください。CSVファイルが必要です（Excelのファイル .xlsx は読めません）。ふりがなは、Accessのフリガナのままで構いません。会社語は、このツールが除きます。</p>
+  <div id="csvInfo" class="note"></div>
+  <div id="csvError" class="err"></div>
+</div>
+
+<div class="card hidden" id="stepCw">
+  <h2>手順2　客先名・ふりがなから会社語を除く</h2>
+  <label style="font-size:14px;"><input type="checkbox" id="cwEnable" checked> 客先名から「株式会社」などの会社語を除く</label>
+  <p class="note">除く言葉を、1行に1つずつ書きます。足したり消したりできます。元のCSVやAccessのデータは変わりません。</p>
+  <textarea id="cwWords" rows="8" style="width:100%;margin-top:8px;padding:9px 10px;border:1.5px solid var(--line);border-radius:8px;font-size:13.5px;font-family:inherit;"></textarea>
+  <div id="cwPreview" class="note" style="margin-top:10px;"></div>
+  <p class="note">会社語を除くと、同じ名前になってしまう客先は、元の名前のまま残します。除いた結果が空になる名前も、元のまま残します。</p>
+
+  <hr style="border:none;border-top:1px solid var(--line);margin:16px 0;">
+
+  <label style="font-size:14px;"><input type="checkbox" id="cwkEnable" checked> ふりがなから「ｶﾌﾞｼｷｶｲｼｬ」などの会社語を除く</label>
+  <p class="note">半角カナ・全角カナ、半角・全角のかっこは、区別せずに除きます。除いたあとのふりがなは、全角カタカナにそろえます。</p>
+  <textarea id="cwkWords" rows="8" style="width:100%;margin-top:8px;padding:9px 10px;border:1.5px solid var(--line);border-radius:8px;font-size:13.5px;font-family:inherit;"></textarea>
+  <div id="cwkPreview" class="note" style="margin-top:10px;"></div>
+  <p class="note">除いた結果が空になるふりがなは、元のまま残します。「ｶ」だけなど、かっこのない短い省略形は、除きません。</p>
+</div>
+
+<div class="card hidden" id="step2">
+  <h2>手順3　営業所ごとのキーを決める</h2>
+  <table>
+    <thead><tr><th>営業所</th><th>件数</th><th>ふりがな未入力</th><th class="keycell">営業所キー</th><th></th></tr></thead>
+    <tbody id="officeRows"></tbody>
+  </table>
+  <p class="note">自動で作ったキーをそのまま使うのがおすすめです。すでに配ったキーを使い続ける場合は、その文字を入力してください（16文字以上）。キーの大文字・小文字、ハイフン、全角・半角の違いは区別されません。</p>
+  <div id="keyError" class="err"></div>
+</div>
+
+<div class="card hidden" id="step3">
+  <h2>手順4　暗号化ファイルを作る</h2>
+  <button class="b-lav" id="makeBtn">暗号化ファイルを作成</button>
+  <span id="progress" class="note"></span>
+  <div id="results"></div>
+</div>
+
+<div class="card">
+  <h2>手順5　営業所に渡す</h2>
+  <ol>
+    <li>作成した <code>〇〇営業所_客先名リスト.enc</code> を、その営業所の担当者だけに渡します。OneDriveの営業所ごとのフォルダに置く方法が手軽です。メールに添付して渡すこともできます。</li>
+    <li>OneDriveで共有するときは、フォルダを「その営業所のメンバーだけ」に共有してください。「リンクを知っている全員」の共有は使わないでください。</li>
+    <li>営業所キーは、ファイルとは別の方法（口頭、別のメッセージなど）で伝えます。</li>
+    <li>担当者は、スマホのアプリの「データ」画面の顧客リストで「取り込む」を押して営業所キーを入れ、「ファイルから取り込む」でこのファイルを選びます。</li>
+  </ol>
+  <div class="warn">
+    ・元のCSVと営業所キーは、OneDriveやメールなど、他の人が見られる場所に置かないでください。<br>
+    ・営業所キーはこのページを閉じると消えます。手順4のあとに表示されるキーの一覧を、必ず安全な場所に控えてください。<br>
+    ・名簿を更新するときは、同じキーでもう一度この手順で作り直し、新しいファイルを渡します。キーを変える場合は、各営業所に新しいキーを伝え直します。<br>
+    ・暗号化ファイルも、GitHubなど誰でも見られる場所には置かないでください。
+  </div>
+</div>
+
+</main>
+
+<script>
+/* ===CRYPTO-BEGIN=== */
+const MASTER_SALT = "eigyo-nippo-master-v1";
+const MASTER_ITER = 600000;
+
+function normalizeKey(raw){
+  return String(raw || "").normalize("NFKC").toUpperCase().replace(/[\s\-\u30FC\u2010-\u2015\u2212]/g, "");
+}
+
+function toHex(buf){
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function deriveMaster(rawKey){
+  const enc = new TextEncoder();
+  const base = await crypto.subtle.importKey("raw", enc.encode(normalizeKey(rawKey)), "PBKDF2", false, ["deriveBits"]);
+  const master = await crypto.subtle.deriveBits(
+    { name:"PBKDF2", hash:"SHA-256", salt:enc.encode(MASTER_SALT), iterations:MASTER_ITER }, base, 256);
+  const hk = await crypto.subtle.importKey("raw", master, "HKDF", false, ["deriveBits"]);
+  const empty = new Uint8Array(0);
+  const aesBits = await crypto.subtle.deriveBits(
+    { name:"HKDF", hash:"SHA-256", salt:empty, info:enc.encode("aes-key") }, hk, 256);
+  const idBits = await crypto.subtle.deriveBits(
+    { name:"HKDF", hash:"SHA-256", salt:empty, info:enc.encode("file-id") }, hk, 128);
+  const aesKey = await crypto.subtle.importKey("raw", aesBits, "AES-GCM", false, ["encrypt", "decrypt"]);
+  return { aesKey, fileId: toHex(idBits) };
+}
+
+async function encryptMaster(aesKey, obj){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = new TextEncoder().encode(JSON.stringify(obj));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name:"AES-GCM", iv }, aesKey, data));
+  const out = new Uint8Array(iv.length + ct.length);
+  out.set(iv, 0);
+  out.set(ct, iv.length);
+  return out;
+}
+
+async function decryptMaster(aesKey, buffer){
+  const bytes = new Uint8Array(buffer);
+  if(bytes.length < 29) throw new Error("bad-format");
+  const iv = bytes.slice(0, 12);
+  const ct = bytes.slice(12);
+  const plain = await crypto.subtle.decrypt({ name:"AES-GCM", iv }, aesKey, ct);
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+/* ===CRYPTO-END=== */
+
+/* ---------- CSV ---------- */
+
+function parseCSV(text){
+  const rows = [];
+  let row = [], field = "", inQ = false;
+  for(let i = 0; i < text.length; i++){
+    const c = text[i];
+    if(inQ){
+      if(c === '"'){
+        if(text[i + 1] === '"'){ field += '"'; i++; }
+        else inQ = false;
+      }else field += c;
+    }else{
+      if(c === '"') inQ = true;
+      else if(c === ","){ row.push(field); field = ""; }
+      else if(c === "\n"){ row.push(field); rows.push(row); row = []; field = ""; }
+      else if(c === "\r"){ /* 無視 */ }
+      else field += c;
+    }
+  }
+  if(field !== "" || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim() !== ""));
+}
+
+// 戻り値: { text, label }。forced が "auto" 以外のときは、その文字コードで読む
+function decodeCsvBytes(buf, forced){
+  const b = new Uint8Array(buf);
+
+  // Excelのファイルは読めない（.xlsx は「PK」、古い .xls は D0 CF 11 E0 で始まる）
+  if((b[0] === 0x50 && b[1] === 0x4B) || (b[0] === 0xD0 && b[1] === 0xCF && b[2] === 0x11 && b[3] === 0xE0)){
+    throw new Error("Excelのファイル（.xlsx・.xls）は読めません。AccessやExcelで、CSV（カンマ区切り）として保存し直してください。");
+  }
+
+  const strip = t => t.replace(/^\uFEFF/, "");
+
+  if(forced && forced !== "auto"){
+    if(forced === "utf-8"){
+      return { text: strip(new TextDecoder("utf-8").decode(buf)), label: "UTF-8（指定）" };
+    }
+    if(forced === "utf-16le"){
+      // 先頭が FE FF なら、上位バイトが先の UTF-16
+      const label = (b[0] === 0xFE && b[1] === 0xFF) ? "utf-16be" : "utf-16le";
+      return { text: strip(new TextDecoder(label).decode(buf)), label: "UTF-16（指定）" };
+    }
+    return { text: strip(new TextDecoder("shift_jis").decode(buf)), label: "Shift_JIS（指定）" };
+  }
+
+  // 自動判定
+  if(b[0] === 0xFF && b[1] === 0xFE) return { text: strip(new TextDecoder("utf-16le").decode(buf)), label: "UTF-16（自動）" };
+  if(b[0] === 0xFE && b[1] === 0xFF) return { text: strip(new TextDecoder("utf-16be").decode(buf)), label: "UTF-16（自動）" };
+  // 先頭の印がないUTF-16：文字のデータにはふつう 0 のバイトがない。0 が多ければUTF-16と判断し、
+  // 0 が奇数番目に多ければ下位バイトが先（LE）、偶数番目に多ければ上位バイトが先（BE）とする
+  {
+    let even = 0, odd = 0;
+    const n = Math.min(b.length, 400);
+    for(let i = 0; i < n; i++){ if(b[i] === 0){ if(i % 2 === 0) even++; else odd++; } }
+    if(even + odd >= 2){
+      const label = odd >= even ? "utf-16le" : "utf-16be";
+      return { text: strip(new TextDecoder(label).decode(buf)), label: "UTF-16（自動）" };
+    }
+  }
+  if(b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF){
+    return { text: strip(new TextDecoder("utf-8").decode(buf)), label: "UTF-8（自動）" };
+  }
+  try{
+    return { text: strip(new TextDecoder("utf-8", { fatal:true }).decode(buf)), label: "UTF-8（自動）" };
+  }catch(e){
+    return { text: new TextDecoder("shift_jis").decode(buf), label: "Shift_JIS（自動）" };
+  }
+}
+
+function buildOffices(rows){
+  const first = rows[0].map(x => x.trim());
+  // 見出し行かどうかは、セルが見出しの名前そのものかで判定する（データ行の「〇〇営業所」を誤認しない）
+  const HEADER_CELL = /^(営業所名?|顧客コード|得意先コード|コード|客先名|顧客名|得意先名?|名称|ふりがな|フリガナ|読み(仮名)?|カナ)$/;
+  const hasHeader = first.filter(x => HEADER_CELL.test(x)).length >= 2;
+  let idx = { office:0, code:1, name:2, reading:3 };
+  let body = rows;
+
+  if(hasHeader){
+    const find = re => first.findIndex(x => re.test(x));
+    idx = {
+      office: find(/営業所/),
+      code: find(/コード/),
+      name: find(/客先|顧客名|名称|得意先/),
+      reading: find(/ふりがな|フリガナ|読み|カナ/)
+    };
+    const missing = Object.entries({ "営業所":idx.office, "顧客コード":idx.code, "客先名":idx.name, "ふりがな":idx.reading })
+      .filter(([, v]) => v < 0).map(([k]) => k);
+    if(missing.length) throw new Error("見出し行に次の列が見つかりません：" + missing.join("、"));
+    body = rows.slice(1);
+  }
+
+  const map = new Map();
+  let skipped = 0;
+  body.forEach(r => {
+    const office = (r[idx.office] || "").trim();
+    const name = (r[idx.name] || "").trim();
+    if(!office || !name){ skipped++; return; }
+    if(!map.has(office)) map.set(office, []);
+    map.get(office).push({ code:(r[idx.code] || "").trim(), name, reading:(r[idx.reading] || "").trim() });
+  });
+  return { offices: map, skipped };
+}
+
+/* ---------- キー ---------- */
+
+function genKey(){
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 紛らわしい文字(I,O,0,1)を除く32文字
+  const r = crypto.getRandomValues(new Uint8Array(20));
+  let s = "";
+  r.forEach(b => { s += alphabet[b & 31]; });
+  return s.match(/.{4}/g).join("-");
+}
+
+/* ---------- 客先名の会社語 ---------- */
+
+const DEFAULT_COMPANY_WORDS = [
+  "株式会社","有限会社","合同会社","合資会社","合名会社",
+  "一般社団法人","一般財団法人","公益社団法人","公益財団法人","社会福祉法人",
+  "医療法人社団","医療法人財団","医療法人","学校法人","宗教法人","特定非営利活動法人",
+  "(株)","（株）","㈱","(有)","（有）","㈲","(合)","（合）",
+  "(社)","（社）","(財)","（財）","(医)","（医）","(学)","（学）","(福)","（福）"
+];
+
+function getCompanyWords(){
+  if(!$("cwEnable").checked) return [];
+  return $("cwWords").value.split("\n").map(w => w.trim()).filter(Boolean)
+    .sort((a, b) => b.length - a.length);   // 長い言葉から除く（「医療法人社団」を「医療法人」より先に）
+}
+
+function cleanName(name, words){
+  let s = name;
+  words.forEach(w => { s = s.split(w).join(""); });
+  return s.replace(/[\s\u3000]+/g, " ").trim();
+}
+
+// 営業所（担当）ごとに、会社語を除いた客先名を決める
+function finalNames(items){
+  const words = getCompanyWords();
+  const res = items.map(i => ({ name:i.name, changed:false, blank:false, reverted:false }));
+  if(words.length === 0) return res;
+
+  res.forEach((r, idx) => {
+    const cleaned = cleanName(items[idx].name, words);
+    if(cleaned === items[idx].name) return;
+    if(!cleaned){ r.blank = true; return; }       // 空になる名前は、そのまま残す
+    r.name = cleaned;
+    r.changed = true;
+  });
+
+  // 除いた結果、同じ名前になる客先は、元の名前に戻す
+  const groups = new Map();
+  res.forEach((r, idx) => {
+    if(!groups.has(r.name)) groups.set(r.name, []);
+    groups.get(r.name).push(idx);
+  });
+  groups.forEach(idxs => {
+    if(idxs.length < 2) return;
+    idxs.forEach(idx => {
+      if(res[idx].changed){ res[idx].name = items[idx].name; res[idx].changed = false; res[idx].reverted = true; }
+    });
+  });
+  return res;
+}
+
+/* ---------- ふりがなの会社語 ---------- */
+
+// 半角・全角をそろえて比べるため、言葉も読みも NFKC（半角カナ→全角カナ、全角かっこ→半角かっこ）にする
+const DEFAULT_KANA_WORDS = [
+  "カブシキカイシャ","ユウゲンカイシャ","ゴウドウカイシャ","ゴウシカイシャ","ゴウメイカイシャ",
+  "カブシキガイシャ","ユウゲンガイシャ","ゴウドウガイシャ","ゴウシガイシャ","ゴウメイガイシャ",
+  "イッパンシャダンホウジン","イッパンザイダンホウジン","コウエキシャダンホウジン","コウエキザイダンホウジン",
+  "シャカイフクシホウジン","イリョウホウジンシャダン","イリョウホウジンザイダン","イリョウホウジン",
+  "ガッコウホウジン","シュウキョウホウジン","トクテイヒエイリカツドウホウジン",
+  "(カ)","(ユ)","(ゴウ)","(シャ)","(ザイ)","(イ)","(ガク)","(フク)"
+];
+
+function normKana(str){
+  return String(str || "").normalize("NFKC");
+}
+
+function getKanaWords(){
+  if(!$("cwkEnable").checked) return null;
+  return $("cwkWords").value.split("\n").map(w => normKana(w).trim()).filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+}
+
+// 戻り値: { text:整えたふりがな, changed:会社語を除いたか, blank:空になるため元のままか }
+function cleanReading(reading, words){
+  const base = normKana(reading).replace(/[\s\u3000]+/g, " ").trim();
+  if(!words) return { text:String(reading || ""), changed:false, blank:false };
+  let s = base;
+  words.forEach(w => { s = s.split(w).join(""); });
+  s = s.replace(/[\s\u3000]+/g, " ").trim();
+  if(!s) return { text:base, changed:false, blank:base !== "" };
+  return { text:s, changed:s !== base, blank:false };
+}
+
+function finalReadings(items){
+  const words = getKanaWords();
+  return items.map(i => cleanReading(i.reading, words).text);
+}
+
+function renderCwkPreview(){
+  const box = $("cwkPreview");
+  if(officeData.size === 0){ box.textContent = ""; return; }
+  if(!$("cwkEnable").checked){ box.textContent = "ふりがなは、CSVのままです。"; return; }
+
+  const words = getKanaWords();
+  let total = 0, changed = 0, blank = 0, empty = 0;
+  const examples = [];
+  officeData.forEach(items => {
+    items.forEach(i => {
+      total++;
+      if(!i.reading){ empty++; return; }
+      const r = cleanReading(i.reading, words);
+      if(r.changed){ changed++; if(examples.length < 5) examples.push(`${i.reading} → ${r.text}`); }
+      if(r.blank) blank++;
+    });
+  });
+  box.textContent = `${total.toLocaleString()}件のうち、${changed.toLocaleString()}件のふりがなから会社語を除きます。` +
+    (blank ? ` 空になるため元のまま：${blank}件。` : "") +
+    (empty ? ` ふりがなが空の客先：${empty}件（50音で「他」に入ります）。` : "") +
+    (examples.length ? `\n例：\n・` + examples.join("\n・") : "");
+  box.style.whiteSpace = "pre-wrap";
+}
+
+function renderCwPreview(){
+  const box = $("cwPreview");
+  if(officeData.size === 0){ box.textContent = ""; return; }
+  if(!$("cwEnable").checked){ box.textContent = "会社語は除きません（客先名は、CSVのままです）。"; return; }
+
+  let changed = 0, blank = 0, reverted = 0, total = 0;
+  const examples = [];
+  officeData.forEach(items => {
+    finalNames(items).forEach((r, idx) => {
+      total++;
+      if(r.changed){ changed++; if(examples.length < 5) examples.push(`${items[idx].name} → ${r.name}`); }
+      if(r.blank) blank++;
+      if(r.reverted) reverted++;
+    });
+  });
+  box.textContent = `${total.toLocaleString()}件のうち、${changed.toLocaleString()}件の客先名が短くなります。` +
+    (blank ? ` 空になるため元のまま：${blank}件。` : "") +
+    (reverted ? ` 同じ名前になるため元のまま：${reverted}件。` : "") +
+    (examples.length ? `\n例：\n・` + examples.join("\n・") : "");
+  box.style.whiteSpace = "pre-wrap";
+}
+
+/* ---------- 画面 ---------- */
+
+let officeData = new Map();   // 営業所 -> items
+const keyInputs = new Map();  // 営業所 -> input要素
+let madeFiles = [];
+
+const $ = id => document.getElementById(id);
+
+$("cwkWords").value = DEFAULT_KANA_WORDS.join("\n");
+$("cwkEnable").addEventListener("change", renderCwkPreview);
+$("cwkWords").addEventListener("input", renderCwkPreview);
+
+$("cwWords").value = DEFAULT_COMPANY_WORDS.join("\n");
+$("cwEnable").addEventListener("change", renderCwPreview);
+$("cwWords").addEventListener("input", renderCwPreview);
+
+let lastCsvBuffer = null;
+
+function loadCsvFromBuffer(buf){
+  $("csvError").textContent = "";
+  $("csvInfo").textContent = "";
+  $("stepCw").classList.add("hidden");
+  $("step2").classList.add("hidden");
+  $("step3").classList.add("hidden");
+  $("results").innerHTML = "";
+
+  try{
+    const { text, label } = decodeCsvBytes(buf, $("csvEncoding").value);
+    const garbled = text.includes("\uFFFD");
+    const rows = parseCSV(text);
+    if(rows.length === 0) throw new Error("データがありません。");
+
+    let result;
+    try{
+      result = buildOffices(rows);
+    }catch(err){
+      throw new Error(err.message + "\n文字が化けているときは、上の「文字コード」を切り替えてください。");
+    }
+    const { offices, skipped } = result;
+    if(offices.size === 0) throw new Error("読み込める行がありません。列の順番と見出し行を確認してください。文字が化けているときは、上の「文字コード」を切り替えてください。");
+
+    officeData = offices;
+    let total = 0;
+    offices.forEach(v => { total += v.length; });
+    $("csvInfo").textContent = `読み込みました：${offices.size}営業所、${total.toLocaleString()}件（文字コード：${label}）` +
+      (skipped ? `（営業所または客先名が空の${skipped}行は除きました）` : "") +
+      (garbled ? "\n注意：読めない文字（�）が含まれています。文字コードを切り替えて、化けていないか確認してください。" : "");
+    $("csvInfo").style.whiteSpace = "pre-wrap";
+    renderOffices();
+  }catch(err){
+    $("csvError").textContent = err.message;
+    $("csvError").style.whiteSpace = "pre-wrap";
+  }
+}
+
+$("csvFile").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if(!file){ lastCsvBuffer = null; return; }
+  lastCsvBuffer = await file.arrayBuffer();
+  loadCsvFromBuffer(lastCsvBuffer);
+});
+
+$("csvEncoding").addEventListener("change", () => {
+  if(lastCsvBuffer) loadCsvFromBuffer(lastCsvBuffer);
+});
+
+function renderOffices(){
+  const tbody = $("officeRows");
+  tbody.innerHTML = "";
+  keyInputs.clear();
+
+  officeData.forEach((items, office) => {
+    const noReading = items.filter(i => !i.reading).length;
+    const tr = document.createElement("tr");
+
+    const td1 = document.createElement("td"); td1.textContent = office;
+    const td2 = document.createElement("td"); td2.textContent = items.length.toLocaleString() + "件";
+    const td3 = document.createElement("td");
+    td3.textContent = noReading ? noReading.toLocaleString() + "件" : "なし";
+    if(noReading) td3.style.color = "var(--pink-ink)";
+
+    const td4 = document.createElement("td"); td4.className = "keycell";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = genKey();
+    input.spellcheck = false;
+    td4.appendChild(input);
+    keyInputs.set(office, input);
+
+    const td5 = document.createElement("td");
+    const btn = document.createElement("button");
+    btn.className = "b-line";
+    btn.textContent = "自動生成";
+    btn.addEventListener("click", () => { input.value = genKey(); });
+    td5.appendChild(btn);
+
+    tr.append(td1, td2, td3, td4, td5);
+    tbody.appendChild(tr);
+  });
+
+  $("stepCw").classList.remove("hidden");
+  renderCwPreview();
+  renderCwkPreview();
+  $("step2").classList.remove("hidden");
+  $("step3").classList.remove("hidden");
+}
+
+function todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+$("makeBtn").addEventListener("click", async () => {
+  $("keyError").textContent = "";
+  $("results").innerHTML = "";
+
+  // キーの確認
+  const used = new Map();
+  const problems = [];
+  for(const [office, input] of keyInputs){
+    const norm = normalizeKey(input.value);
+    if(norm.length < 16) problems.push(`「${office}」のキーが短すぎます（16文字以上にしてください）。`);
+    if(used.has(norm)) problems.push(`「${office}」と「${used.get(norm)}」が同じキーです。営業所ごとに別のキーにしてください。`);
+    used.set(norm, office);
+  }
+  if(problems.length){ $("keyError").textContent = problems.join("\n"); return; }
+
+  $("makeBtn").disabled = true;
+  madeFiles = [];
+  let n = 0;
+
+  try{
+    for(const [office, items] of officeData){
+      n++;
+      $("progress").textContent = `作成中… ${n} / ${officeData.size}（${office}）`;
+      const key = keyInputs.get(office).value;
+      const { aesKey } = await deriveMaster(key);
+      const payload = { v:1, office, updated:todayStr(), items: (() => { const fn = finalNames(items); const fk = finalReadings(items); return items.map((i, idx) => ({ c:i.code, n:fn[idx].name, k:fk[idx] })); })() };
+      const bytes = await encryptMaster(aesKey, payload);
+
+      // 作成直後に復号して確認
+      const check = await decryptMaster(aesKey, bytes.buffer);
+      if(check.items.length !== items.length) throw new Error("確認に失敗しました（" + office + "）");
+
+      const safeOffice = office.replace(/[\\\/:*?"<>|]/g, "_");
+      madeFiles.push({ office, count:items.length, key, fileName:`${safeOffice}_客先名リスト.enc`, bytes });
+    }
+    $("progress").textContent = "完了しました。";
+    renderResults();
+  }catch(err){
+    $("progress").textContent = "";
+    $("keyError").textContent = "作成に失敗しました：" + err.message;
+  }finally{
+    $("makeBtn").disabled = false;
+  }
+});
+
+function downloadFile(f){
+  const blob = new Blob([f.bytes], { type:"application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = f.fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function renderResults(){
+  const box = $("results");
+  box.innerHTML = "";
+
+  const all = document.createElement("button");
+  all.className = "b-mint";
+  all.style.margin = "12px 0";
+  all.textContent = "すべてダウンロード";
+  all.addEventListener("click", () => {
+    madeFiles.forEach((f, i) => setTimeout(() => downloadFile(f), i * 400));
+  });
+  box.appendChild(all);
+
+  const table = document.createElement("table");
+  table.innerHTML = "<thead><tr><th>営業所</th><th>件数</th><th>渡すファイル</th><th>営業所キー（控えてください）</th><th></th></tr></thead>";
+  const tb = document.createElement("tbody");
+  madeFiles.forEach(f => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td></td><td></td><td><code></code></td><td><code></code></td><td></td>`;
+    tr.children[0].textContent = "✓ " + f.office;
+    tr.children[1].textContent = f.count.toLocaleString() + "件";
+    tr.children[2].firstChild.textContent = f.fileName;
+    tr.children[3].firstChild.textContent = f.key;
+    const b = document.createElement("button");
+    b.className = "b-line";
+    b.textContent = "ダウンロード";
+    b.addEventListener("click", () => downloadFile(f));
+    tr.children[4].appendChild(b);
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb);
+  box.appendChild(table);
+
+  const copy = document.createElement("button");
+  copy.className = "b-line";
+  copy.style.marginTop = "12px";
+  copy.textContent = "キーの一覧をコピー";
+  copy.addEventListener("click", async () => {
+    const text = madeFiles.map(f => `${f.office}\t${f.key}`).join("\n");
+    try{ await navigator.clipboard.writeText(text); copy.textContent = "コピーしました"; }
+    catch(e){ copy.textContent = "コピーできませんでした（画面から控えてください）"; }
+  });
+  box.appendChild(copy);
+
+  const w = document.createElement("div");
+  w.className = "warn";
+  w.textContent = "このキーの一覧は、ページを閉じると消えます。会社の安全な保管場所に控えてから閉じてください。";
+  box.appendChild(w);
+}
+</script>
+</body>
+</html>

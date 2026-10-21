@@ -47,6 +47,12 @@ finally:
     srv.shutdown()
 
 text = (out.stdout or "") + (out.stderr or "")
+
+# 客先名リストの取り込みの確認(本物の index.html と customer_list_tool.html を使う)
+imp = subprocess.run(["node", "master_import_test.js"], capture_output=True, text=True, encoding="utf-8", errors="replace", shell=(os.name == "nt"))
+text += (imp.stdout or "") + (imp.stderr or "")
+if imp.returncode != 0 and out.returncode == 0:
+    out = imp
 open(os.path.join(HERE, "smoke8.out"), "w", encoding="utf-8").write(text)
 lines = text.splitlines()
 print("合格の項目数:", sum(1 for l in lines if l.startswith("PASS ")))

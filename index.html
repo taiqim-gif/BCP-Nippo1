@@ -424,7 +424,6 @@
         <input type="password" id="masterKeyInput" autocomplete="off" autocapitalize="characters" spellcheck="false" style="margin-bottom:8px;">
         <div class="row-gap master-actions">
           <button type="button" class="btn btn-mint" id="masterFileButton">ファイルから取り込む</button>
-          <button type="button" class="btn btn-outline-mint" id="masterGoButton">ネットから取得</button>
         </div>
         <input type="file" id="masterFile" style="display:none;">
         <div id="masterMessage" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
@@ -1597,7 +1596,6 @@ function setMasterMessage(text, isError){
 
 function setMasterBusy(busy){
   document.getElementById("masterFileButton").disabled = busy;
-  document.getElementById("masterGoButton").disabled = busy;
 }
 
 function saveMasterData(data){
@@ -1618,7 +1616,7 @@ function hasCryptoSupport(){
   return false;
 }
 
-// 方法1：受け取ったファイル（OneDrive・メールなど）を選んで取り込む
+// 受け取ったファイル（OneDrive・メールなど）を選んで取り込む
 document.getElementById("masterFileButton").addEventListener("click", () => {
   const input = document.getElementById("masterKeyInput");
   if(!normalizeKey(input.value)){
@@ -1665,59 +1663,8 @@ document.getElementById("masterFile").addEventListener("change", async e => {
   }
 });
 
-// 方法2：サーバー（GitHubなど）の master フォルダから自動で取得する
-document.getElementById("masterGoButton").addEventListener("click", async () => {
-  const input = document.getElementById("masterKeyInput");
-  if(!normalizeKey(input.value)){
-    setMasterMessage("先に営業所キーを入力してください。", true);
-    input.focus();
-    return;
-  }
-
-  setMasterBusy(true);
-  setMasterMessage("確認中です…（数秒かかることがあります）", false);
-
-  try{
-    if(!hasCryptoSupport()) return;
-
-    const { aesKey, fileId } = await deriveMaster(input.value);
-
-    let res;
-    try{
-      res = await fetch(`master/${fileId}.enc`, { cache: "no-store" });
-    }catch(netErr){
-      setMasterMessage("通信できませんでした。電波の状況を確認してください。", true);
-      return;
-    }
-
-    if(!res.ok){
-      setMasterMessage(res.status === 404
-        ? "キーが違うか、この営業所のリストが登録されていません。"
-        : `取得できませんでした（エラー ${res.status}）。`, true);
-      return;
-    }
-
-    let data;
-    try{
-      data = await decryptMaster(aesKey, await res.arrayBuffer());
-    }catch(decErr){
-      setMasterMessage("キーが違うか、ファイルが壊れています。キーをもう一度確認してください。", true);
-      return;
-    }
-    if(!data || !Array.isArray(data.items)){
-      setMasterMessage("リストの形式が正しくありません。", true);
-      return;
-    }
-    saveMasterData(data);
-  }catch(err){
-    setMasterMessage("取得に失敗しました。", true);
-  }finally{
-    setMasterBusy(false);
-  }
-});
-
 document.getElementById("masterClearButton").addEventListener("click", () => {
-  if(!window.confirm("このスマホから客先名リストを消します。\n再び使うには、営業所キーでもう一度取得します。\n\n消しますか？")) return;
+  if(!window.confirm("このスマホから客先名リストを消します。\n再び使うには、営業所キーでもう一度取り込みます。\n\n消しますか？")) return;
   localStorage.removeItem(MASTER_STORE_KEY);
   customerMaster = null;
   selectedCustomer = null;

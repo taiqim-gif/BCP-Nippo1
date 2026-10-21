@@ -3,10 +3,9 @@
    ・最初に電波のある所で開くと、アプリ本体を端末に保管する
    ・次回からは、電波がなくても保管した本体で起動する
    ・電波があるときは最新版を取りに行き、保管内容を更新する
-   ・客先名リスト（master フォルダ）は保管せず、常にネットから取得する
    ※ アプリを大きく作り替えたときは、下の CACHE の v1 → v2 に変える
 ========================================================= */
-const CACHE = "nippo-cache-v8";
+const CACHE = "nippo-cache-v9";
 const FONT_CACHE = "nippo-fonts-v1";                    // Google Fonts（見た目用）を保管する入れ物
 const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
 
@@ -97,7 +96,6 @@ self.addEventListener("fetch", event => {
     return;
   }
   if(url.origin !== self.location.origin) return;       // それ以外の外部は対象外
-  if(url.pathname.includes("/master/")) return;         // 客先名リストは保管しない
 
   event.respondWith(networkFirst(req));
 });
