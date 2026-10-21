@@ -29,7 +29,7 @@
 |---|---|
 | `index.html` | 元のアプリ本体(利用者のもの)。ホーム/訪問入力/車両の画面、客先リスト取り込み、日報メール |
 | `container.js` | 追加機能すべて(約20万文字)。`index.html` の最後で読み込む。容器・データ・顧客の管理・天気・各種の手直し |
-| `sw.js` | オフライン用(Service Worker)。保管の名前は `nippo-cache-v9`。大きく作り替えたら、版を上げる |
+| `sw.js` | オフライン用(Service Worker)。保管の名前は `nippo-cache-v10`。大きく作り替えたら、版を上げる |
 | `manifest.webmanifest`, `icon-180/192/512.png` | ホーム画面に追加するための部品 |
 | `customer_list_tool.html` | 顧客リストの暗号化ツール(管理者がPCのブラウザで開く。アプリからは読み込まない。下の「顧客リストの暗号化ツール」) |
 | `docs/global-CLAUDE.md` | 共通の約束(パソコンの `~/.claude/CLAUDE.md` に置くものの写し) |
@@ -41,10 +41,11 @@
 - iPhoneで更新を反映するには、アプリを完全に閉じて、もう一度開く。
 
 ### 顧客リストの暗号化ツール(customer_list_tool.html)
-- 流れ: Access のクエリ `Q_スマホアプリ用` から CSV(営業所、顧客コード、客先名、ふりがな) → このツール → 担当ごとの暗号化ファイル(`.enc`) → OneDrive・メールで配る → アプリの「データ」画面の顧客リストで「取り込む」→ 営業所キー → 「ファイルから取り込む」。
+- 流れ: Access のクエリ `Q_スマホアプリ用` から CSV(営業所、顧客コード、客先名、ふりがな、非表示) → このツール → 担当ごとの暗号化ファイル(`.enc`) → OneDrive・メールで配る → アプリの「データ」画面の顧客リストで「取り込む」→ 営業所キー → 「ファイルから取り込む」。
 - **取り込みはファイルからだけ**。「ネットから取得」(GitHub の `master/` から取る機能)は、v9 でやめた。暗号化ファイルを GitHub に置かない。
 - 暗号のコード(`/* ===CRYPTO-BEGIN=== */` から `CRYPTO-END` まで)は、`index.html` と**同じ文字列**にする。片方を直したら、もう片方も直す(AES-256-GCM、PBKDF2-SHA256 60万回、HKDF で暗号鍵とファイルID)。
 - キー: 全角→半角、大文字化、空白・ハイフン・長音記号を除いて整える。16文字以上。自動生成は20文字。営業所キーはスマホに保存しない。
+- **Access の「非表示」**(v10): CSV の5列目「非表示」(1・-1・True・はい・○ を非表示とみなす。なくてもよい)を読み、ファイル全体に `hidden:1`、非表示の顧客に `h:1` を付ける。画面の表に、担当ごとの非表示の件数。アプリは取り込むとき、スマホに初めて入る顧客は Access に従い、すでにある顧客でスマホの設定と違うものがあるときだけ「非表示の設定」の確認(`#ctHiddenChoice`): [スマホの設定を残す](すでにある顧客はそのまま) / [Access の設定で上書き](ファイルの全員を Access に合わせる)。違いがなければ聞かない。別の担当のリストのときは、[残して足す/入れ替える] のあとに聞く。`hidden` のない古いファイルは、非表示に手を付けない。印は、これまでどおり `customerHidden` に保存(`customerMaster` の各顧客にも `h` が残る)。
 - 会社語の除去: 客先名から「株式会社」など(34語)、ふりがなから「カブシキカイシャ」などを除く(画面で編集できる)。空になる名前と、同じ名前になる客先は、元のまま。
 
 ## 3. コードの作りの要点
@@ -61,7 +62,7 @@
   - 包んでいる関数: `renderTodoList`, `renderVehicleScreen`, `saveTodos`, `buildReportMail`, `getLatestPastReturnDistance`, `attachTodoDrag`(並べ替えを置き換え), `goToVisit`, `updateNav`, `updateDate`, `deleteData`, `renderMasterUI`, `setMasterMessage`, `showToast`, `confirm`。
   - 追加している画面: `containerScreen`(容器)、`dataScreen`(データ)、`custScreen`(顧客の管理)。ヘッダーに `navContainerButton`、`navDataButton` を足している。
 - 画面の色の統一は、`#tabColors` という `<style>`(`container.js` の中で作る)で上書きしている。
-- テスト用に、`window.ctXxx`(`ctMailAllCsv`, `ctRefreshWeather`, `ctWxStep`, `ctWxView`, `ctEnsureVisible`, `ctRenderBar`, `ctApplyTab`, `ctSetSlot`, `ctSlotNow`, `ctCompactVisits`, `ctMasterMerged`, `ctSetListUse`, `ctDeleteMasterSource`, `ctHomeTypeSuggest`, `ctWxTempColor`, `ctStyleTodoDates`, `ctWxInterval`, `ctWxPageIndex`, `ctWxRestart`, `ctVehicleCardColor`)を公開している。
+- テスト用に、`window.ctXxx`(`ctMailAllCsv`, `ctRefreshWeather`, `ctWxStep`, `ctWxView`, `ctEnsureVisible`, `ctRenderBar`, `ctApplyTab`, `ctSetSlot`, `ctSlotNow`, `ctCompactVisits`, `ctMasterMerged`, `ctAccessHiddenPlan`, `ctSetListUse`, `ctDeleteMasterSource`, `ctHomeTypeSuggest`, `ctWxTempColor`, `ctStyleTodoDates`, `ctWxInterval`, `ctWxPageIndex`, `ctWxRestart`, `ctVehicleCardColor`)を公開している。
 
 ### 保存データ(localStorage のキー)— **名前を変えない・消さない**
 - 元のアプリ: `meetingLogs`, `dailyVehicleInfo`, `todoItems`, `appLastOpenDate`, `customerMaster`
@@ -156,6 +157,6 @@
 ## 7. 変更するときの注意(いつも守ること)
 
 - **保存データを消さない。キー名を変えない。** 変更の前に、データ画面の「バックアップ保存」を押すよう、利用者に伝える。
-- `container.js` を差し替えたら、`sw.js` の `CACHE` の版(今は v9)を上げる。
+- `container.js` を差し替えたら、`sw.js` の `CACHE` の版(今は v10)を上げる。
 - 顧客リスト(暗号化)や、顧客の実データを、GitHubに置かない。
 - 「テストで」と言われたら、テスト用のページ(作業用の枝)だけに入れる。**main に入れるのは「main に入れて」と言われたときだけ。**

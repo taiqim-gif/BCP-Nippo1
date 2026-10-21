@@ -2428,7 +2428,7 @@ if(typeof origSaveMasterData === "function"){
   window.saveMasterData = function(data){
     const prev = rawMaster(), office = (data && data.office) || "";
     const has = !!(prev && Array.isArray(prev.items) && prev.items.length);
-    if(!has || masterSources(prev).some(x => x.office === office)){ finishMasterSave(masterMerged(prev, data, "add")); return; }   // 初めて・同じ担当の取り込み直しは、選ばずに進める
+    if(!has || masterSources(prev).some(x => x.office === office)){ saveWithAccessHidden(prev, data, "add"); return; }   // 初めて・同じ担当の取り込み直しは、選ばずに進める
     showMasterChoice(prev, data);
   };
 }
@@ -2447,9 +2447,57 @@ function showMasterChoice(prev, data){
   const now = masterSources(prev).map(x => `「${srcLabel(x.office)}」`).join("・");
   $("ctMcText").textContent = `今、${now} (${prev.items.length.toLocaleString()}件) が入っています。新しく「${srcLabel(data.office)}」(${data.items.length.toLocaleString()}件) を取り込みます。`;
   const close = () => { sh.hidden = true; };
-  $("ctMcAdd").onclick = () => { close(); finishMasterSave(masterMerged(prev, data, "add")); };
-  $("ctMcReplace").onclick = () => { close(); finishMasterSave(masterMerged(prev, data, "replace")); };
+  $("ctMcAdd").onclick = () => { close(); saveWithAccessHidden(prev, data, "add"); };
+  $("ctMcReplace").onclick = () => { close(); saveWithAccessHidden(prev, data, "replace"); };
   $("ctMcCancel").onclick = () => { close(); if(typeof setMasterMessage === "function") setMasterMessage("取り込みをやめました(前のリストのままです)", false); };
+  sh.hidden = false;
+}
+
+/* ---------- 顧客リスト：Access の「非表示」を、取り込みのときにスマホへ反映する ----------
+   ・ツールが、CSV の5列目「非表示」を、ファイルに入れる(ファイル全体に hidden:1、非表示の顧客に h:1)
+   ・スマホに初めて入る顧客は、Access の非表示に従う
+   ・スマホにすでにある顧客で、スマホの設定と Access が違うときだけ、[スマホの設定を残す] / [Access の設定で上書き] を選ぶ
+   ・古いツールで作ったファイル(hidden がない)は、非表示に手を付けない
+   ・非表示の印は、これまでどおり customerHidden に保存する */
+function accessHiddenPlan(prev, data){
+  if(!data || !data.hidden || !Array.isArray(data.items)) return null;
+  custHidden = new Set(loadJson(CH_KEY, []));                                   // 保存されている最新の印で比べる
+  const known = new Set((prev && Array.isArray(prev.items) ? prev.items : []).map(custKey));
+  const diff = [], fresh = [];
+  data.items.forEach(i => {
+    const x = { k: custKey(i), h: i.h === 1 };
+    if(!known.has(x.k)) fresh.push(x);                                          // スマホに初めて入る顧客
+    else if(custHidden.has(x.k) !== x.h) diff.push(x);                          // スマホの設定と Access が違う顧客
+  });
+  return { diff, fresh };
+}
+window.ctAccessHiddenPlan = accessHiddenPlan;
+function applyAccessHidden(list){
+  list.forEach(x => { if(x.h) custHidden.add(x.k); else custHidden.delete(x.k); });
+  saveCust();
+}
+function saveWithAccessHidden(prev, data, mode){
+  const plan = accessHiddenPlan(prev, data);
+  const finish = () => finishMasterSave(masterMerged(prev, data, mode));
+  if(!plan){ finish(); return; }
+  if(plan.diff.length === 0){ applyAccessHidden(plan.fresh); finish(); return; }
+  let sh = $("ctHiddenChoice");
+  if(!sh){
+    sh = document.createElement("div");
+    sh.id = "ctHiddenChoice";
+    sh.className = "ct-mchoice";
+    sh.innerHTML = '<div class="ct-mchoice-box"><h3>非表示の設定</h3><p id="ctHcText"></p>' +
+      '<button type="button" class="btn btn-mint" id="ctHcKeep">スマホの設定を残す</button>' +
+      '<button type="button" class="btn btn-outline-pink" id="ctHcAccess">Access の設定で上書き</button></div>';
+    document.body.appendChild(sh);
+  }
+  const toHide = plan.diff.filter(x => x.h).length, toShow = plan.diff.length - toHide;
+  $("ctHcText").textContent = `スマホと Access で、非表示の設定が違う顧客が ${plan.diff.length.toLocaleString()}件あります` +
+    `(Access で非表示 ${toHide.toLocaleString()}件・Access で表示 ${toShow.toLocaleString()}件)。` +
+    `スマホに初めて入る顧客は、どちらを選んでも Access の設定に従います。`;
+  const close = () => { sh.hidden = true; };
+  $("ctHcKeep").onclick = () => { close(); applyAccessHidden(plan.fresh); finish(); };
+  $("ctHcAccess").onclick = () => { close(); applyAccessHidden(plan.fresh.concat(plan.diff)); finish(); };
   sh.hidden = false;
 }
 

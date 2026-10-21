@@ -1536,3 +1536,38 @@ ok(!$("ctListMenu").hidden && [...$("ctListMenu").querySelectorAll(".ct-lopt")].
 ok($("ctListMenu").hidden && cand48()==="岡田工業" && $("ctListBtn").textContent==="リスト: B担当 ▼" && w.localStorage.getItem("customerListUse")==="B担当","choosing B担当: the candidates are shown again from that list at once; the same setting as home");
 ok(!$("hmListBtn") || $("hmListBtn").textContent==="リスト: B担当 ▼","the home button shows the same list");
 w.ctSetListUse(""); set("ctCustomer",""); ev($("ctCustomer"),"input"); w.ctSetSlot(null); w.localStorage.removeItem("customerListUse");
+
+// ---- 49) 顧客リスト：Access の「非表示」を取り込みで反映(違うときだけ、スマホの設定を残す/Access で上書き を選ぶ) ----
+const m49=()=>JSON.parse(w.localStorage.getItem("customerMaster"));
+const h49=()=>JSON.parse(w.localStorage.getItem("customerHidden")).slice().sort().join();
+const prep49=()=>{ w.localStorage.setItem("customerHidden",JSON.stringify(["c:2"]));
+  w.localStorage.setItem("customerMaster",JSON.stringify({office:"A営業所",updated:"2026-10-01",items:[{n:"北ガス",k:"きたがす",c:"1"},{n:"山田商店",k:"やまだ",c:"2"},{n:"川口工業",k:"かわぐち",c:"3"}]}));
+  w.localStorage.removeItem("customerListUse"); w.renderMasterUI(); };
+// Access: 1=非表示(スマホは表示)、2=表示(スマホは非表示)、3=同じ、4=新しく非表示、5=新しく表示
+const file49=(office)=>({office:office||"A営業所",updated:"2026-10-21",hidden:1,items:[{n:"北ガス",k:"きたがす",c:"1",h:1},{n:"山田商店",k:"やまだ",c:"2"},{n:"川口工業",k:"かわぐち",c:"3"},{n:"新しい商店",k:"あたらしい",c:"4",h:1},{n:"見本ガス",k:"みほん",c:"5"}]});
+prep49();
+const plan49=w.ctAccessHiddenPlan(m49(),file49());
+ok(plan49.diff.map(x=>x.k+(x.h?"=非":"=表")).join()==="c:1=非,c:2=表" && plan49.fresh.map(x=>x.k).join()==="c:4,c:5","plan: customers already on the phone that differ (c:1, c:2) / customers new to the phone (c:4, c:5)");
+w.saveMasterData(file49());
+const sh49=$("ctHiddenChoice");
+ok(!!sh49 && !sh49.hidden && /2件/.test($("ctHcText").textContent) && /Access で非表示 1件・Access で表示 1件/.test($("ctHcText").textContent),"when the phone and Access differ: asks スマホの設定を残す / Access の設定で上書き (2件, with the breakdown)");
+ok(m49().items.length===3,"(nothing is saved until one is chosen)");
+$("ctHcKeep").click();
+ok(sh49.hidden && h49()==="c:2,c:4" && m49().items.length===5,"スマホの設定を残す: c:1 stays shown and c:2 stays hidden; the new c:4 follows Access (hidden), c:5 shown");
+prep49(); w.saveMasterData(file49()); $("ctHcAccess").click();
+ok(sh49.hidden && h49()==="c:1,c:4" && m49().items.length===5,"Access の設定で上書き: every customer in the file follows Access (c:1 hidden, c:2 shown, c:4 hidden)");
+ok(/非表示 2/.test($("masterStatus").textContent),"the status shows the hidden count after importing");
+// 違いがないときは、選ばずに進む
+prep49(); w.localStorage.setItem("customerHidden",JSON.stringify(["c:1"])); w.saveMasterData(file49());
+ok(sh49.hidden && h49()==="c:1,c:4","no difference: imported without asking; new customers follow Access");
+// 古いツールのファイル(hidden がない)は、非表示に手を付けない
+prep49(); w.saveMasterData({office:"A営業所",updated:"2026-10-21",items:[{n:"北ガス",k:"きたがす",c:"1"},{n:"新しい商店",k:"あたらしい",c:"4"}]});
+ok(sh49.hidden && h49()==="c:2" && m49().items.length===2,"a file from the old tool (no 非表示 column): hidden marks are not touched, no question");
+// 別の担当のリスト：先に 残して足す/入れ替える、そのあと非表示の確認
+prep49(); w.saveMasterData(file49("B担当"));
+ok(!$("ctMasterChoice").hidden && sh49.hidden,"another person's list: first asks 残して足す / 入れ替える");
+$("ctMcAdd").click();
+ok(!sh49.hidden,"then asks about the hidden settings");
+$("ctHcAccess").click();
+ok(sh49.hidden && h49()==="c:1,c:4" && m49().sources.map(x=>x.office).join()==="B担当","both choices are applied");
+w.localStorage.setItem("customerHidden","[]"); w.localStorage.removeItem("customerMaster"); w.renderMasterUI();

@@ -51,7 +51,7 @@
     </select>
     <span class="note">文字が化けて見えるときは、ここを切り替えてください。</span>
   </div>
-  <p class="note">列は左から「営業所」「顧客コード」「客先名」「ふりがな（またはフリガナ）」。1行目は見出し行にしてください。CSVファイルが必要です（Excelのファイル .xlsx は読めません）。ふりがなは、Accessのフリガナのままで構いません。会社語は、このツールが除きます。</p>
+  <p class="note">列は左から「営業所」「顧客コード」「客先名」「ふりがな（またはフリガナ）」。5列目に「非表示」（1＝非表示、0＝表示）があれば、スマホの非表示の設定に使います（なくても構いません）。1行目は見出し行にしてください。CSVファイルが必要です（Excelのファイル .xlsx は読めません）。ふりがなは、Accessのフリガナのままで構いません。会社語は、このツールが除きます。</p>
   <div id="csvInfo" class="note"></div>
   <div id="csvError" class="err"></div>
 </div>
@@ -76,7 +76,7 @@
 <div class="card hidden" id="step2">
   <h2>手順3　営業所ごとのキーを決める</h2>
   <table>
-    <thead><tr><th>営業所</th><th>件数</th><th>ふりがな未入力</th><th class="keycell">営業所キー</th><th></th></tr></thead>
+    <thead><tr><th>営業所</th><th>件数</th><th>ふりがな未入力</th><th>非表示</th><th class="keycell">営業所キー</th><th></th></tr></thead>
     <tbody id="officeRows"></tbody>
   </table>
   <p class="note">自動で作ったキーをそのまま使うのがおすすめです。すでに配ったキーを使い続ける場合は、その文字を入力してください（16文字以上）。キーの大文字・小文字、ハイフン、全角・半角の違いは区別されません。</p>
@@ -230,9 +230,10 @@ function decodeCsvBytes(buf, forced){
 function buildOffices(rows){
   const first = rows[0].map(x => x.trim());
   // 見出し行かどうかは、セルが見出しの名前そのものかで判定する（データ行の「〇〇営業所」を誤認しない）
-  const HEADER_CELL = /^(営業所名?|顧客コード|得意先コード|コード|客先名|顧客名|得意先名?|名称|ふりがな|フリガナ|読み(仮名)?|カナ)$/;
+  const HEADER_CELL = /^(営業所名?|顧客コード|得意先コード|コード|客先名|顧客名|得意先名?|名称|ふりがな|フリガナ|読み(仮名)?|カナ|非表示)$/;
   const hasHeader = first.filter(x => HEADER_CELL.test(x)).length >= 2;
-  let idx = { office:0, code:1, name:2, reading:3 };
+  // 見出し行がないときは、5列目を「非表示」とみなす（5列目がない行は、表示）
+  let idx = { office:0, code:1, name:2, reading:3, hidden: rows.some(r => r.length >= 5) ? 4 : -1 };
   let body = rows;
 
   if(hasHeader){
@@ -241,7 +242,8 @@ function buildOffices(rows){
       office: find(/営業所/),
       code: find(/コード/),
       name: find(/客先|顧客名|名称|得意先/),
-      reading: find(/ふりがな|フリガナ|読み|カナ/)
+      reading: find(/ふりがな|フリガナ|読み|カナ/),
+      hidden: find(/非表示/)          // なくてもよい
     };
     const missing = Object.entries({ "営業所":idx.office, "顧客コード":idx.code, "客先名":idx.name, "ふりがな":idx.reading })
       .filter(([, v]) => v < 0).map(([k]) => k);
@@ -256,9 +258,16 @@ function buildOffices(rows){
     const name = (r[idx.name] || "").trim();
     if(!office || !name){ skipped++; return; }
     if(!map.has(office)) map.set(office, []);
-    map.get(office).push({ code:(r[idx.code] || "").trim(), name, reading:(r[idx.reading] || "").trim() });
+    map.get(office).push({ code:(r[idx.code] || "").trim(), name, reading:(r[idx.reading] || "").trim(),
+      hidden: idx.hidden >= 0 && isHiddenValue(r[idx.hidden]) });
   });
-  return { offices: map, skipped };
+  return { offices: map, skipped, hasHidden: idx.hidden >= 0 };
+}
+
+// 「非表示」の列の値：1・-1・True・はい・○ などを非表示とみなす（Access の Yes/No の書き出しにも対応）
+function isHiddenValue(v){
+  const s = String(v || "").normalize("NFKC").trim().toLowerCase();
+  return ["1", "-1", "true", "yes", "y", "on", "はい", "○", "〇"].includes(s);
 }
 
 /* ---------- キー ---------- */
@@ -409,6 +418,7 @@ function renderCwPreview(){
 /* ---------- 画面 ---------- */
 
 let officeData = new Map();   // 営業所 -> items
+let hasHiddenColumn = false;  // CSV に「非表示」の列があるか
 const keyInputs = new Map();  // 営業所 -> input要素
 let madeFiles = [];
 
@@ -444,14 +454,16 @@ function loadCsvFromBuffer(buf){
     }catch(err){
       throw new Error(err.message + "\n文字が化けているときは、上の「文字コード」を切り替えてください。");
     }
-    const { offices, skipped } = result;
+    const { offices, skipped, hasHidden } = result;
     if(offices.size === 0) throw new Error("読み込める行がありません。列の順番と見出し行を確認してください。文字が化けているときは、上の「文字コード」を切り替えてください。");
 
     officeData = offices;
-    let total = 0;
-    offices.forEach(v => { total += v.length; });
+    hasHiddenColumn = hasHidden;
+    let total = 0, hiddenTotal = 0;
+    offices.forEach(v => { total += v.length; hiddenTotal += v.filter(i => i.hidden).length; });
     $("csvInfo").textContent = `読み込みました：${offices.size}営業所、${total.toLocaleString()}件（文字コード：${label}）` +
       (skipped ? `（営業所または客先名が空の${skipped}行は除きました）` : "") +
+      (hasHidden ? `\n「非表示」の列があります：非表示 ${hiddenTotal.toLocaleString()}件（スマホに取り込むときに反映します）` : "\n「非表示」の列はありません（スマホの非表示の設定は変わりません）") +
       (garbled ? "\n注意：読めない文字（�）が含まれています。文字コードを切り替えて、化けていないか確認してください。" : "");
     $("csvInfo").style.whiteSpace = "pre-wrap";
     renderOffices();
@@ -486,6 +498,8 @@ function renderOffices(){
     const td3 = document.createElement("td");
     td3.textContent = noReading ? noReading.toLocaleString() + "件" : "なし";
     if(noReading) td3.style.color = "var(--pink-ink)";
+    const tdH = document.createElement("td");
+    tdH.textContent = hasHiddenColumn ? items.filter(i => i.hidden).length.toLocaleString() + "件" : "－";
 
     const td4 = document.createElement("td"); td4.className = "keycell";
     const input = document.createElement("input");
@@ -502,7 +516,7 @@ function renderOffices(){
     btn.addEventListener("click", () => { input.value = genKey(); });
     td5.appendChild(btn);
 
-    tr.append(td1, td2, td3, td4, td5);
+    tr.append(td1, td2, td3, tdH, td4, td5);
     tbody.appendChild(tr);
   });
 
@@ -543,7 +557,10 @@ $("makeBtn").addEventListener("click", async () => {
       $("progress").textContent = `作成中… ${n} / ${officeData.size}（${office}）`;
       const key = keyInputs.get(office).value;
       const { aesKey } = await deriveMaster(key);
-      const payload = { v:1, office, updated:todayStr(), items: (() => { const fn = finalNames(items); const fk = finalReadings(items); return items.map((i, idx) => ({ c:i.code, n:fn[idx].name, k:fk[idx] })); })() };
+      // 「非表示」の列があるときは、ファイル全体に hidden:1、非表示の顧客に h:1 を付ける（アプリが取り込むときに反映する）
+      const payload = { v:1, office, updated:todayStr(), items: (() => { const fn = finalNames(items); const fk = finalReadings(items);
+        return items.map((i, idx) => Object.assign({ c:i.code, n:fn[idx].name, k:fk[idx] }, hasHiddenColumn && i.hidden ? { h:1 } : {})); })() };
+      if(hasHiddenColumn) payload.hidden = 1;
       const bytes = await encryptMaster(aesKey, payload);
 
       // 作成直後に復号して確認
