@@ -592,6 +592,35 @@ function downloadFile(f){
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+// 選んだ保存先に「客先名リスト_日付」のフォルダを作り、全部の暗号化ファイルを書き込む
+// 同じ名前のフォルダ（またはファイル）があるときは、_2、_3…と番号を付ける（今あるものは上書きしない）
+async function saveAllToFolder(){
+  const parent = await window.showDirectoryPicker({ mode:"readwrite" });
+  const base = `客先名リスト_${todayStr()}`;
+  let name = base;
+  for(let n = 2; await entryExists(parent, name); n++){
+    if(n > 99) throw new Error("同じ名前のフォルダが多すぎます");
+    name = `${base}_${n}`;
+  }
+  const dir = await parent.getDirectoryHandle(name, { create:true });
+  for(const f of madeFiles){
+    const fh = await dir.getFileHandle(f.fileName, { create:true });
+    const w = await fh.createWritable();
+    await w.write(f.bytes);
+    await w.close();
+  }
+  return { name, count: madeFiles.length };
+}
+
+async function entryExists(parent, name){
+  try{
+    await parent.getDirectoryHandle(name);
+    return true;
+  }catch(e){
+    return !(e && e.name === "NotFoundError");   // 同じ名前のファイルがあるとき（TypeMismatchError）も、使わない
+  }
+}
+
 function renderResults(){
   const box = $("results");
   box.innerHTML = "";
@@ -600,10 +629,36 @@ function renderResults(){
   all.className = "b-mint";
   all.style.margin = "12px 0";
   all.textContent = "すべてダウンロード";
-  all.addEventListener("click", () => {
+  const allMsg = document.createElement("span");
+  allMsg.className = "note";
+  allMsg.style.marginLeft = "10px";
+  all.addEventListener("click", async () => {
+    // Edge・Chrome：保存先を選び、その中に「客先名リスト_日付」のフォルダを作って、全部を入れる
+    if(typeof window.showDirectoryPicker === "function"){
+      all.disabled = true;
+      allMsg.textContent = "";
+      try{
+        const r = await saveAllToFolder();
+        allMsg.textContent = `フォルダ「${r.name}」に ${r.count}個のファイルを保存しました。`;
+      }catch(err){
+        if(err && err.name === "AbortError") allMsg.textContent = "保存をやめました。";
+        else allMsg.textContent = "保存できませんでした。別の保存先を選んでください。（" + ((err && err.message) || err) + "）";
+      }finally{
+        all.disabled = false;
+      }
+      return;
+    }
+    // ほかのブラウザ：今までどおり、1つずつダウンロード
     madeFiles.forEach((f, i) => setTimeout(() => downloadFile(f), i * 400));
   });
   box.appendChild(all);
+  box.appendChild(allMsg);
+  if(typeof window.showDirectoryPicker === "function"){
+    const hint = document.createElement("p");
+    hint.className = "note";
+    hint.textContent = "「すべてダウンロード」を押すと、保存先を選ぶ画面が出ます。選んだ場所に「客先名リスト_日付」のフォルダを作り、その中に全部のファイルを保存します（営業所キーの一覧は入れません）。";
+    box.appendChild(hint);
+  }
 
   const table = document.createElement("table");
   table.innerHTML = "<thead><tr><th>営業所</th><th>件数</th><th>渡すファイル</th><th>営業所キー（控えてください）</th><th></th></tr></thead>";

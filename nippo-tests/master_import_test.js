@@ -156,6 +156,84 @@ const payload = { v:1, office:"架空営業所", updated:"2026-10-21", items:[
     check("ツール: 非表示の列があるときだけ、ファイルに hidden:1 が付く", p5.hidden === 1 && p4.hidden === undefined && !p4.items.some(i => "h" in i));
   }
 
+  // ツールの「すべてダウンロード」：保存先を選び、「客先名リスト_日付」のフォルダに全部を入れる
+  // (ブラウザのフォルダ選びの代わりに、メモリの中の作りものの「フォルダ」を使う)
+  function fakeDir(existing){
+    const entries = new Map();
+    (existing || []).forEach(n => entries.set(n, { kind:"directory", h: fakeDir() }));
+    const err = (name) => { const e = new Error(name); e.name = name; return e; };
+    return { entries,
+      async getDirectoryHandle(name, opt){
+        const e = entries.get(name);
+        if(e){ if(e.kind !== "directory") throw err("TypeMismatchError"); return e.h; }
+        if(opt && opt.create){ const d = fakeDir(); entries.set(name, { kind:"directory", h:d }); return d; }
+        throw err("NotFoundError");
+      },
+      async getFileHandle(name){
+        const file = { data:null };
+        entries.set(name, { kind:"file", file });
+        return { async createWritable(){ return { async write(b){ file.data = new Uint8Array(b); }, async close(){} }; } };
+      }
+    };
+  }
+  {
+    let anchorClicks = 0;
+    const tdom = new JSDOM(toolHtml, {
+      runScripts: "dangerously",
+      url: "https://example.test/customer_list_tool.html",
+      beforeParse(tw){
+        Object.defineProperty(tw, "crypto", { value: webcrypto, configurable: true });
+        tw.TextEncoder = TextEncoder;
+        tw.TextDecoder = TextDecoder;
+        tw.showDirectoryPicker = async () => { throw Object.assign(new Error("abort"), { name:"AbortError" }); };
+        tw.URL.createObjectURL = () => "blob:test";
+        tw.URL.revokeObjectURL = () => {};
+        tw.HTMLAnchorElement.prototype.click = function(){ anchorClicks++; };
+      }
+    });
+    const tw = tdom.window, td = tw.document;
+    tw.loadCsvFromBuffer(new TextEncoder().encode("営業所,顧客コード,客先名,ふりがな\n架空営業所,T0001,架空商店,カクウ\n見本担当,T0002,見本ガス,ミホン\n").buffer);
+    let i = 0; tw.eval("keyInputs").forEach(input => { input.value = KEY + (i++ ? "-ZZZZ" : ""); });
+    td.getElementById("makeBtn").click();
+    for(let n = 0; n < 150 && tw.eval("madeFiles").length < 2; n++) await sleep(100);
+    const allBtn = [...td.querySelectorAll("#results button")].find(b => b.textContent === "すべてダウンロード");
+    const allMsg = () => allBtn.nextElementSibling.textContent;
+    const waitMsg = async () => { for(let n = 0; n < 50 && !allMsg(); n++) await sleep(50); return allMsg(); };
+    check("ツール: 保存先を選べるブラウザでは、フォルダに保存する案内が出る", /客先名リスト_日付/.test(td.getElementById("results").textContent));
+
+    // 1) 保存先を選ぶ画面で「キャンセル」
+    allBtn.click();
+    check("ツール: 保存先の選択をやめると、何も保存せず「保存をやめました」", /保存をやめました/.test(await waitMsg()) && anchorClicks === 0, allMsg());
+
+    // 2) 同じ名前のフォルダがすでにあるとき → _2 を作って、そこに全部
+    const today = tw.eval("todayStr()");
+    const root = fakeDir([`客先名リスト_${today}`]);
+    tw.showDirectoryPicker = async () => root;
+    allBtn.nextElementSibling.textContent = "";
+    allBtn.click();
+    const m2 = await waitMsg();
+    const made = root.entries.get(`客先名リスト_${today}_2`);
+    const names = made ? [...made.h.entries.keys()].sort().join() : "";
+    check("ツール: 選んだ場所に「客先名リスト_日付」のフォルダを作る(同じ名前があれば _2)", !!made && root.entries.size === 2 && /2個のファイルを保存しました/.test(m2), m2);
+    check("ツール: フォルダの中に、全部の暗号化ファイルが入る(キーの一覧は入れない)", names === "架空営業所_客先名リスト.enc,見本担当_客先名リスト.enc", names);
+    {
+      const { aesKey } = await toolCtx.deriveMaster(KEY);
+      const appCtx = { crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array, JSON };
+      vm.createContext(appCtx);
+      vm.runInContext(appCrypto + "\nthis.decryptMaster = decryptMaster;", appCtx);
+      let p = null;
+      try{ p = await appCtx.decryptMaster(aesKey, made.h.entries.get("架空営業所_客先名リスト.enc").file.data.buffer); }catch(e){}
+      check("ツール: フォルダに保存したファイルを、アプリの暗号で読める", !!p && p.office === "架空営業所" && p.items.length === 1);
+    }
+
+    // 3) フォルダを選べないブラウザ → 今までどおり1つずつダウンロード
+    delete tw.showDirectoryPicker;
+    allBtn.click();
+    for(let n = 0; n < 30 && anchorClicks < 2; n++) await sleep(100);
+    check("ツール: フォルダを選べないブラウザでは、今までどおり1つずつダウンロード", anchorClicks === 2, anchorClicks);
+    tw.close();
+  }
+
   win.close();
   console.log(fails === 0 ? "取り込みの確認: すべて合格" : `取り込みの確認: 不合格 ${fails}件`);
   process.exit(fails === 0 ? 0 : 1);
