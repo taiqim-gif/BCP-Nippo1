@@ -30,9 +30,8 @@
 | `index.html` | 元のアプリ本体(利用者のもの)。ホーム/訪問入力/車両の画面、客先リスト取り込み、日報メール |
 | `container.js` | 追加機能すべて(約20万文字)。`index.html` の最後で読み込む。容器・データ・顧客の管理・天気・各種の手直し |
 | `sw.js` | オフライン用(Service Worker)。保管の名前は `nippo-cache-v10`。大きく作り替えたら、版を上げる |
-| `customer_list_tool.html` | 顧客リストの暗号化ツール(パソコンで使う)。暗号のコード(`CRYPTO-BEGIN`〜`CRYPTO-END`)は `index.html` と同じ文字にする。**消さない** |
+| `customer_list_tool.html` | 顧客リストの暗号化ツール(管理者がPCのブラウザで開く。アプリからは読み込まない。下の「顧客リストの暗号化ツール」)。暗号のコードは `index.html` と同じ文字にする。**消さない** |
 | `manifest.webmanifest`, `icon-180/192/512.png` | ホーム画面に追加するための部品 |
-| `customer_list_tool.html` | 顧客リストの暗号化ツール(管理者がPCのブラウザで開く。アプリからは読み込まない。下の「顧客リストの暗号化ツール」) |
 | `docs/skill-backup/` | アカウントの skill の写し(`nippo-app-change` は、削除した元の1ファイル版 `sales_report.html` 用。今は使わない) |
 | `docs/global-CLAUDE.md` | 共通の約束(パソコンの `~/.claude/CLAUDE.md` に置くものの写し) |
 | `nippo-tests/` | パソコン上の自動確認(使い方は `nippo-tests/README.md`) |
