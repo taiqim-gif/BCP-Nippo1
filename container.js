@@ -57,7 +57,8 @@ const CAP_PRESETS = {
 };
 
 const CT_KEY = "containerLogs";
-const BACKUP_KEYS = ["meetingLogs","dailyVehicleInfo","todoItems","containerLogs","customerHidden","customerExtra","dailyWeather"];
+const TODO_ARCHIVE_KEY = "todoArchive";   // 送信済みにした「完了したToDo」の自動保存(リストからは外す。月まとめの送信とバックアップに使う)
+const BACKUP_KEYS = ["meetingLogs","dailyVehicleInfo","todoItems","containerLogs","customerHidden","customerExtra","dailyWeather",TODO_ARCHIVE_KEY];
 const MAILTO_LIMIT = 50000;
 
 /* ---------- データ ---------- */
@@ -336,6 +337,14 @@ style.textContent = `
   .ct-mchoice-box h3{ margin:0; font-size:16px; }
   .ct-mchoice-box p{ margin:0; font-size:14px; line-height:1.6; }
   .ct-mchoice-box .btn-mini{ align-self:center; }
+  .ct-mchoice-box label{ display:flex; flex-direction:column; gap:4px; font-size:13px; font-weight:700; }
+  .ct-mchoice-box input{ font-size:16px; padding:8px 10px; border:1px solid #CFC8BB; border-radius:10px; }
+  .ct-user-err{ color:#C0392B; font-size:13px; min-height:1em; }
+  .dt-frame.user{ background:#F3EFFC; border-color:var(--lavender-dark); }
+  .dt-frame.user .dt-head{ background:var(--lavender); color:var(--lavender-ink); }
+  .ct-monthly{ background:#FFF3EA; border:2px solid var(--peach-dark); border-radius:14px; padding:10px 12px; margin:0 0 12px; display:flex; flex-direction:column; gap:8px; }
+  .ct-monthly[hidden]{ display:none; }
+  .ct-monthly-text{ font-size:15px; font-weight:700; color:var(--peach-ink); line-height:1.5; }
   .visit-card.ct-out{ border-left-color:var(--sky); }
   .visit-card.ct-in{ border-left-color:var(--peach); }
   .visit-card.ct-oth{ border-left-color:var(--lavender); }
@@ -1901,41 +1910,136 @@ async function saveFiles(files, title, text){
   return "downloaded";
 }
 
-/* 全データ：未送信の訪問・車両・容器と、ToDoリストを、4つのCSVにして、メールで送る(添付) */
-async function mailAllCsv(){
-  const today = getToday(), ymd = today.replace(/-/g, "");
-  const visits = meetingLogs.filter(l => !l.sentAt).slice()
-    .sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.startTime || "").localeCompare(b.startTime || ""));
-  const vdays = Object.keys(dailyVehicleInfo).filter(k => { const v = dailyVehicleInfo[k]; return v && !v.sentAt && vehicleHasData(v); }).sort();
+/* ---------- 使う人の登録(名前・送り先のメールアドレス。スマホの中だけに保存) ---------- */
+const USER_NAME_KEY = "nippoUserName", USER_MAIL_KEY = "nippoUserMail";
+function userName(){ try{ return (localStorage.getItem(USER_NAME_KEY) || "").trim(); }catch(e){ return ""; } }
+function userMail(){ try{ return (localStorage.getItem(USER_MAIL_KEY) || "").trim(); }catch(e){ return ""; } }
+function fileTag(){ const n = userName().replace(/[\\/:*?"<>|\s]/g, ""); return n ? n + "_" : ""; }   // ファイル名に入れる名前(使えない文字は除く)
+function mailtoHead(){ const m = userMail(); return "mailto:" + (m ? m.replace(/[^\w.@+-]/g, "") : ""); }
+function isMailAddr(s){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s); }
+// 添付で送るときは、宛先を自動で入れられない(iPhoneの決まり)。先にアドレスをコピーしておき、宛先に貼り付けてもらう
+function copyMailAddr(){
+  const m = userMail();
+  if(!m || typeof copyToClipboard !== "function") return false;
+  try{ copyToClipboard(m); return true; }catch(e){ return false; }
+}
+
+/* ---------- CSVの中身(毎日の送信と、月まとめの送信で同じ形) ---------- */
+function localYmd(iso){                       // 日時(ISO)を、スマホの時刻の「年-月-日」にする
+  if(!iso) return "";
+  const d = new Date(iso);
+  if(isNaN(d)) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function sortVisits(list){
+  return list.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.startTime || "").localeCompare(b.startTime || ""));
+}
+function visitCsv(visits){
+  const nm = userName();
+  return csvRows(
+    ["日付","番号","顧客コード","訪問先","開始時刻","終了時刻","面談者","敬称","内容","特記事項","開始位置","終了位置","担当者"],
+    visits.map(l => [l.date, l.number, l.customerCode, l.target, formatTimeOnly(l.startTime), formatTimeOnly(l.endTime), l.attendee, l.attendeeTitle, l.content, l.notes,
+      posText(l.startLat, l.startLng, l.startLocation), posText(l.endLat, l.endLng, l.endLocation), nm]));
+}
+function vehicleCsv(vdays){
+  const nm = userName();
   let wx = {};
   try{ wx = JSON.parse(localStorage.getItem("dailyWeather") || "{}") || {}; }catch(e){ wx = {}; }
-  const todos = [...todoItems.filter(t => !t.done).sort(sortByTodoOrder),
-    ...todoItems.filter(t => t.done).sort((a, b) => (a.completedAt || a.createdAt || "").localeCompare(b.completedAt || b.createdAt || ""))];
+  return csvRows(
+    ["日付","出発時刻","出発距離","帰社時刻","帰社距離","給油量","出発位置","帰社位置","天気","担当者"],
+    vdays.map(k => { const v = dailyVehicleInfo[k], d = v.departure || {}, r = v.return || {}, w = wx[k] || {};
+      return [k, formatTimeOnly(d.time), d.distance, formatTimeOnly(r.time), r.distance, r.fuel, posText(d.lat, d.lng, d.location), posText(r.lat, r.lng, r.location), wxFirstWord(w.text), nm]; }));
+}
+// ToDo：右の4列(ID・登録日・完了日・担当者)は、パソコンの取り込みツール用(年まで入れる。同じToDoを二重に入れない)
+function todoCsv(todos){
+  const nm = userName();
+  return csvRows(
+    ["状態","日付","顧客名","内容","対応日","ID","登録日","完了日","担当者"],
+    todos.map(t => [t.done ? "済" : "未対応", formatMonthDay(t.date), t.target, t.content, t.done ? formatCompletedDay(t.completedAt) : "",
+      t.id, t.date || localYmd(t.createdAt), t.done ? localYmd(t.completedAt) : "", nm]));
+}
+function sortTodosForCsv(list){
+  return [...list.filter(t => !t.done).sort(sortByTodoOrder),
+    ...list.filter(t => t.done).sort((a, b) => (a.completedAt || a.createdAt || "").localeCompare(b.completedAt || b.createdAt || ""))];
+}
+
+/* 全データ：未送信の訪問・車両・容器と、ToDoリストを、4つのCSVにして、メールで送る(添付) */
+const TODO_SENT_IDS_KEY = "todoLastSentIds";   // 最後に送った「完了したToDo」のID(「送信済みにする」で自動保存に移す)
+async function mailAllCsv(){
+  const today = getToday(), ymd = today.replace(/-/g, ""), tag = fileTag();
+  const visits = sortVisits(meetingLogs.filter(l => !l.sentAt));
+  const vdays = Object.keys(dailyVehicleInfo).filter(k => { const v = dailyVehicleInfo[k]; return v && !v.sentAt && vehicleHasData(v); }).sort();
+  const todos = sortTodosForCsv(todoItems);
   const cts = ctLogs.filter(l => !l.sentAt);
   const files = [];
-  if(visits.length) files.push({ name:`訪問_${ymd}.csv`, content:csvRows(
-    ["日付","番号","顧客コード","訪問先","開始時刻","終了時刻","面談者","敬称","内容","特記事項","開始位置","終了位置"],
-    visits.map(l => [l.date, l.number, l.customerCode, l.target, formatTimeOnly(l.startTime), formatTimeOnly(l.endTime), l.attendee, l.attendeeTitle, l.content, l.notes,
-      posText(l.startLat, l.startLng, l.startLocation), posText(l.endLat, l.endLng, l.endLocation)])) });
-  if(vdays.length) files.push({ name:`車両_${ymd}.csv`, content:csvRows(
-    ["日付","出発時刻","出発距離","帰社時刻","帰社距離","給油量","出発位置","帰社位置","天気"],
-    vdays.map(k => { const v = dailyVehicleInfo[k], d = v.departure || {}, r = v.return || {}, w = wx[k] || {};
-      return [k, formatTimeOnly(d.time), d.distance, formatTimeOnly(r.time), r.distance, r.fuel, posText(d.lat, d.lng, d.location), posText(r.lat, r.lng, r.location), wxFirstWord(w.text)]; })) });
-  if(todos.length) files.push({ name:`ToDo_${ymd}.csv`, content:csvRows(
-    ["状態","日付","顧客名","内容","対応日"],
-    todos.map(t => [t.done ? "済" : "未対応", formatMonthDay(t.date), t.target, t.content, t.done ? formatCompletedDay(t.completedAt) : ""])) });
-  if(cts.length) files.push({ name:`容器ログ_${ymd}.csv`, content:csvText(cts) });
+  if(visits.length) files.push({ name:`訪問_${tag}${ymd}.csv`, content:visitCsv(visits) });
+  if(vdays.length) files.push({ name:`車両_${tag}${ymd}.csv`, content:vehicleCsv(vdays) });
+  if(todos.length) files.push({ name:`ToDo_${tag}${ymd}.csv`, content:todoCsv(todos) });
+  if(cts.length) files.push({ name:`容器ログ_${tag}${ymd}.csv`, content:csvText(cts) });
   if(files.length === 0){ showToast("送るデータがありません"); return; }
-  const title = `営業日報 ${today}`;
-  const text = `営業日報 ${today}\n訪問${visits.length}件・車両${vdays.length}日・ToDo${todos.length}件・容器${cts.length}本(CSVを添付)`;
+  try{ localStorage.setItem(TODO_SENT_IDS_KEY, JSON.stringify(todos.filter(t => t.done).map(t => t.id))); }catch(e){ /* 保存できなくても送れる */ }
+  const nm = userName();
+  const title = `営業日報 ${today}${nm ? " " + nm : ""}`;
+  const text = `営業日報 ${today}${nm ? " " + nm : ""}\n訪問${visits.length}件・車両${vdays.length}日・ToDo${todos.length}件・容器${cts.length}本(CSVを添付)`;
+  const copied = copyMailAddr();
   const r = await saveFiles(files, title, text);
   if(r === "shared"){
-    showToast("送れたら「送信済みにする」を押してください");
+    showToast(copied ? "宛先はコピー済み(貼り付け)。送れたら「送信済みにする」" : "送れたら「送信済みにする」を押してください");
   }else if(r === "downloaded"){
-    window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + "\n(CSVはダウンロードに保存しました。添付してください)")}`;
+    window.location.href = `${mailtoHead()}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + "\n(CSVはダウンロードに保存しました。添付してください)")}`;
   }
 }
 window.ctMailAllCsv = mailAllCsv;
+
+/* ---------- 月まとめの送信(運転管理表用)：その月の訪問・車両・ToDoを、送信済みも含めて全部送る ---------- */
+const MONTHLY_SENT_KEY = "monthlyReportSent";   // 送ったと答えた最後の月("2026-10")
+function prevMonth(ymdStr){
+  const y = Number(ymdStr.slice(0, 4)), m = Number(ymdStr.slice(5, 7));
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2,"0")}`;
+}
+function todoArchive(){
+  try{ const a = JSON.parse(localStorage.getItem(TODO_ARCHIVE_KEY) || "[]"); return Array.isArray(a) ? a : []; }catch(e){ return []; }
+}
+function monthData(ym){
+  const visits = sortVisits(meetingLogs.filter(l => (l.date || "").startsWith(ym)));
+  const vdays = Object.keys(dailyVehicleInfo).filter(k => k.startsWith(ym) && vehicleHasData(dailyVehicleInfo[k])).sort();
+  const seen = new Set();
+  const todos = sortTodosForCsv([...todoItems, ...todoArchive()].filter(t => {
+    if(!t || seen.has(t.id)) return false;
+    seen.add(t.id);
+    return (t.date || localYmd(t.createdAt)).startsWith(ym) || (t.done && localYmd(t.completedAt).startsWith(ym));
+  }));
+  return { visits, vdays, todos };
+}
+function monthLabel(ym){ return `${Number(ym.slice(5, 7))}月`; }
+async function mailMonthCsv(ym){
+  ym = ym || prevMonth(getToday());
+  const md = monthData(ym), tag = fileTag(), mk = ym.replace("-", "");
+  const files = [];
+  if(md.visits.length) files.push({ name:`訪問_${tag}${mk}月分.csv`, content:visitCsv(md.visits) });
+  if(md.vdays.length) files.push({ name:`車両_${tag}${mk}月分.csv`, content:vehicleCsv(md.vdays) });
+  if(md.todos.length) files.push({ name:`ToDo_${tag}${mk}月分.csv`, content:todoCsv(md.todos) });
+  if(files.length === 0){ showToast(`${monthLabel(ym)}分のデータがありません`); return; }
+  const nm = userName();
+  const title = `運転日報 ${ym.slice(0, 4)}年${monthLabel(ym)}分${nm ? " " + nm : ""}`;
+  const text = `${title}\n訪問${md.visits.length}件・車両${md.vdays.length}日・ToDo${md.todos.length}件(CSVを添付)`;
+  const copied = copyMailAddr();
+  const r = await saveFiles(files, title, text);
+  if(!r) return;                                  // 共有の画面を閉じただけ
+  if(r === "downloaded"){
+    window.location.href = `${mailtoHead()}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + "\n(CSVはダウンロードに保存しました。添付してください)")}`;
+  }else if(copied){
+    showToast("宛先はコピー済みです。宛先に貼り付けてください");
+  }
+  setTimeout(() => {
+    if(window.confirm(`${monthLabel(ym)}分の運転日報を、送れましたか?\n\n「OK」で、お知らせを消します。`)){
+      try{ if((localStorage.getItem(MONTHLY_SENT_KEY) || "") < ym) localStorage.setItem(MONTHLY_SENT_KEY, ym); }catch(e){ /* 保存できなくても動く */ }
+      renderMonthly();
+    }
+  }, r === "downloaded" ? 1500 : 300);
+}
+window.ctMailMonthCsv = mailMonthCsv;
+window.ctMonthData = monthData;
 
 /* 容器ログ：未送信の分をCSVにして、共有画面からメールで送る(添付)。共有画面が使えない環境では、保存してメールの下書きを開く */
 async function mailContainerCsv(){
@@ -2100,12 +2204,27 @@ dataSection.innerHTML = `
     <span class="dt-chip c" id="dtChipC"></span>
   </div>
 
+  <section class="dt-frame user">
+    <div class="dt-head">使う人</div>
+    <div class="dt-body">
+      <div class="dt-state" id="dtUserState"></div>
+      <div class="dt-item">
+        <button class="btn btn-outline-mint" id="dtUserEdit">登録・変更</button>
+        <div class="dt-desc">名前と、日報の送り先</div>
+      </div>
+    </div>
+  </section>
+
   <section class="dt-frame send">
     <div class="dt-head">送る</div>
     <div class="dt-body">
       <div class="dt-item">
         <button class="btn btn-outline-mint" id="dtMailReport">全データをメール送信<br>(CSV添付)</button>
         <div class="dt-desc">未送信の全データを送る</div>
+      </div>
+      <div class="dt-item">
+        <button class="btn btn-outline-mint" id="dtMailMonth">先月分をメール送信<br>(CSV添付)</button>
+        <div class="dt-desc" id="dtMailMonthDesc"></div>
       </div>
       <div class="dt-item">
         <button class="btn btn-outline-mint" id="dtMailCsv">容器だけメール送信<br>(CSV添付)</button>
@@ -3542,6 +3661,9 @@ function renderData(){
   $("dtDelReportDesc").textContent = `訪問 ${c.visits}・車両 ${c.vehDays}`;
   $("dtDelContainerDesc").textContent = `${c.ct}本(未送信 ${c.ctUnsent})`;
   $("dtDelTodoDesc").textContent = `未完了 ${c.todoPending}・完了 ${c.todoDone}`;
+  renderUserState();
+  const pm = prevMonth(getToday()), pmd = monthData(pm);
+  $("dtMailMonthDesc").textContent = `${monthLabel(pm)}分(運転管理表用)　訪問 ${pmd.visits.length}・車両 ${pmd.vdays.length}`;
 }
 
 // 「消す」の枠は、見出しをタップして開く（押し間違い防止。画面を開くたびに閉じる）
@@ -3552,16 +3674,37 @@ function setDelOpen(open){
 }
 $("dtDelHead").addEventListener("click", () => setDelOpen($("dtDelBody").hidden));
 
+// 最後に「全データをメール送信」で送った、完了したToDo(今もリストにあり、完了のままのもの)
+function sentDoneTodos(){
+  let ids = [];
+  try{ ids = JSON.parse(localStorage.getItem(TODO_SENT_IDS_KEY) || "[]") || []; }catch(e){ ids = []; }
+  const set = new Set(ids);
+  return todoItems.filter(t => t && t.done && set.has(t.id));
+}
 function markAllSent(){
   const c = dataCounts();
-  if(c.visitsUnsent + c.vehMarkable + c.ctUnsent === 0){ showToast("未送信はありません"); return; }
-  if(!window.confirm(`未送信(訪問 ${c.visitsUnsent}・車両 ${c.vehMarkable}・容器 ${c.ctUnsent})を\n送信済みにします。次回から送りません。\n\nよろしいですか?`)) return;
+  const doneTodos = sentDoneTodos();
+  if(c.visitsUnsent + c.vehMarkable + c.ctUnsent + doneTodos.length === 0){ showToast("未送信はありません"); return; }
+  const todoNote = doneTodos.length ? `\n完了したToDo ${doneTodos.length}件は、リストから外して自動保存します。` : "";
+  if(!window.confirm(`未送信(訪問 ${c.visitsUnsent}・車両 ${c.vehMarkable}・容器 ${c.ctUnsent})を\n送信済みにします。次回から送りません。${todoNote}\n\nよろしいですか?`)) return;
   const now = new Date().toISOString();
   meetingLogs.forEach(l => { if(!l.sentAt) l.sentAt = now; });
   vehDays().forEach(d => { if(!dailyVehicleInfo[d].sentAt && vehSendable(d)) dailyVehicleInfo[d].sentAt = now; });
   ctLogs.forEach(l => { if(!l.sentAt) l.sentAt = now; });
   persistReport();
   ctSave();
+  if(doneTodos.length){
+    const ids = new Set(doneTodos.map(t => t.id));
+    const arc = todoArchive().filter(t => t && !ids.has(t.id)).concat(doneTodos.map(t => Object.assign({}, t, { sentAt:now })));
+    try{
+      localStorage.setItem(TODO_ARCHIVE_KEY, JSON.stringify(arc));
+      todoItems = todoItems.filter(t => !ids.has(t.id));          // 保存できたときだけ、リストから外す
+      if(typeof saveTodos === "function") saveTodos(); else localStorage.setItem("todoItems", JSON.stringify(todoItems));
+      localStorage.removeItem(TODO_SENT_IDS_KEY);
+    }catch(e){ /* 保存できないときは、リストに残す */ }
+    if(typeof renderTodoList === "function") renderTodoList();
+    renderDoneTodos();
+  }
   renderList();
   renderData();
   showToast("送信済みにしました");
@@ -3618,6 +3761,8 @@ function delTodo(){
 }
 
 $("dtMailReport").addEventListener("click", mailAllCsv);
+$("dtMailMonth").addEventListener("click", () => mailMonthCsv());
+$("dtUserEdit").addEventListener("click", () => openUserDialog());
 $("dtMailCsv").addEventListener("click", mailContainerCsv);
 $("dtCsv").addEventListener("click", async () => {
   if(ctLogs.length === 0){ showToast("容器がありません"); return; }
@@ -4325,5 +4470,117 @@ $("ctNumKb").addEventListener("click", () => {
   setTimeout(() => inp.focus(), 50);
 });
 $("ctCancelEdit").addEventListener("click", cancelEdit);
+
+/* =========================================================
+   使う人の登録・月初のお知らせ・日報メールの宛先
+========================================================= */
+// 登録の画面(初めて開いたとき と、データ画面の「登録・変更」)
+function openUserDialog(){
+  let d = $("ctUserDlg");
+  if(!d){
+    d = document.createElement("div");
+    d.id = "ctUserDlg";
+    d.className = "ct-mchoice";
+    d.innerHTML = '<div class="ct-mchoice-box"><h3>使う人の登録</h3>' +
+      '<p>日報のメールの送り先です。このスマホの中だけに保存します。</p>' +
+      '<label>名前<input type="text" id="ctUserName" autocomplete="name" placeholder="例: 佐藤"></label>' +
+      '<label>送り先のメールアドレス<input type="email" id="ctUserMail" inputmode="email" autocomplete="email" autocapitalize="off" placeholder="例: xxx@icloud.com"></label>' +
+      '<div class="ct-user-err" id="ctUserErr"></div>' +
+      '<button type="button" class="btn btn-mint" id="ctUserSave">登録</button>' +
+      '<button type="button" class="btn btn-outline-mint" id="ctUserLater">あとで</button></div>';
+    document.body.appendChild(d);
+    $("ctUserSave").addEventListener("click", () => {
+      const n = $("ctUserName").value.trim();
+      const m = $("ctUserMail").value.replace(/[\s　]/g, "").replace(/[Ａ-Ｚａ-ｚ０-９＠．＿－]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+      if(!n){ $("ctUserErr").textContent = "名前を入れてください"; return; }
+      if(!isMailAddr(m)){ $("ctUserErr").textContent = "メールアドレスの形が正しくありません"; return; }
+      try{ localStorage.setItem(USER_NAME_KEY, n); localStorage.setItem(USER_MAIL_KEY, m); }
+      catch(e){ $("ctUserErr").textContent = "保存できませんでした"; return; }
+      d.hidden = true;
+      renderUserState();
+      showToast("登録しました");
+    });
+    $("ctUserLater").addEventListener("click", () => {
+      d.hidden = true;
+      try{ sessionStorage.setItem("nippoUserLater", "1"); }catch(e){ /* 次に開いたときに、また聞く */ }
+    });
+  }
+  $("ctUserName").value = userName();
+  $("ctUserMail").value = userMail();
+  $("ctUserErr").textContent = "";
+  d.hidden = false;
+}
+window.ctOpenUserDialog = openUserDialog;
+
+function renderUserState(){
+  const el = $("dtUserState");
+  if(!el) return;
+  const n = userName(), m = userMail();
+  if(n && m){
+    el.textContent = `${n}　送り先：${m}`;
+    el.className = "dt-state";
+  }else{
+    el.textContent = "まだ登録していません";
+    el.className = "dt-state warn";
+  }
+}
+renderUserState();
+
+// 初めて開いたとき(未登録)は、登録の画面を出す。「あとで」なら、アプリを開き直すまで出さない
+(function(){
+  let later = false;
+  try{ later = sessionStorage.getItem("nippoUserLater") === "1"; }catch(e){ later = false; }
+  if((!userName() || !userMail()) && !later) openUserDialog();
+})();
+
+// 月初のお知らせ：先月の訪問・車両があり、まだ「送った」と答えていないとき、ホームと車両の上に出す
+function renderMonthly(){
+  const pm = prevMonth(getToday());
+  let sent = "";
+  try{ sent = localStorage.getItem(MONTHLY_SENT_KEY) || ""; }catch(e){ sent = ""; }
+  const md = monthData(pm);
+  const show = sent < pm && (md.visits.length + md.vdays.length) > 0;
+  ["reportScreen", "vehicleScreen"].forEach(id => {
+    const scr = $(id);
+    if(!scr) return;
+    let b = scr.querySelector(".ct-monthly");
+    if(!b){
+      b = document.createElement("div");
+      b.className = "ct-monthly";
+      b.innerHTML = '<div class="ct-monthly-text"></div><button type="button" class="btn btn-mint ct-monthly-send"></button>';
+      b.querySelector(".ct-monthly-send").addEventListener("click", () => mailMonthCsv(prevMonth(getToday())));
+      scr.insertBefore(b, scr.firstChild);
+    }
+    b.hidden = !show;
+    b.querySelector(".ct-monthly-text").textContent = `${monthLabel(pm)}分の運転日報を、メールで送ってください`;
+    b.querySelector(".ct-monthly-send").textContent = `${monthLabel(pm)}分を送る(CSV添付)`;
+  });
+}
+window.ctRenderMonthly = renderMonthly;
+renderMonthly();
+document.addEventListener("visibilitychange", () => { if(!document.hidden) renderMonthly(); });   // 日をまたいで開いたままのとき
+
+// 日報メール(ホームのボタン)：登録した送り先を、宛先に入れる。件名に名前を足す
+(function(){
+  const old = $("mailButton");
+  if(!old || typeof window.buildReportMail !== "function") return;
+  const btn = old.cloneNode(true);                 // 元のボタンの働き(宛先なし)を外して、付け直す
+  old.parentNode.replaceChild(btn, old);
+  btn.addEventListener("click", () => {
+    const r = window.buildReportMail();
+    const nm = userName();
+    const subject = r.subject + (nm ? " " + nm : "");
+    const head = mailtoHead();
+    const limit = typeof MAILTO_LIMIT === "number" ? MAILTO_LIMIT : 50000;
+    const url = `${head}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(r.body)}`;
+    if(url.length > limit){
+      if(typeof copyToClipboard === "function") copyToClipboard(r.body);
+      showToast("本文が長いためコピーしました。メールに貼り付けてください");
+      window.location.href = `${head}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent("（本文が長いため、コピーしました。ここに貼り付けてください）")}`;
+      return;
+    }
+    window.location.href = url;
+  });
+})();
 
 })();
