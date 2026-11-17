@@ -33,7 +33,7 @@ ok($("dataScreen").classList.contains("active") && $("navDataButton").classList.
 ok($("dtMaster").contains($("masterKeyBox")) && $("dtMaster").querySelector(".master-bar"),"客先名リスト controls moved into データ");
 // 枠・ボタン名
 const frames=[...d.querySelectorAll("#dataScreen .dt-frame")].map(f=>f.className.replace("dt-frame ","")+":"+f.querySelector(".dt-head").textContent.replace(/[▶▼]/g,"").trim());
-ok(frames.join()==="send:送る,save:保存,master:顧客リスト(ダウンロード),del:消す,wx:天気の表示","5 colored frames: "+frames.join());
+ok(frames.join()==="user:使う人,send:送る,save:保存,master:顧客リスト(ダウンロード),del:消す,wx:天気の表示","6 colored frames (使う人 first): "+frames.join());
 ok(/\.dt-frame\.send\{[^}]*#EEF9F5/.test(css2) && /\.dt-frame\.save\{[^}]*#EDF6FB/.test(css2) && /\.dt-frame\.master\{[^}]*#F3EFFC/.test(css2) && /\.dt-frame\.del\{[^}]*#FFF0F4/.test(css2),"each frame has its own light background");
 ok($("dtMailReport").innerHTML==="日報メール送信<br>(日報・車両・容器ログ)","button 1 (2 lines): "+$("dtMailReport").innerHTML);
 ok($("dtMailCsv").innerHTML==="容器ログだけメール送信<br>(CSV添付)","button 2 (2 lines): "+$("dtMailCsv").innerHTML);
@@ -606,7 +606,7 @@ ok(!d.querySelector(".ct-wxpage") && !d.querySelector(".ct-wxtrack") && !d.query
 // 自動で切り替わる速さ
 $("navDataButton").click();
 const wxf=[...d.querySelectorAll("#dataScreen .dt-frame")];
-ok(wxf.map(f=>f.querySelector(".dt-head").textContent.replace(/[▶▼]/g,"").trim()).join()==="送る,保存,顧客リスト(ダウンロード),消す,天気の表示","the 天気の表示 frame comes after 消す");
+ok(wxf.map(f=>f.querySelector(".dt-head").textContent.replace(/[▶▼]/g,"").trim()).join()==="使う人,送る,保存,顧客リスト(ダウンロード),消す,天気の表示","the 天気の表示 frame comes after 消す");
 ok(/\.dt-frame\.wx\{[^}]*background:#E9F6F6/.test(css6),"天気の表示 frame has its own color");
 const speedBtns=()=>[...d.querySelectorAll("#wxSpeedSeg button")];
 ok(speedBtns().map(b=>b.textContent).join()==="速い(3秒),標準(3.5秒),ゆっくり(4秒),止める" && speedBtns().find(b=>b.classList.contains("on")).textContent==="標準(3.5秒)" && w.ctWxInterval()===3500,"speed choices (unchanged); default 標準(3.5秒)");
@@ -949,10 +949,10 @@ $("dtMailReport").click(); await sleep(200);
 const rd31=f=>new Promise(r=>{ const fr=new w.FileReader(); fr.onload=()=>r(fr.result); fr.readAsText(f); });
 ok(!!shared31 && shared31.files.map(f=>f.name).join()==="訪問_20261008.csv,車両_20261008.csv,ToDo_20261008.csv,容器ログ_20261008.csv","全データ: 4 CSV files are attached together: "+(shared31?shared31.files.map(f=>f.name).join(" "):"(not shared)"));
 const csv31=await Promise.all(shared31.files.map(rd31));
-ok(csv31[0].split("\r\n")[0]==="日付,番号,顧客コード,訪問先,開始時刻,終了時刻,面談者,敬称,内容,特記事項,開始位置,終了位置","訪問.csv header");
+ok(csv31[0].split("\r\n")[0]==="日付,番号,顧客コード,訪問先,開始時刻,終了時刻,面談者,敬称,内容,特記事項,開始位置,終了位置,ID,担当者","訪問.csv header (ID and 担当者 at the end)");
 ok(csv31[0].includes('"配達：A,B\n""重要"""') && csv31[0].includes('"43.06212,141.35424","43.06230,141.35401"') && !csv31[0].includes("送信済み商店"),"訪問.csv: commas/newlines/quotes are quoted; positions included; already-sent visits are left out");
-ok(csv31[1].split("\r\n")[0]==="日付,出発時刻,出発距離,帰社時刻,帰社距離,給油量,出発位置,帰社位置,天気" && csv31[1].includes('2026-10-08,08:00,1000,17:00,1100,20,"43.10000,141.20000",,くもり') && !/最高|最低|晴れ/.test(csv31[1]),"車両.csv: times, distances, fuel, positions and ONE weather word (くもり) - even from an older saved record");
-ok(csv31[2].split("\r\n")[0]==="状態,日付,顧客名,内容,対応日" && csv31[2].includes("未対応,10/8,北ガス,配達,") && /済,10\/7,札ガス,見積,\d+\/\d+/.test(csv31[2]),"ToDo.csv: unfinished and finished items");
+ok(csv31[1].split("\r\n")[0]==="日付,出発時刻,出発距離,帰社時刻,帰社距離,給油量,出発位置,帰社位置,天気,担当者" && csv31[1].includes('2026-10-08,08:00,1000,17:00,1100,20,"43.10000,141.20000",,くもり,') && !/最高|最低|晴れ/.test(csv31[1]),"車両.csv: times, distances, fuel, positions and ONE weather word (くもり) - even from an older saved record");
+ok(csv31[2].split("\r\n")[0]==="状態,日付,顧客名,内容,対応日,ID,登録日,完了日,担当者" && csv31[2].includes("未対応,10/8,北ガス,配達,,t1,2026-10-08,,") && /済,10\/7,札ガス,見積,\d+\/\d+/.test(csv31[2]),"ToDo.csv: unfinished and finished items");
 ok(csv31[3].split("\r\n")[0]==="日付,時刻,区分コード,区分,記号,番号,顧客コード,顧客名,ガス種コード,ガス種,容量,単位" && csv31[3].includes("山田ガス店"),"容器ログ.csv: the same format as the container-only CSV");
 const bom31=await new Promise(r=>{ const fr=new w.FileReader(); fr.onload=()=>r([...new Uint8Array(fr.result).slice(0,3)]); fr.readAsArrayBuffer(shared31.files[0]); });
 ok(bom31.join()==="239,187,191","files start with a BOM (Excel opens the Japanese text correctly)");
@@ -1571,3 +1571,110 @@ ok(!sh49.hidden,"then asks about the hidden settings");
 $("ctHcAccess").click();
 ok(sh49.hidden && h49()==="c:1,c:4" && m49().sources.map(x=>x.office).join()==="B担当","both choices are applied");
 w.localStorage.setItem("customerHidden","[]"); w.localStorage.removeItem("customerMaster"); w.renderMasterUI();
+// ---- 50) 使う人の登録(名前・送り先)・CSVに担当者・送信済みの完了ToDoの自動保存・月初のお知らせと月まとめの送信 ----
+{
+const dlg50=$("ctUserDlg");
+ok(!!dlg50,"not registered: the registration dialog was made on the first open");
+w.ctOpenUserDialog();
+ok(!dlg50.hidden && $("ctUserName").value==="" ,"the dialog opens from データ → 登録・変更 (empty while not registered)");
+$("ctUserName").value="佐藤"; $("ctUserMail").value="sato@example"; $("ctUserSave").click();
+ok(!dlg50.hidden && /形が正しくありません/.test($("ctUserErr").textContent) && !w.localStorage.getItem("nippoUserMail"),"a wrong address is not saved (message shown)");
+$("ctUserMail").value="ｓａｔｏ＠ｅｘａｍｐｌｅ．ｃｏｍ "; $("ctUserSave").click();
+ok(dlg50.hidden && w.localStorage.getItem("nippoUserName")==="佐藤" && w.localStorage.getItem("nippoUserMail")==="sato@example.com","name and address are saved (full-width letters and spaces are fixed)");
+$("navDataButton").click();
+ok(/佐藤/.test($("dtUserState").textContent) && /sato@example\.com/.test($("dtUserState").textContent) && !$("dtUserState").classList.contains("warn"),"データ shows the name and the address: "+$("dtUserState").textContent);
+// 全データの送信：ファイル名と各CSVに、担当者の名前
+let shared50=null;
+Object.defineProperty(w.navigator,"canShare",{configurable:true,value:()=>true});
+Object.defineProperty(w.navigator,"share",{configurable:true,value:async d0=>{ shared50=d0; }});
+w.eval('meetingLogs=[{createdAt:"v50",date:"2026-10-08",number:1,target:"山田ガス店",startTime:"2026-10-08T09:00",endTime:"2026-10-08T09:30",content:"配達"}]');
+w.eval('dailyVehicleInfo={}');
+w.eval('todoItems=[{id:"a1",date:"2026-10-08",target:"北ガス",content:"配達",done:false,order:1},{id:"a2",date:"2026-10-07",target:"札ガス",content:"見積",done:true,order:2,completedAt:"2026-10-09T03:00:00.000Z"}]');
+w.localStorage.setItem("todoItems",w.eval("JSON.stringify(todoItems)"));
+w.eval("ctLogs=[]");
+$("dtMailReport").click(); await sleep(200);
+const names50=shared50?shared50.files.map(f=>f.name).join():"";
+ok(/^訪問_佐藤_\d{8}\.csv,ToDo_佐藤_\d{8}\.csv(,容器ログ_佐藤_\d{8}\.csv)?$/.test(names50) && /佐藤/.test(shared50.title),"file names and the title have the name: "+names50+" / "+(shared50&&shared50.title));
+const csv50=await Promise.all(shared50.files.map(rd31));
+ok(/,v50,佐藤\r?$/.test(csv50[0].split("\r\n")[1]) && csv50[1].includes("済,10/7,札ガス,見積,10/9,a2,2026-10-07,2026-10-09,佐藤"),"each row has the name; ToDo has the ID, the dates with the year and the name");
+ok(JSON.parse(w.localStorage.getItem("todoLastSentIds")).join()==="a2","the finished ToDo that was sent is remembered");
+// 送信済みにする：送った完了ToDoは、リストから外して自動保存
+confirmAnswer=true; const c50=confirms.length; w.localStorage.removeItem("todoArchive");
+$("dtMarkSent").click();
+ok(/完了したToDo 1件は、リストから外して自動保存します/.test(confirms[c50]||""),"the confirm tells about the finished ToDo");
+ok(w.eval("todoItems").map(t=>t.id).join()==="a1" && JSON.parse(w.localStorage.getItem("todoItems")).map(t=>t.id).join()==="a1","the sent finished ToDo leaves the list (unfinished stays)");
+const arc50=JSON.parse(w.localStorage.getItem("todoArchive")||"[]");
+ok(arc50.length===1 && arc50[0].id==="a2" && !!arc50[0].sentAt,"it is kept in the auto-save (todoArchive) with sentAt: "+JSON.stringify(arc50).slice(0,200));
+// 送ったあとに完了したToDoは、外さない
+w.eval('todoItems.push({id:"a3",date:"2026-10-08",target:"",content:"電話",done:true,order:3,completedAt:"2026-10-10T03:00:00.000Z"})');
+$("dtMarkSent").click();
+ok(w.eval("todoItems").map(t=>t.id).join()==="a1,a3","a ToDo finished after the last send is not moved");
+// 月初のお知らせ：先月の訪問・車両があり、まだ送っていないとき
+const td50=w.getToday(), pmD=new Date(Number(td50.slice(0,4)), Number(td50.slice(5,7))-2, 5);   // アプリの「今日」の先月
+const pm50=`${pmD.getFullYear()}-${String(pmD.getMonth()+1).padStart(2,"0")}`, pmLabel=`${pmD.getMonth()+1}月`;
+w.localStorage.removeItem("monthlyReportSent");
+w.eval(`meetingLogs=[{createdAt:"m1",date:"${pm50}-05",number:1,target:"北ガス",startTime:"${pm50}-05T09:00",endTime:"${pm50}-05T09:30",content:"配達",sentAt:"x"}]`);
+w.eval(`dailyVehicleInfo={"${pm50}-05":{departure:{time:"${pm50}-05T08:00",distance:"1000"},return:{time:"${pm50}-05T17:00",distance:"1080",fuel:"30"},sentAt:"x"}}`);
+w.eval(`todoItems=[]`);
+w.localStorage.setItem("todoArchive",JSON.stringify([{id:"z1",date:`${pm50}-03`,target:"北ガス",content:"見積",done:true,completedAt:`${pm50}-04T03:00:00.000Z`,sentAt:"x"}]));
+w.ctRenderMonthly();
+const bnH=$("reportScreen").querySelector(".ct-monthly"), bnV=$("vehicleScreen").querySelector(".ct-monthly");
+ok(!!bnH && !bnH.hidden && !!bnV && !bnV.hidden && bnH.textContent.includes(pmLabel+"分の運転日報"),"the notice shows on ホーム and 車両 (first child): "+(bnH?bnH.textContent:""));
+ok($("reportScreen").firstElementChild===bnH && $("vehicleScreen").firstElementChild===bnV,"the notice is at the top of the screens");
+const md50=w.ctMonthData(pm50);
+ok(md50.visits.length===1 && md50.vdays.length===1 && md50.todos.map(t=>t.id).join()==="z1","the month data includes sent visits/days and the auto-saved ToDo: "+JSON.stringify(md50).slice(0,300)+" arc="+w.localStorage.getItem("todoArchive"));
+shared50=null; confirmAnswer=false; const c50b=confirms.length;
+bnH.querySelector(".ct-monthly-send").click(); await sleep(600);
+const mnames=shared50?shared50.files.map(f=>f.name).join():"";
+ok(new RegExp(`^訪問_佐藤_${pm50.replace("-","")}月分\.csv,車両_佐藤_${pm50.replace("-","")}月分\.csv,ToDo_佐藤_${pm50.replace("-","")}月分\.csv$`).test(mnames) && /運転日報/.test(shared50.title),"the monthly send attaches 3 CSVs (all of last month): "+mnames);
+ok(/送れましたか/.test(confirms[c50b]||"") && !bnH.hidden,"asks if it was sent; 'cancel' keeps the notice");
+confirmAnswer=true;
+bnH.querySelector(".ct-monthly-send").click(); await sleep(600);
+ok(w.localStorage.getItem("monthlyReportSent")===pm50 && bnH.hidden && bnV.hidden,"'OK' hides the notice until the next month");
+$("navDataButton").click();
+ok(/訪問 1・車両 1/.test($("dtMailMonthDesc").textContent),"データ → 先月分をメール送信 shows the counts: "+$("dtMailMonthDesc").textContent);
+// 先月のデータがないときは、お知らせを出さない
+w.localStorage.removeItem("monthlyReportSent"); w.eval("meetingLogs=[]; dailyVehicleInfo={}"); w.ctRenderMonthly();
+ok(bnH.hidden,"no data last month: no notice");
+// バックアップに自動保存のToDoも入る
+shared50=null; $("dtBackup").click(); await sleep(300);
+const bk50=shared50?JSON.parse(await rd31(shared50.files[0])):null;
+ok(!!bk50 && typeof bk50.data.todoArchive==="string" && /z1/.test(bk50.data.todoArchive),"the backup includes the auto-saved ToDo (todoArchive)");
+w.localStorage.removeItem("nippoUserName"); w.localStorage.removeItem("nippoUserMail"); w.localStorage.removeItem("todoArchive"); w.eval("todoItems=[]");
+}
+// ---- 51) 終了したToDo：左へなぞって1件削除・「完了を全部消す」(どちらも自動保存に移す) ----
+{
+w.localStorage.removeItem("todoArchive");
+w.eval('todoItems=[{id:"d1",date:"2026-10-08",target:"北ガス",content:"配達",done:false,order:1},{id:"d2",date:"2026-10-07",target:"札ガス",content:"見積",done:true,order:2,completedAt:"2026-10-08T03:00:00.000Z"},{id:"d3",date:"2026-10-06",target:"",content:"電話",done:true,order:3,completedAt:"2026-10-07T03:00:00.000Z"}]');
+w.localStorage.setItem("todoItems",w.eval("JSON.stringify(todoItems)"));
+w.renderTodoList();
+$("navVehicleButton").click();
+const box51=$("doneTodoBox"), row51=id=>box51.querySelector(`.ct-dswrap[data-id="${id}"] > .done-item`);
+ok(!!row51("d2") && !!row51("d3") && !box51.querySelector('.ct-dswrap[data-id="d1"]'),"finished ToDos are in swipe rows (unfinished is not)");
+ok(/左になぞると削除/.test(box51.querySelector(".ct-swipe-hint").textContent) && /チェックを外すと戻る/.test(box51.querySelector(".dt-head").textContent) && /完了を全部消す\(2件\)/.test($("doneClearAll").textContent),"the head tells about swiping; the clear-all button shows the count");
+const sw51=async(row,dx,dy=0)=>{ const mk=(t,x,y)=>new w.MouseEvent(t,{bubbles:true,clientX:x,clientY:y});
+  row.dispatchEvent(mk("pointerdown",200,50)); row.dispatchEvent(mk("pointermove",200+dx,50+dy)); row.dispatchEvent(mk("pointerup",200+dx,50+dy)); await sleep(80); };
+const ids51=()=>w.eval("todoItems").map(t=>t.id).join(), arc51=()=>JSON.parse(w.localStorage.getItem("todoArchive")||"[]");
+confirms.length=0; await sw51(row51("d2"),30);
+ok(ids51()==="d1,d2,d3" && confirms.length===0,"short swipe → nothing");
+await sw51(row51("d2"),100);
+ok(ids51()==="d1,d2,d3" && confirms.length===0,"right swipe → nothing");
+await sw51(row51("d2"),-10,80);
+ok(ids51()==="d1,d2,d3" && confirms.length===0,"vertical drag → nothing (scroll)");
+confirmAnswer=false; await sw51(row51("d2"),-100);
+ok(ids51()==="d1,d2,d3" && /このToDoを削除しますか/.test(confirms[0]||"") && /見積/.test(confirms[0]||""),"left swipe → confirm (with the text); 'いいえ' keeps it");
+confirmAnswer=true; await sw51(row51("d2"),-100);
+ok(ids51()==="d1,d3" && JSON.parse(w.localStorage.getItem("todoItems")).map(t=>t.id).join()==="d1,d3","left swipe + はい → removed from the list (saved)");
+ok(arc51().map(t=>t.id).join()==="d2" && !!arc51()[0].removedAt && !arc51()[0].sentAt,"it is moved to the auto-save with removedAt");
+ok(!box51.querySelector('.ct-dswrap[data-id="d2"]'),"the row is gone from the screen");
+// 完了を全部消す
+w.eval('todoItems.push({id:"d4",date:"2026-10-08",target:"",content:"返却",done:true,order:4,completedAt:"2026-10-08T05:00:00.000Z"})'); w.renderTodoList();
+confirmAnswer=false; const c51=confirms.length; $("doneClearAll").click();
+ok(ids51()==="d1,d3,d4" && /完了したToDo 2件を、リストから消しますか/.test(confirms[c51]||""),"clear-all asks first (2件); 'いいえ' keeps them");
+confirmAnswer=true; $("doneClearAll").click();
+ok(ids51()==="d1" && arc51().map(t=>t.id).sort().join()==="d2,d3,d4" && box51.hidden,"clear-all + はい → only the unfinished stays; all finished are in the auto-save; the box hides");
+// 月まとめの送信に入る
+const md51=w.ctMonthData("2026-10");
+ok(["d2","d3","d4"].every(id=>md51.todos.some(t=>t.id===id)),"the removed ToDos are in the monthly send");
+w.localStorage.removeItem("todoArchive"); w.eval("todoItems=[]"); w.localStorage.setItem("todoItems","[]"); w.renderTodoList();
+}
