@@ -1937,9 +1937,9 @@ function sortVisits(list){
 function visitCsv(visits){
   const nm = userName();
   return csvRows(
-    ["日付","番号","顧客コード","訪問先","開始時刻","終了時刻","面談者","敬称","内容","特記事項","開始位置","終了位置","担当者"],
+    ["日付","番号","顧客コード","訪問先","開始時刻","終了時刻","面談者","敬称","内容","特記事項","開始位置","終了位置","ID","担当者"],
     visits.map(l => [l.date, l.number, l.customerCode, l.target, formatTimeOnly(l.startTime), formatTimeOnly(l.endTime), l.attendee, l.attendeeTitle, l.content, l.notes,
-      posText(l.startLat, l.startLng, l.startLocation), posText(l.endLat, l.endLng, l.endLocation), nm]));
+      posText(l.startLat, l.startLng, l.startLocation), posText(l.endLat, l.endLng, l.endLocation), l.createdAt, nm]));   // ID=訪問ごとの目印(パソコンで二重に入れない)
 }
 function vehicleCsv(vdays){
   const nm = userName();

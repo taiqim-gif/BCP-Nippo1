@@ -949,7 +949,7 @@ $("dtMailReport").click(); await sleep(200);
 const rd31=f=>new Promise(r=>{ const fr=new w.FileReader(); fr.onload=()=>r(fr.result); fr.readAsText(f); });
 ok(!!shared31 && shared31.files.map(f=>f.name).join()==="訪問_20261008.csv,車両_20261008.csv,ToDo_20261008.csv,容器ログ_20261008.csv","全データ: 4 CSV files are attached together: "+(shared31?shared31.files.map(f=>f.name).join(" "):"(not shared)"));
 const csv31=await Promise.all(shared31.files.map(rd31));
-ok(csv31[0].split("\r\n")[0]==="日付,番号,顧客コード,訪問先,開始時刻,終了時刻,面談者,敬称,内容,特記事項,開始位置,終了位置,担当者","訪問.csv header (担当者 at the end)");
+ok(csv31[0].split("\r\n")[0]==="日付,番号,顧客コード,訪問先,開始時刻,終了時刻,面談者,敬称,内容,特記事項,開始位置,終了位置,ID,担当者","訪問.csv header (ID and 担当者 at the end)");
 ok(csv31[0].includes('"配達：A,B\n""重要"""') && csv31[0].includes('"43.06212,141.35424","43.06230,141.35401"') && !csv31[0].includes("送信済み商店"),"訪問.csv: commas/newlines/quotes are quoted; positions included; already-sent visits are left out");
 ok(csv31[1].split("\r\n")[0]==="日付,出発時刻,出発距離,帰社時刻,帰社距離,給油量,出発位置,帰社位置,天気,担当者" && csv31[1].includes('2026-10-08,08:00,1000,17:00,1100,20,"43.10000,141.20000",,くもり,') && !/最高|最低|晴れ/.test(csv31[1]),"車両.csv: times, distances, fuel, positions and ONE weather word (くもり) - even from an older saved record");
 ok(csv31[2].split("\r\n")[0]==="状態,日付,顧客名,内容,対応日,ID,登録日,完了日,担当者" && csv31[2].includes("未対応,10/8,北ガス,配達,,t1,2026-10-08,,") && /済,10\/7,札ガス,見積,\d+\/\d+/.test(csv31[2]),"ToDo.csv: unfinished and finished items");
@@ -1596,7 +1596,7 @@ $("dtMailReport").click(); await sleep(200);
 const names50=shared50?shared50.files.map(f=>f.name).join():"";
 ok(/^訪問_佐藤_\d{8}\.csv,ToDo_佐藤_\d{8}\.csv(,容器ログ_佐藤_\d{8}\.csv)?$/.test(names50) && /佐藤/.test(shared50.title),"file names and the title have the name: "+names50+" / "+(shared50&&shared50.title));
 const csv50=await Promise.all(shared50.files.map(rd31));
-ok(/,佐藤\r?$/.test(csv50[0].split("\r\n")[1]) && csv50[1].includes("済,10/7,札ガス,見積,10/9,a2,2026-10-07,2026-10-09,佐藤"),"each row has the name; ToDo has the ID, the dates with the year and the name");
+ok(/,v50,佐藤\r?$/.test(csv50[0].split("\r\n")[1]) && csv50[1].includes("済,10/7,札ガス,見積,10/9,a2,2026-10-07,2026-10-09,佐藤"),"each row has the name; ToDo has the ID, the dates with the year and the name");
 ok(JSON.parse(w.localStorage.getItem("todoLastSentIds")).join()==="a2","the finished ToDo that was sent is remembered");
 // 送信済みにする：送った完了ToDoは、リストから外して自動保存
 confirmAnswer=true; const c50=confirms.length; w.localStorage.removeItem("todoArchive");
