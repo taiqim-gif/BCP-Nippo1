@@ -1642,3 +1642,39 @@ const bk50=shared50?JSON.parse(await rd31(shared50.files[0])):null;
 ok(!!bk50 && typeof bk50.data.todoArchive==="string" && /z1/.test(bk50.data.todoArchive),"the backup includes the auto-saved ToDo (todoArchive)");
 w.localStorage.removeItem("nippoUserName"); w.localStorage.removeItem("nippoUserMail"); w.localStorage.removeItem("todoArchive"); w.eval("todoItems=[]");
 }
+// ---- 51) 終了したToDo：左へなぞって1件削除・「完了を全部消す」(どちらも自動保存に移す) ----
+{
+w.localStorage.removeItem("todoArchive");
+w.eval('todoItems=[{id:"d1",date:"2026-10-08",target:"北ガス",content:"配達",done:false,order:1},{id:"d2",date:"2026-10-07",target:"札ガス",content:"見積",done:true,order:2,completedAt:"2026-10-08T03:00:00.000Z"},{id:"d3",date:"2026-10-06",target:"",content:"電話",done:true,order:3,completedAt:"2026-10-07T03:00:00.000Z"}]');
+w.localStorage.setItem("todoItems",w.eval("JSON.stringify(todoItems)"));
+w.renderTodoList();
+$("navVehicleButton").click();
+const box51=$("doneTodoBox"), row51=id=>box51.querySelector(`.ct-dswrap[data-id="${id}"] > .done-item`);
+ok(!!row51("d2") && !!row51("d3") && !box51.querySelector('.ct-dswrap[data-id="d1"]'),"finished ToDos are in swipe rows (unfinished is not)");
+ok(/左になぞると削除/.test(box51.querySelector(".ct-swipe-hint").textContent) && /チェックを外すと戻る/.test(box51.querySelector(".dt-head").textContent) && /完了を全部消す\(2件\)/.test($("doneClearAll").textContent),"the head tells about swiping; the clear-all button shows the count");
+const sw51=async(row,dx,dy=0)=>{ const mk=(t,x,y)=>new w.MouseEvent(t,{bubbles:true,clientX:x,clientY:y});
+  row.dispatchEvent(mk("pointerdown",200,50)); row.dispatchEvent(mk("pointermove",200+dx,50+dy)); row.dispatchEvent(mk("pointerup",200+dx,50+dy)); await sleep(80); };
+const ids51=()=>w.eval("todoItems").map(t=>t.id).join(), arc51=()=>JSON.parse(w.localStorage.getItem("todoArchive")||"[]");
+confirms.length=0; await sw51(row51("d2"),30);
+ok(ids51()==="d1,d2,d3" && confirms.length===0,"short swipe → nothing");
+await sw51(row51("d2"),100);
+ok(ids51()==="d1,d2,d3" && confirms.length===0,"right swipe → nothing");
+await sw51(row51("d2"),-10,80);
+ok(ids51()==="d1,d2,d3" && confirms.length===0,"vertical drag → nothing (scroll)");
+confirmAnswer=false; await sw51(row51("d2"),-100);
+ok(ids51()==="d1,d2,d3" && /このToDoを削除しますか/.test(confirms[0]||"") && /見積/.test(confirms[0]||""),"left swipe → confirm (with the text); 'いいえ' keeps it");
+confirmAnswer=true; await sw51(row51("d2"),-100);
+ok(ids51()==="d1,d3" && JSON.parse(w.localStorage.getItem("todoItems")).map(t=>t.id).join()==="d1,d3","left swipe + はい → removed from the list (saved)");
+ok(arc51().map(t=>t.id).join()==="d2" && !!arc51()[0].removedAt && !arc51()[0].sentAt,"it is moved to the auto-save with removedAt");
+ok(!box51.querySelector('.ct-dswrap[data-id="d2"]'),"the row is gone from the screen");
+// 完了を全部消す
+w.eval('todoItems.push({id:"d4",date:"2026-10-08",target:"",content:"返却",done:true,order:4,completedAt:"2026-10-08T05:00:00.000Z"})'); w.renderTodoList();
+confirmAnswer=false; const c51=confirms.length; $("doneClearAll").click();
+ok(ids51()==="d1,d3,d4" && /完了したToDo 2件を、リストから消しますか/.test(confirms[c51]||""),"clear-all asks first (2件); 'いいえ' keeps them");
+confirmAnswer=true; $("doneClearAll").click();
+ok(ids51()==="d1" && arc51().map(t=>t.id).sort().join()==="d2,d3,d4" && box51.hidden,"clear-all + はい → only the unfinished stays; all finished are in the auto-save; the box hides");
+// 月まとめの送信に入る
+const md51=w.ctMonthData("2026-10");
+ok(["d2","d3","d4"].every(id=>md51.todos.some(t=>t.id===id)),"the removed ToDos are in the monthly send");
+w.localStorage.removeItem("todoArchive"); w.eval("todoItems=[]"); w.localStorage.setItem("todoItems","[]"); w.renderTodoList();
+}

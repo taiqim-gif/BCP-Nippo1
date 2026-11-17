@@ -409,6 +409,11 @@ style.textContent = `
   .done-item .done-suffix{ color:rgba(214,69,69,0.7); margin-left:4px; }
   .done-item input[type=checkbox]{ width:20px; height:20px; }
   #doneTodoBox .btn{ margin-top:6px; }
+  .ct-dswrap{ position:relative; overflow:hidden; border-radius:10px; margin-bottom:6px; }
+  .ct-dswrap > .done-item{ position:relative; margin-bottom:0 !important; touch-action:pan-y; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+  .ct-dsbg{ position:absolute; inset:0; display:flex; visibility:hidden; font-size:var(--fs-swipe,15px); font-weight:700; }
+  .ct-dswrap.ct-swiping .ct-dsbg{ visibility:visible; }
+  .ct-dsbg .ct-sw-del{ flex:1; display:flex; align-items:center; justify-content:flex-end; padding:0 18px; background:var(--pink); color:var(--pink-ink); }
   .ct-timebox{ position:relative; display:inline-flex; align-items:center; gap:8px; width:7.6em; min-width:0; padding:8px 10px; border:1.5px solid var(--line); border-radius:10px; background:#FFFDF9; box-sizing:border-box; vertical-align:middle; }
   .ct-timebox .ct-inlab{ font-size:11px; color:var(--ink-soft); flex:none; }
   .ct-timetext{ font-size:15px; white-space:nowrap; }
@@ -3046,12 +3051,17 @@ function renderDoneTodos(){
     const md = typeof formatMonthDay === "function" ? formatMonthDay(t.date) : "";
     const suffix = typeof formatDoneSuffix === "function" ? formatDoneSuffix(t.completedAt) : "(済)";
     const rest = `${t.target ? t.target + "　" : ""}${t.content || ""}`;
+    const wrap = document.createElement("div");          // 左になぞると、下の「削除」が見える
+    wrap.className = "ct-dswrap";
+    wrap.setAttribute("data-id", t.id);
+    wrap.innerHTML = '<div class="ct-dsbg"><span class="ct-sw-del">削除</span></div>';
     const div = document.createElement("div");
     div.className = "todo-item done-item";
     div.setAttribute("data-id", t.id);
     div.innerHTML = `<label><input type="checkbox" class="todo-undo" data-id="${escapeHtml(t.id)}" checked>` +
       `<span class="todo-line"><span class="line-done">${md ? `<span class="todo-date">${escapeHtml(md)}</span>` : ""}${escapeHtml(rest)}</span><span class="done-suffix">${escapeHtml(suffix)}</span></span></label>`;
-    body.appendChild(div);
+    wrap.appendChild(div);
+    body.appendChild(wrap);
   });
   if(done.length > doneLimit){
     const more = document.createElement("button");
@@ -3061,7 +3071,91 @@ function renderDoneTodos(){
     more.textContent = `さらに表示(残り ${done.length - doneLimit}件)`;
     body.appendChild(more);
   }
+  const hint = document.createElement("div");
+  hint.className = "ct-swipe-hint";
+  hint.textContent = "← 左になぞると削除";
+  body.appendChild(hint);
+  const clr = document.createElement("button");
+  clr.type = "button";
+  clr.className = "btn btn-outline-pink";
+  clr.id = "doneClearAll";
+  clr.textContent = `完了を全部消す(${done.length}件)`;
+  body.appendChild(clr);
 }
+
+/* 完了したToDoを、リストから外して自動保存(todoArchive)に移す。extra＝足す印(sentAt か removedAt) */
+function moveTodosToArchive(list, extra){
+  if(!list.length) return true;
+  const ids = new Set(list.map(t => t.id));
+  const arc = todoArchive().filter(t => t && !ids.has(t.id)).concat(list.map(t => Object.assign({}, t, extra)));
+  try{
+    localStorage.setItem(TODO_ARCHIVE_KEY, JSON.stringify(arc));
+  }catch(e){
+    showToast("保存できませんでした");                 // 保存できないときは、リストに残す
+    return false;
+  }
+  todoItems = todoItems.filter(t => !ids.has(t.id));
+  if(typeof saveTodos === "function") saveTodos(); else localStorage.setItem("todoItems", JSON.stringify(todoItems));
+  if(typeof renderTodoList === "function") renderTodoList();
+  renderDoneTodos();
+  return true;
+}
+function removeDoneTodos(list, msg){
+  if(moveTodosToArchive(list, { removedAt:new Date().toISOString() })) showToast(msg);
+}
+window.ctRemoveDoneTodos = removeDoneTodos;
+
+// 終了したToDo：左へなぞると削除(確認あり)。縦のスクロールは邪魔しない
+(function(){
+  let sw = null, justSwiped = false;
+  doneBox.addEventListener("pointerdown", e => {
+    const row = e.target.closest(".ct-dswrap > .done-item");
+    if(!row) return;
+    if(e.pointerType === "mouse" && e.button !== 0) return;
+    sw = { row, id:row.getAttribute("data-id"), x:e.clientX, y:e.clientY, dx:0, active:false, pid:e.pointerId };
+  });
+  doneBox.addEventListener("pointermove", e => {
+    if(!sw) return;
+    const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+    if(!sw.active){
+      if(dx < -10 && Math.abs(dx) > Math.abs(dy) * 1.5){
+        sw.active = true;
+        sw.row.parentNode.classList.add("ct-swiping");   // なぞっている間だけ、下の「削除」を見せる
+        try{ sw.row.setPointerCapture(sw.pid); }catch(err){ /* 未対応の環境では無視 */ }
+        sw.row.style.transition = "none";
+      }else if(Math.abs(dy) > 10 || dx > 10){
+        sw = null;                                       // 縦(スクロール)や右へは、なにもしない
+        return;
+      }else{
+        return;
+      }
+    }
+    sw.dx = Math.min(0, dx);
+    sw.row.style.transform = `translateX(${sw.dx}px)`;
+  });
+  function finish(cancelled){
+    if(!sw) return;
+    const { row, id, dx, active } = sw;
+    sw = null;
+    if(!active) return;
+    justSwiped = true;                                   // 指を離したときの「クリック」で、チェックが外れないように
+    setTimeout(() => { justSwiped = false; }, 400);
+    row.style.transition = "transform .18s";
+    row.style.transform = "";
+    setTimeout(() => { if(row.parentNode) row.parentNode.classList.remove("ct-swiping"); }, 200);   // 戻りきってから隠す
+    if(cancelled) return;
+    const threshold = Math.min(90, (row.offsetWidth || 300) * 0.28);
+    if(dx <= -threshold){
+      setTimeout(() => {
+        const t = todoItems.find(x => x.id === id && x.done);
+        if(t && window.confirm(`このToDoを削除しますか?\n「${t.content || ""}」\n\n(リストから外して、自動保存に移します。月初の送信には入ります)`)) removeDoneTodos([t], "削除しました");
+      }, 30);
+    }
+  }
+  doneBox.addEventListener("pointerup", () => finish(false));
+  doneBox.addEventListener("pointercancel", () => finish(true));
+  doneBox.addEventListener("click", e => { if(justSwiped && e.target.closest(".ct-dswrap")){ e.preventDefault(); e.stopPropagation(); } }, true);
+})();
 
 doneBox.addEventListener("change", e => {
   const cb = e.target.closest(".todo-undo");
@@ -3077,6 +3171,12 @@ doneBox.addEventListener("change", e => {
 });
 doneBox.addEventListener("click", e => {
   if(e.target.closest("#doneMore")){ doneLimit += 20; renderDoneTodos(); }
+  if(e.target.closest("#doneClearAll")){
+    const done = todoItems.filter(t => t && t.done);
+    if(done.length === 0) return;
+    if(!window.confirm(`完了したToDo ${done.length}件を、リストから消しますか?\n未対応のToDoは残ります。\n\n(自動保存に移します。月初の送信には入ります)`)) return;
+    removeDoneTodos(done, `完了したToDo ${done.length}件を消しました`);
+  }
 });
 renderDoneTodos();
 
@@ -3693,17 +3793,8 @@ function markAllSent(){
   ctLogs.forEach(l => { if(!l.sentAt) l.sentAt = now; });
   persistReport();
   ctSave();
-  if(doneTodos.length){
-    const ids = new Set(doneTodos.map(t => t.id));
-    const arc = todoArchive().filter(t => t && !ids.has(t.id)).concat(doneTodos.map(t => Object.assign({}, t, { sentAt:now })));
-    try{
-      localStorage.setItem(TODO_ARCHIVE_KEY, JSON.stringify(arc));
-      todoItems = todoItems.filter(t => !ids.has(t.id));          // 保存できたときだけ、リストから外す
-      if(typeof saveTodos === "function") saveTodos(); else localStorage.setItem("todoItems", JSON.stringify(todoItems));
-      localStorage.removeItem(TODO_SENT_IDS_KEY);
-    }catch(e){ /* 保存できないときは、リストに残す */ }
-    if(typeof renderTodoList === "function") renderTodoList();
-    renderDoneTodos();
+  if(doneTodos.length && moveTodosToArchive(doneTodos, { sentAt:now })){   // 保存できたときだけ、リストから外す
+    try{ localStorage.removeItem(TODO_SENT_IDS_KEY); }catch(e){ /* 次の送信で上書きされる */ }
   }
   renderList();
   renderData();
@@ -4096,6 +4187,7 @@ function attachClear(inp){
   const cur = () => TABS.findIndex(([sid]) => $(sid) && $(sid).classList.contains("active"));       // 訪問入力・顧客の管理の画面では、-1(使わない)
   document.addEventListener("touchstart", e => {
     st = null;
+    if(e.target && e.target.closest && e.target.closest(".ct-dswrap")) return;   // 終了したToDoの「なぞって削除」とぶつけない
     const t = e.touches && e.touches[0];
     if(!t || e.touches.length > 1) return;
     const W = window.innerWidth;

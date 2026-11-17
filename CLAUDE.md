@@ -65,7 +65,7 @@
   - 包んでいる関数: `renderTodoList`, `renderVehicleScreen`, `saveTodos`, `buildReportMail`, `getLatestPastReturnDistance`, `attachTodoDrag`(並べ替えを置き換え), `goToVisit`, `updateNav`, `updateDate`, `deleteData`, `renderMasterUI`, `setMasterMessage`, `showToast`, `confirm`。
   - 追加している画面: `containerScreen`(容器)、`dataScreen`(データ)、`custScreen`(顧客の管理)。ヘッダーに `navContainerButton`、`navDataButton` を足している。
 - 画面の色の統一は、`#tabColors` という `<style>`(`container.js` の中で作る)で上書きしている。
-- テスト用に、`window.ctXxx`(`ctMailAllCsv`, `ctRefreshWeather`, `ctWxStep`, `ctWxView`, `ctEnsureVisible`, `ctRenderBar`, `ctApplyTab`, `ctSetSlot`, `ctSlotNow`, `ctCompactVisits`, `ctMasterMerged`, `ctAccessHiddenPlan`, `ctSetListUse`, `ctDeleteMasterSource`, `ctHomeTypeSuggest`, `ctWxTempColor`, `ctStyleTodoDates`, `ctWxInterval`, `ctWxPageIndex`, `ctWxRestart`, `ctVehicleCardColor`, `ctMailMonthCsv`, `ctMonthData`, `ctRenderMonthly`, `ctOpenUserDialog`)を公開している。
+- テスト用に、`window.ctXxx`(`ctMailAllCsv`, `ctRefreshWeather`, `ctWxStep`, `ctWxView`, `ctEnsureVisible`, `ctRenderBar`, `ctApplyTab`, `ctSetSlot`, `ctSlotNow`, `ctCompactVisits`, `ctMasterMerged`, `ctAccessHiddenPlan`, `ctSetListUse`, `ctDeleteMasterSource`, `ctHomeTypeSuggest`, `ctWxTempColor`, `ctStyleTodoDates`, `ctWxInterval`, `ctWxPageIndex`, `ctWxRestart`, `ctVehicleCardColor`, `ctMailMonthCsv`, `ctMonthData`, `ctRenderMonthly`, `ctOpenUserDialog`, `ctRemoveDoneTodos`)を公開している。
   - `#mailButton`(日報メール)は、`cloneNode` で元の働きを外して付け直している(登録した送り先を宛先に入れ、件名に名前を足すため)。
 
 ### 保存データ(localStorage のキー)— **名前を変えない・消さない**
@@ -147,6 +147,9 @@
   - CSV添付の送信では、iPhoneの決まりで宛先を入れられないので、送る前にアドレスをコピーし、「宛先はコピー済み(貼り付け)」と出す。
   - CSVのファイル名に名前(`訪問_佐藤_20261117.csv`)。訪問の右端に「ID(`createdAt`)・担当者」、車両の右端に「担当者」、ToDoの右端に「ID・登録日・完了日(年まで)・担当者」(パソコンの取り込みツール用)。未登録なら、名前の部分は空(ファイル名は前と同じ)。
 - **送信済みの完了ToDo**(v11): 「全データをメール送信」で送った完了ToDoは、「送信済みにする」で、リストから外して `todoArchive` に自動保存(`sentAt` 付き)。送ったあとに完了したものは外さない。未完了は、いつまでもリストに残り、毎回送る。
+- **終了したToDoを消す**(v11。車両画面の「終了したToDoリスト」): 行を**左へなぞる**と下からピンクの「削除」(なぞっている間だけ見える)→ 確認 → 消す。右・縦・短いなぞりは何もしない。一覧の下に「← 左になぞると削除」と[完了を全部消す(n件)](確認あり。未対応は残す)。
+  - どちらも完全には消さず、`todoArchive` に移す(`removedAt` 付き。送信済みは `sentAt`)。毎日の送信には入らないが、月まとめの送信には入る。
+  - なぞりは `.ct-dswrap` の中。画面の端のなぞり(タブ移動)は、`.ct-dswrap` の上では動かさない。
 - **月まとめの送信**(v11。運転管理表用): 「先月分をメール送信(CSV添付)」= 先月の訪問・車両・ToDo(自動保存も含む)を、**送信済みも含めて全部**、3つのCSV(`訪問_佐藤_202610月分.csv` など)で送る。件名「運転日報 2026年10月分 佐藤」。送ったあと「送れましたか?」→ OK で `monthlyReportSent` に記録。
   - **月初のお知らせ**: 先月の訪問か車両があり、`monthlyReportSent` が先月より前のとき、ホームと車両の一番上に、ピーチ色の枠「10月分の運転日報を、メールで送ってください」と[10月分を送る(CSV添付)]。アプリを開いたとき・画面に戻ったときに出し直す。
   - 先月のデータを「消す」で消すと、送れない。月まとめを送るまで、先月分は消さない。
