@@ -22,12 +22,16 @@ Private gLog As String                       ' 結果のメモ(最後に画面�
 ' ---------------------------------------------------------------------
 Public Sub ImportCsv()
     Dim nm As String, tpl As String, csvDir As String, outDir As String, msg As String
+    ' OneDrive などWeb上の場所で開くと、フォルダの場所が分からないので止める
+    If LCase$(Left$(ThisWorkbook.Path, 4)) = "http" Then
+        MsgBox "このツールのフォルダの場所が分かりません。" & vbLf & "USBやパソコンの中のフォルダに置いて開いてください。", vbExclamation, "日報取り込みツール"
+        Exit Sub
+    End If
+    ' 場所はすべて、ツールが今あるフォルダを元に決める(フォルダごと持ち歩けるように)
     nm = Setting("担当者名")
-    tpl = Setting("日誌原紙のファイル")
-    csvDir = Setting("CSVを置くフォルダ")
-    outDir = Setting("日誌の保存先フォルダ")
-    If csvDir = "" Then csvDir = ThisWorkbook.Path & "\CSV"
-    If outDir = "" Then outDir = ThisWorkbook.Path & "\営業日誌"
+    tpl = TemplatePath()
+    csvDir = FolderPath("CSVを置くフォルダ", "CSV")
+    outDir = FolderPath("日誌の保存先フォルダ", "営業日誌")
 
     msg = ImportAll(nm, tpl, csvDir, outDir)
     WriteLog msg
@@ -42,9 +46,9 @@ Public Function ImportAll(ByVal nm As String, ByVal tpl As String, ByVal csvDir 
 
     gLog = ""
     If nm = "" Then ImportAll = "「設定」の担当者名を入れてください。": Exit Function
-    If tpl = "" Or Dir(tpl) = "" Then ImportAll = "日誌原紙のファイルが見つかりません。" & vbLf & tpl: Exit Function
-    If Dir(csvDir, vbDirectory) = "" Then ImportAll = "CSVを置くフォルダが見つかりません。" & vbLf & csvDir: Exit Function
-    If Dir(outDir, vbDirectory) = "" Then MkDir outDir
+    If tpl = "" Or Not FileExists(tpl) Then ImportAll = "日誌原紙のファイルが見つかりません。" & vbLf & tpl: Exit Function
+    If Not FolderExists(csvDir) Then ImportAll = "CSVを置くフォルダが見つかりません。" & vbLf & csvDir: Exit Function
+    If Not FolderExists(outDir) Then MkDir outDir
 
     ' CSVを集める(訪問_・車両_・ToDo_ で始まるもの)
     Set files = New Collection
@@ -476,36 +480,97 @@ End Sub
 Public Sub PickTemplate()
     Dim f As Variant
     f = Application.GetOpenFilename("Excel ファイル (*.xlsx;*.xlsm;*.xls),*.xlsx;*.xlsm;*.xls", , "日誌原紙を選んでください")
-    If VarType(f) = vbString Then SetSetting "日誌原紙のファイル", CStr(f)
+    ' ツールのフォルダの中なら、「日誌原紙.xlsx」のように、フォルダから見た書き方で残す
+    If VarType(f) = vbString Then SetSetting "日誌原紙のファイル", ToRel(CStr(f))
 End Sub
 
 Public Sub PickCsvFolder()
     Dim p As String
     p = PickFolder("CSVを置くフォルダを選んでください")
-    If p <> "" Then SetSetting "CSVを置くフォルダ", p
+    If p <> "" Then SetSetting "CSVを置くフォルダ", ToRel(p)
 End Sub
 
 Public Sub PickOutFolder()
     Dim p As String
     p = PickFolder("営業日誌の保存先フォルダを選んでください")
-    If p <> "" Then SetSetting "日誌の保存先フォルダ", p
+    If p <> "" Then SetSetting "日誌の保存先フォルダ", ToRel(p)
 End Sub
 
 Public Sub OpenOutFolder()
     Dim p As String
-    p = Setting("日誌の保存先フォルダ")
-    If p = "" Then p = ThisWorkbook.Path & "\営業日誌"
-    If Dir(p, vbDirectory) = "" Then MsgBox "まだフォルダがありません。" & vbLf & p, vbExclamation: Exit Sub
+    p = FolderPath("日誌の保存先フォルダ", "営業日誌")
+    If Not FolderExists(p) Then MsgBox "まだフォルダがありません。" & vbLf & p, vbExclamation: Exit Sub
     Shell "explorer.exe """ & p & """", vbNormalFocus
 End Sub
 
 Public Sub OpenCsvFolder()
     Dim p As String
-    p = Setting("CSVを置くフォルダ")
-    If p = "" Then p = ThisWorkbook.Path & "\CSV"
-    If Dir(p, vbDirectory) = "" Then MkDir p
+    p = FolderPath("CSVを置くフォルダ", "CSV")
+    If Not FolderExists(p) Then MkDir p
     Shell "explorer.exe """ & p & """", vbNormalFocus
 End Sub
+
+' ---------------------------------------------------------------------
+'  場所の決め方(フォルダごと持ち歩けるように、ツールが今あるフォルダを元にする)
+' ---------------------------------------------------------------------
+' 日誌原紙の場所。空欄なら、ツールと同じフォルダの「日誌原紙.xlsx」
+Private Function TemplatePath() As String
+    Dim p As String, alt As String
+    p = FullPath(Setting("日誌原紙のファイル"))
+    If p = "" Then p = AddSep(ThisWorkbook.Path) & "日誌原紙.xlsx"
+    ' 書いてある場所に無いとき(USBのドライブ名が変わったなど)は、ツールのフォルダの同じ名前のファイルを使う
+    If Not FileExists(p) Then
+        alt = AddSep(ThisWorkbook.Path) & LastName(p)
+        If FileExists(alt) Then p = alt
+    End If
+    TemplatePath = p
+End Function
+
+' フォルダの場所。空欄なら、ツールと同じフォルダの中の defName フォルダ
+Private Function FolderPath(ByVal key As String, ByVal defName As String) As String
+    Dim p As String, alt As String
+    p = FullPath(Setting(key))
+    If p = "" Then
+        p = AddSep(ThisWorkbook.Path) & defName
+    ElseIf Not FolderExists(p) Then
+        alt = AddSep(ThisWorkbook.Path) & LastName(p)
+        If FolderExists(alt) Then p = alt
+    End If
+    FolderPath = p
+End Function
+
+' 「C:\…」「\\…」で始まればそのまま。それ以外は、ツールのフォルダから見た場所とする
+Private Function FullPath(ByVal p As String) As String
+    If p = "" Then Exit Function
+    If Mid$(p, 2, 1) = ":" Or Left$(p, 2) = "\\" Then
+        FullPath = p
+    Else
+        If Left$(p, 2) = ".\" Then p = Mid$(p, 3)
+        FullPath = AddSep(ThisWorkbook.Path) & p
+    End If
+End Function
+
+' ツールのフォルダの中なら、フォルダから見た書き方にする(外ならそのまま)
+Private Function ToRel(ByVal p As String) As String
+    Dim base As String
+    base = AddSep(ThisWorkbook.Path)
+    If LCase$(Left$(p, Len(base))) = LCase$(base) Then ToRel = Mid$(p, Len(base) + 1) Else ToRel = p
+End Function
+
+' 場所の一番最後の名前(ファイル名かフォルダ名)
+Private Function LastName(ByVal p As String) As String
+    If Right$(p, 1) = "\" Then p = Left$(p, Len(p) - 1)
+    LastName = Mid$(p, InStrRev(p, "\") + 1)
+End Function
+
+' ある・なしの確認(ドライブが無いときも、止まらずに「なし」を返す)
+Private Function FileExists(ByVal p As String) As Boolean
+    FileExists = CreateObject("Scripting.FileSystemObject").FileExists(p)
+End Function
+
+Private Function FolderExists(ByVal p As String) As Boolean
+    FolderExists = CreateObject("Scripting.FileSystemObject").FolderExists(p)
+End Function
 
 Private Function PickFolder(ByVal title As String) As String
     With Application.FileDialog(msoFileDialogFolderPicker)
