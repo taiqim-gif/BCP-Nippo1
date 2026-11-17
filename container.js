@@ -4652,27 +4652,11 @@ window.ctRenderMonthly = renderMonthly;
 renderMonthly();
 document.addEventListener("visibilitychange", () => { if(!document.hidden) renderMonthly(); });   // 日をまたいで開いたままのとき
 
-// 日報メール(ホームのボタン)：登録した送り先を、宛先に入れる。件名に名前を足す
+// 日報メール(ホームのボタン、本文が文字のメール)は使わない(v12)。送るのは CSV だけにしたので、ボタンを出さない
+//   本文を作る処理(buildReportMail)は index.html に残っている(ボタンを戻すときは、ここを消す)
 (function(){
-  const old = $("mailButton");
-  if(!old || typeof window.buildReportMail !== "function") return;
-  const btn = old.cloneNode(true);                 // 元のボタンの働き(宛先なし)を外して、付け直す
-  old.parentNode.replaceChild(btn, old);
-  btn.addEventListener("click", () => {
-    const r = window.buildReportMail();
-    const nm = userName();
-    const subject = r.subject + (nm ? " " + nm : "");
-    const head = mailtoHead();
-    const limit = typeof MAILTO_LIMIT === "number" ? MAILTO_LIMIT : 50000;
-    const url = `${head}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(r.body)}`;
-    if(url.length > limit){
-      if(typeof copyToClipboard === "function") copyToClipboard(r.body);
-      showToast("本文が長いためコピーしました。メールに貼り付けてください");
-      window.location.href = `${head}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent("（本文が長いため、コピーしました。ここに貼り付けてください）")}`;
-      return;
-    }
-    window.location.href = url;
-  });
+  const btn = $("mailButton");
+  if(btn) btn.style.display = "none";
 })();
 
 })();
