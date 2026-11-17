@@ -1678,3 +1678,9 @@ const md51=w.ctMonthData("2026-10");
 ok(["d2","d3","d4"].every(id=>md51.todos.some(t=>t.id===id)),"the removed ToDos are in the monthly send");
 w.localStorage.removeItem("todoArchive"); w.eval("todoItems=[]"); w.localStorage.setItem("todoItems","[]"); w.renderTodoList();
 }
+// ---- 52) 日報メール(本文)のボタンは出さない(v12。送るのは CSV だけ) ----
+{
+const mb=$("mailButton");
+ok(!mb || mb.style.display==="none","the report mail (text body) button is hidden");
+ok(typeof w.buildReportMail==="function","the mail body builder is still there (not removed)");
+}
