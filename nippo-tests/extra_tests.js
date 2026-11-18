@@ -1784,7 +1784,7 @@ const add57=(n,c)=>{ $("cmAddName").value=n; $("cmAddKana").value=""; $("cmAddCo
 add57("追加の店","9101"); add57("名前だけの店","");
 w.localStorage.setItem("customerHidden",JSON.stringify(["c:9001"])); w.ctCustSettingsPlan({hidden:[]});   // 印を読み直す
 const pay57=w.ctCustSettingsPayload();
-ok(pay57.kind==="customerSettings" && pay57.ver===1 && pay57.from==="架空太郎" && pay57.hidden.join()==="c:9001" && pay57.extra.some(e=>e.n==="追加の店" && e.c==="9101") && pay57.extra.some(e=>e.n==="名前だけの店"),"the payload has kind/from/hidden/extra: "+JSON.stringify(pay57.hidden));
+ok(pay57.kind==="customerSettings" && pay57.ver===2 && pay57.from==="架空太郎" && pay57.hidden.join()==="c:9001" && pay57.extra.some(e=>e.n==="追加の店" && e.c==="9101") && pay57.extra.some(e=>e.n==="名前だけの店"),"the payload has kind/from/hidden/extra: "+JSON.stringify(pay57.hidden));
 ok(pay57.extra.every(e=>!("id" in e)),"the payload does not carry the phone's own ids");
 // 受け取る人の状態:非表示は 9002 だけ。「追加の店」「名前だけの店」はもうある
 w.localStorage.setItem("customerHidden",JSON.stringify(["c:9002"]));
@@ -1816,4 +1816,64 @@ ok(!JSON.parse(w.localStorage.getItem("customerExtra")).some(e=>e.n==="やめた
 if(mBak57===null) w.localStorage.removeItem("customerMaster"); else w.localStorage.setItem("customerMaster",mBak57);
 if(hBak57===null) w.localStorage.removeItem("customerHidden"); else w.localStorage.setItem("customerHidden",hBak57);
 if(uBak57===null) w.localStorage.removeItem("nippoUserName"); else w.localStorage.setItem("nippoUserName",uBak57);
+}
+
+// ---- 58) v18:「他の人にコピーする」に顧客リストも入れる。取り込みは足すだけ(架空の顧客) ----
+{
+const mBak58=w.localStorage.getItem("customerMaster"), hBak58=w.localStorage.getItem("customerHidden"), eBak58=w.localStorage.getItem("customerExtra"), uBak58=w.localStorage.getItem("customerListUse");
+const reload58=()=>w.ctCustSettingsPlan({hidden:[]});   // 印を読み直す
+ok($("cmShareCard").querySelector(".dt-title").textContent==="他の人にコピーする(顧客リスト・非表示・追加した顧客)","the card title is 他の人にコピーする(顧客リスト・非表示・追加した顧客)");
+ok(!$("cmShareCard").textContent.includes("分ける"),"the card no longer says 分ける");
+// 送る人:2つのリスト(A担当・B担当)と非表示1件
+const sender58={office:"A担当 + B担当",updated:"2026-11-10",items:[{n:"コピー商事",k:"かくうしょうじ",c:"8801",o:"A担当"},{n:"コピー工業",k:"みほんこうぎょう",c:"8802",o:"A担当",h:1},{n:"コピー産業",k:"しけんさんぎょう",c:"8803",o:"B担当"},{n:"コピー名前商店",k:"なまえだけしょうてん",c:"",o:"B担当"}],sources:[{office:"A担当",updated:"2026-11-01",count:2},{office:"B担当",updated:"2026-11-10",count:2}]};
+w.localStorage.setItem("customerMaster",JSON.stringify(sender58));
+w.localStorage.setItem("customerHidden",JSON.stringify(["c:8802"])); reload58();
+const pay58=w.ctCustSettingsPayload();
+ok(pay58.ver===2 && pay58.master && pay58.master.items.length===4 && pay58.master.sources.length===2,"the payload carries the whole customer list with its sources");
+const file58=JSON.parse(JSON.stringify(pay58));
+// 受け取る人1:顧客リストが無いスマホ → そのまま全部入る
+w.localStorage.removeItem("customerMaster"); w.localStorage.setItem("customerHidden","[]"); reload58();
+const p58a=w.ctCustSettingsPlan(file58);
+ok(p58a.masterTotal===4 && p58a.masterAdd.length===4,"empty phone: all 4 customers will be added");
+w.ctShowCustSettingsChoice(p58a);
+ok($("ctCsText").textContent.includes("顧客リスト 4件(このスマホに足す 4件"),"the dialog shows the list count: "+$("ctCsText").textContent);
+$("ctCsAdd").click();
+const m58a=JSON.parse(w.localStorage.getItem("customerMaster"));
+ok(m58a.items.length===4 && m58a.sources.map(x=>x.office).join()==="A担当,B担当" && m58a.sources.every(x=>x.count===2),"empty phone: the list is copied with both sources");
+ok(m58a.items.find(i=>i.c==="8802").h===1,"the Access hidden flag is kept");
+ok(JSON.parse(w.localStorage.getItem("customerHidden")).join()==="c:8802","the hidden mark is copied too");
+const vis58=w.eval("customerMaster.items.map(i=>i.c)");
+ok(vis58.includes("8801") && vis58.includes("8803") && !vis58.includes("8802"),"the visible list is refreshed (the hidden one is left out)");
+// 受け取る人2:A担当のリストを持っている(8801 は名前が違う・コードの違う「コピー産業」・受け手だけの客)
+w.localStorage.setItem("customerMaster",JSON.stringify({office:"A担当",updated:"2026-11-15",items:[{n:"コピー商事(新)",k:"かくうしょうじ",c:"8801",o:"A担当"},{n:"コピー受け手店",k:"うけて",c:"8851",o:"A担当"},{n:"コピー産業",k:"",c:"8853",o:"A担当"}],sources:[{office:"A担当",updated:"2026-11-15",count:3}]}));
+w.localStorage.setItem("customerHidden",JSON.stringify(["c:8851"])); reload58();
+const p58b=w.ctCustSettingsPlan(file58);
+ok(p58b.masterAdd.map(i=>i.c||i.n).sort().join()==="8802,コピー名前商店","only customers this phone does not have are added (same code / same name are skipped): "+p58b.masterAdd.map(i=>i.c||i.n).join());
+w.ctShowCustSettingsChoice(p58b); $("ctCsAdd").click();
+const m58b=JSON.parse(w.localStorage.getItem("customerMaster"));
+ok(m58b.items.find(i=>i.c==="8801").n==="コピー商事(新)" && m58b.items.some(i=>i.c==="8851"),"this phone's customers are kept as they are");
+ok(m58b.items.length===5 && m58b.sources.find(x=>x.office==="A担当").updated==="2026-11-15" && m58b.sources.find(x=>x.office==="A担当").count===4 &&m58b.sources.find(x=>x.office==="B担当").count===1,"sources: A担当 keeps its own date, B担当 is added: "+JSON.stringify(m58b.sources));
+ok(JSON.parse(w.localStorage.getItem("customerHidden")).sort().join()==="c:8802,c:8851","add: hidden marks are added, this phone's mark stays");
+// 同じファイルをもう一度:何も足さない
+const p58c=w.ctCustSettingsPlan(file58);
+ok(p58c.masterAdd.length===0 && p58c.newExtra.length===0,"importing the same file again adds nothing");
+// 「送った人と同じにする」でも、顧客リストは足すだけ
+w.localStorage.setItem("customerMaster",JSON.stringify({office:"C担当",updated:"2026-11-12",items:[{n:"C社",k:"しーしゃ",c:"8861"}]})); reload58();
+const p58d=w.ctCustSettingsPlan(file58);
+w.ctShowCustSettingsChoice(p58d); $("ctCsReplace").click();
+const m58d=JSON.parse(w.localStorage.getItem("customerMaster"));
+ok(m58d.items.length===5 && m58d.items.find(i=>i.c==="8861").o==="C担当" && m58d.sources.map(x=>x.office).join()==="C担当,A担当,B担当","replace: an old-style list (no sources) is kept and the sender's lists are added: "+JSON.stringify(m58d.sources));
+ok(JSON.parse(w.localStorage.getItem("customerHidden")).join()==="c:8802","replace: hidden marks become the sender's");
+// v17 のファイル(master なし)も、これまでどおり取り込める
+const p58e=w.ctCustSettingsPlan({kind:"customerSettings",ver:1,hidden:[],extra:[{n:"v17の店",c:"8871"}]});
+ok(p58e.masterTotal===0 && p58e.masterAdd.length===0 && p58e.newExtra.length===1,"a v17 file without the list still works");
+w.ctShowCustSettingsChoice(p58e);
+ok(!$("ctCsText").textContent.includes("顧客リスト"),"a v17 file: the dialog does not mention the list");
+$("ctCsCancel").click();
+// 壊れた中身は無視する
+const p58f=w.ctCustSettingsPlan({kind:"customerSettings",hidden:[],extra:[],master:{items:[null,{n:""},{n:"壊れ店",c:"8881",o:"どこにもない"}],sources:[null]}});
+ok(p58f.masterAdd.length===1 && p58f.masterAdd[0].o==="","broken list entries are ignored, unknown list names fall back to the first list");
+// 後片付け
+[["customerMaster",mBak58],["customerHidden",hBak58],["customerExtra",eBak58],["customerListUse",uBak58]].forEach(([k,v])=>{ if(v===null) w.localStorage.removeItem(k); else w.localStorage.setItem(k,v); });
+reload58();
 }
