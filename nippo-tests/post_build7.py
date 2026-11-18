@@ -26,6 +26,71 @@ rep('ok(before35($("ctUnitSeg"),$("ctSymbol")) && before35($("ctAdjField"),$("ct
 rep('$("ctTitle").textContent==="容器ログ(変更中)","right swipe → 変更 state: 更新 / 更新をやめる");','$("ctConfirmBar").querySelector(".cb-tag").textContent==="変更中","right swipe → 変更 state: 更新 / 更新をやめる (変更中 on the top card)");')
 rep('ok($("ctTitle").textContent==="容器ログ(追加中)" && $("ctCustomer").value==="〇〇商店","＋追加 starts adding for that customer");','ok($("ctConfirmBar").querySelector(".cb-tag").textContent==="追加中" && $("ctCustomer").value==="〇〇商店","＋追加 starts adding for that customer (追加中 on the top card)");')
 rep('ok(/容器ログ/.test(d.querySelector("#containerScreen .dt-head").textContent),"容器 tab keeps its own 「容器ログ」 heading");','ok(/^選択/.test(d.querySelector("#containerScreen .dt-head").textContent) && /容器ログ/.test(d.querySelector("#containerScreen .dt-frame.ctlist .dt-head").textContent),"容器 tab: the input card is 「選択」, the list keeps its 「容器ログ」 heading");')
+# v15) 送る枠の作り直し:「まだ送っていない分を送る」+「送れたら押す：送信済みにする」/「○月分をまとめて送る」。容器だけのボタンはなくした
+rep(r'''ok($("dtMailReport").innerHTML==="全データをメール送信<br>(CSV添付)","button 1 (2 lines): "+$("dtMailReport").innerHTML);
+ok($("dtMailCsv").innerHTML==="容器だけメール送信<br>(CSV添付)","button 2 (2 lines): "+$("dtMailCsv").innerHTML);
+ok($("dtCsv").innerHTML==="容器だけスマホ保存<br>(CSV保存)","button 3 (2 lines): "+$("dtCsv").innerHTML);
+ok($("dtMailReport").parentNode.querySelector(".dt-desc").textContent==="未送信の全データを送る","button 1 description: "+$("dtMailReport").parentNode.querySelector(".dt-desc").textContent);
+ok($("dtMarkSent").textContent==="送信済みにする" &&''', r'''ok($("dtMailReport").innerHTML==="まだ送っていない分を送る<br>(CSV・バックアップ添付)","button 1 (2 lines): "+$("dtMailReport").innerHTML);
+ok(!$("dtMailCsv") && !$("dtCsv"),"the container-only buttons are gone (v15)");
+ok(/^訪問 \d+件・車両 \d+日・容器 \d+本・ToDo \d+件$/.test($("dtMailReportDesc").textContent),"button 1 description: the counts to send: "+$("dtMailReportDesc").textContent);
+ok($("dtMarkSent").textContent==="送れたら押す：送信済みにする" &&''')
+rep(r'''ok($("dtMailCsvDesc").textContent===`未送信 ${ct0}本` && $("dtCsvDesc").textContent===`全件 ${ct0}本を保存`,"short descriptions: "+$("dtMailCsvDesc").textContent+" / "+$("dtCsvDesc").textContent);''',
+    r'''ok($("dtMailReportDesc").textContent.includes(`容器 ${ct0}本`),"the description has the unsent container count: "+$("dtMailReportDesc").textContent);''')
+rep(r'''toasts0=w.eval("toasts.length"); $("dtMailCsv").click(); await sleep(60);
+ok(w.eval("toasts").slice(toasts0).includes("未送信の容器はありません"),"mail CSV with nothing unsent → message");''', r'''ok(true,"(the container-only mail is gone in v15)");''')
+rep(r'''$("dtMailCsv").click(); await sleep(60);
+ok(shared.length===1 && /^容器ログ_\d{8}\.csv$/.test(shared[0][0]) && /csv/.test(shared[0][1]),"mail CSV: shared as a csv file (attach via share sheet): "+shared[0]);
+$("dtCsv").click(); await sleep(60);
+ok(shared.length===2 && /^容器ログ全件_\d{8}\.csv$/.test(shared[1][0]),"CSV export (all): "+shared[1][0]);
+$("dtBackup").click(); await sleep(60);
+ok(shared.length===3 && /バックアップ/.test(shared[2][0]) &&''', r'''$("dtMailReport").click(); await sleep(60);
+ok(shared.length===1 && /^日報_\d{8}\.csv$/.test(shared[0][0]) && /csv/.test(shared[0][1]),"mail: shared as one csv file (attach via share sheet): "+shared[0]);
+ok(!!w.localStorage.getItem("lastBackupAt"),"the mail also counts as a backup (the backup is attached)");
+w.localStorage.removeItem("lastBackupAt");
+$("dtBackup").click(); await sleep(60);
+ok(shared.length===2 && /バックアップ/.test(shared[1][0]) &&''')
+rep(r'''dl2.length=0; $("dtMailCsv").click(); await sleep(80);
+ok(dl2.length===1 && /^容器ログ_/.test(dl2[0]),"no share sheet: file is downloaded, mail draft opens");''', r'''dl2.length=0; $("dtMailReport").click(); await sleep(80);
+ok(dl2.length===2 && /^日報_/.test(dl2[0]) && /^営業日報バックアップ_/.test(dl2[1]),"no share sheet: the CSV and the backup are downloaded, mail draft opens: "+dl2.join());''')
+rep(r'''ok($("dtMailReport").innerHTML==="全データをメール送信<br>(CSV添付)","button 1 line 2: (CSV添付)");
+ok($("dtCsv").innerHTML==="容器だけスマホ保存<br>(CSV保存)","button 3: 容器だけスマホ保存 / (CSV保存)");
+ok($("dtMailCsv").innerHTML==="容器だけメール送信<br>(CSV添付)","button 2: 容器だけメール送信 / (CSV添付)");''', r'''ok($("dtMailReport").innerHTML==="まだ送っていない分を送る<br>(CSV・バックアップ添付)","button 1 line 2: (CSV・バックアップ添付)");''')
+# v15) 1つのCSV(区切りの行 [訪問] [車両] [ToDo] [容器])とバックアップを添付する
+rep(r'''const rd31=f=>new Promise(r=>{ const fr=new w.FileReader(); fr.onload=()=>r(fr.result); fr.readAsText(f); });
+ok(!!shared31 && shared31.files.map(f=>f.name).join()==="訪問_20261008.csv,車両_20261008.csv,ToDo_20261008.csv,容器ログ_20261008.csv","全データ: 4 CSV files are attached together: "+(shared31?shared31.files.map(f=>f.name).join(" "):"(not shared)"));
+const csv31=await Promise.all(shared31.files.map(rd31));''', r'''const rd31=f=>new Promise(r=>{ const fr=new w.FileReader(); fr.onload=()=>r(fr.result); fr.readAsText(f); });
+// 1つのCSVから、区切りの行 [名前] の表だけを取り出す
+const sec31=(txt,lab)=>{ const L=String(txt).replace(/^﻿/,"").split("\r\n"); const i=L.indexOf("["+lab+"]"); if(i<0) return ""; let j=i+1; while(j<L.length && !/^\[(訪問|車両|ToDo|容器)\]$/.test(L[j])) j++; return L.slice(i+1,j).join("\r\n"); };
+ok(!!shared31 && shared31.files.map(f=>f.name).join()==="日報_20261008.csv,営業日報バックアップ_20261008.json","1 CSV and the backup are attached together: "+(shared31?shared31.files.map(f=>f.name).join(" "):"(not shared)"));
+const all31=await rd31(shared31.files[0]);
+ok(all31.split("\r\n").filter(x=>/^\[.+\]$/.test(x)).join()==="[訪問],[車両],[ToDo],[容器]","the CSV has the 4 section lines in order");
+const csv31=["訪問","車両","ToDo","容器"].map(x=>sec31(all31,x));
+ok(shared31.files[1].type==="application/json" && /"app":"eigyo-nippo"/.test(await rd31(shared31.files[1])),"the backup (.json) is the same as 「バックアップ保存」");''')
+rep(r'''const names50=shared50?shared50.files.map(f=>f.name).join():"";
+ok(/^訪問_佐藤_\d{8}\.csv,ToDo_佐藤_\d{8}\.csv(,容器ログ_佐藤_\d{8}\.csv)?$/.test(names50) && /佐藤/.test(shared50.title),"file names and the title have the name: "+names50+" / "+(shared50&&shared50.title));
+const csv50=await Promise.all(shared50.files.map(rd31));''', r'''const names50=shared50?shared50.files.map(f=>f.name).join():"";
+ok(/^日報_佐藤_\d{8}\.csv,営業日報バックアップ_\d{8}\.json$/.test(names50) && /佐藤/.test(shared50.title),"file names and the title have the name: "+names50+" / "+(shared50&&shared50.title));
+const all50=await rd31(shared50.files[0]);
+const csv50=[sec31(all50,"訪問"),sec31(all50,"ToDo")];
+ok(!all50.includes("[車両]"),"tables with no rows are left out");''')
+# v15) 月分:1つのCSV(容器も)+バックアップ。送れたら、その月の分をスマホから消す
+rep(r'''ok(new RegExp(`^訪問_佐藤_${pm50.replace("-","")}月分\.csv,車両_佐藤_${pm50.replace("-","")}月分\.csv,ToDo_佐藤_${pm50.replace("-","")}月分\.csv$`).test(mnames) && /運転日報/.test(shared50.title),"the monthly send attaches 3 CSVs (all of last month): "+mnames);''',
+    r'''ok(new RegExp(`^日報_佐藤_${pm50.replace("-","")}月分\.csv,営業日報バックアップ_\\d{8}\\.json$`).test(mnames) && /運転日報/.test(shared50.title),"the monthly send attaches 1 CSV and the backup (all of last month): "+mnames);''')
+rep(r'''confirmAnswer=true;
+bnH.querySelector(".ct-monthly-send").click(); await sleep(600);
+ok(w.localStorage.getItem("monthlyReportSent")===pm50 && bnH.hidden && bnV.hidden,"'OK' hides the notice until the next month");
+$("navDataButton").click();
+ok(/訪問 1・車両 1/.test($("dtMailMonthDesc").textContent),"データ → 先月分をメール送信 shows the counts: "+$("dtMailMonthDesc").textContent);''', r'''$("navDataButton").click();
+ok(/訪問 1・車両 1・容器 \d+・ToDo 1/.test($("dtMailMonthDesc").textContent) && /スマホから消します/.test($("dtMailMonthDesc").textContent),"データ → the monthly button shows the counts: "+$("dtMailMonthDesc").textContent);
+ok($("dtMailMonth").innerHTML===`${pmLabel}分をまとめて送る<br>(CSV・バックアップ添付)`,"the monthly button has the month name: "+$("dtMailMonth").innerHTML);
+confirmAnswer=true; const c50c=confirms.length;
+bnH.querySelector(".ct-monthly-send").click(); await sleep(600);
+ok(w.localStorage.getItem("monthlyReportSent")===pm50 && bnH.hidden && bnV.hidden,"'OK' hides the notice until the next month");
+ok(/スマホから消します/.test(confirms[c50c+1]||"") && /訪問 1件・車両 1日・容器 \d+本・済ToDo 1件/.test(confirms[c50c+1]||""),"then it asks to delete the month, with the counts: "+(confirms[c50c+1]||"").split("\n").slice(0,2).join(" / "));
+ok(w.eval("meetingLogs.length")===0 && w.eval(`Object.keys(dailyVehicleInfo).filter(k=>k.startsWith("${pm50}")).length`)===0 && !/z1/.test(w.localStorage.getItem("todoArchive")||""),"'OK' deletes the month (visits, vehicle days, the finished ToDo in the auto-save)");''')
+rep(r'''shared50=null; $("dtBackup").click(); await sleep(300);''', r'''w.localStorage.setItem("todoArchive",JSON.stringify([{id:"z1",done:true}]));
+shared50=null; $("dtBackup").click(); await sleep(300);''')
 open("smoke8.js","w",encoding="utf-8").write(t)
 print("post7")
 

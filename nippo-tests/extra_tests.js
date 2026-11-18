@@ -1707,3 +1707,31 @@ ok(w.ctTodoCode({id:"old",source:"line",sourceId:"vx54::0",target:"架空"})==="
 ok(w.ctTodoCode({id:"old2",source:"line",sourceId:"gone::0",target:"架空"})==="","…and empty when the visit is gone");
 w.eval("todoItems=[]; meetingLogs=[]"); w.localStorage.setItem("todoItems","[]");
 }
+
+// ---- 55) v15:送る枠・1つのCSV・ToDoの正式な顧客名・月分を送ったあとに、その月を消す ----
+{
+$("navDataButton").click();
+const it55=$("dtMailReport").closest(".dt-item");
+ok(it55===$("dtMarkSent").closest(".dt-item"),"「送れたら押す：送信済みにする」 is in the same box as the send button");
+ok([...d.querySelectorAll("#dataScreen .dt-frame.send .dt-sub")].map(e=>e.textContent).join("|")==="毎日(まとめてでもよい)|月に1回(月初)","the send frame has 2 small headings: 毎日 / 月に1回");
+ok(w.ctBundleCsv([{label:"訪問",n:1,text:"a,b\r\n1,2"},{label:"車両",n:0,text:""},{label:"容器",n:1,text:"x"}])==="[訪問]\r\na,b\r\n1,2\r\n[容器]\r\nx","bundle: a section line before each table; empty tables are left out");
+// ToDoの正式な顧客名
+w.eval('meetingLogs=[{createdAt:"vx55",date:"2026-11-04",number:1,target:"架空商事株式会社",content:"見積"}]');
+ok(w.ctTodoFullName({target:"架空商",fullTarget:"架空商事株式会社"})==="架空商事株式会社","the CSV uses the name before shortening");
+ok(w.ctTodoFullName({target:"架空商",source:"line",sourceId:"vx55::0"})==="架空商事株式会社","an older ToDo gets the full name from its visit");
+ok(w.ctTodoFullName({target:"別の名前",source:"line",sourceId:"vx55::0"})==="別の名前","a ToDo whose name was changed by hand keeps that name");
+ok(w.ctTodoFullName({target:"手書き"})==="手書き","a hand-written ToDo keeps its name");
+// 月分を送ったあとに消す:その月だけ。未済のToDoと、来月に済ませたToDoは残す
+w.eval('meetingLogs=[{createdAt:"s1",date:"2026-09-03",number:1,target:"A"},{createdAt:"s2",date:"2026-10-01",number:1,target:"B"}]');
+w.eval('dailyVehicleInfo={"2026-09-03":{departure:{time:"2026-09-03T08:00",distance:"10"}},"2026-10-01":{departure:{time:"2026-10-01T08:00",distance:"20"}}}');
+w.ctSetLogs(eval('[{id:"k1",date:"2026-09-03",time:"10:00",status:"2",symbol:"A",number:"1",customer:"A",gas:"酸素",gasCode:"O2",capacity:"7",unit:"㎥"},{id:"k2",date:"2026-10-02",time:"10:00",status:"2",symbol:"A",number:"2",customer:"B",gas:"酸素",gasCode:"O2",capacity:"7",unit:"㎥"}]'));
+w.eval('todoItems=[{id:"p1",date:"2026-09-02",target:"A",content:"未",done:false,order:1},{id:"p2",date:"2026-09-02",target:"A",content:"済9月",done:true,order:2,completedAt:"2026-09-05T03:00:00.000Z"},{id:"p3",date:"2026-09-02",target:"A",content:"済10月",done:true,order:3,completedAt:"2026-10-05T03:00:00.000Z"}]');
+w.localStorage.setItem("todoArchive",JSON.stringify([{id:"q1",date:"2026-09-01",done:true,completedAt:"2026-09-02T03:00:00.000Z"},{id:"q2",date:"2026-10-01",done:true,completedAt:"2026-10-02T03:00:00.000Z"}]));
+const md55=w.ctMonthData("2026-09");
+ok(md55.cts.length===1 && md55.doneTodos.map(t=>t.id).sort().join()==="p2,q1","the month data has the container logs; deletable = finished by the end of the month: "+md55.doneTodos.map(t=>t.id).join());
+w.ctDeleteMonth("2026-09");
+ok(w.eval("meetingLogs").map(l=>l.createdAt).join()==="s2" && Object.keys(w.eval("dailyVehicleInfo")).filter(k=>k<"2026-10-02").join()==="2026-10-01" && JSON.parse(w.localStorage.getItem("containerLogs")).map(l=>l.id).join()==="k2","only that month's visits, vehicle days and container logs are deleted");
+ok(w.eval("todoItems").map(t=>t.id).join()==="p1,p3" && JSON.parse(w.localStorage.getItem("todoArchive")).map(t=>t.id).join()==="q2","unfinished ToDos stay; ToDos finished next month stay");
+ok(JSON.parse(w.localStorage.getItem("containerLogs")).map(l=>l.id).join()==="k2" && JSON.parse(w.localStorage.getItem("todoItems")).map(t=>t.id).join()==="p1,p3","the deletion is saved");
+w.eval("todoItems=[]; meetingLogs=[]; dailyVehicleInfo={}"); w.ctSetLogs([]); w.localStorage.setItem("todoItems","[]"); w.localStorage.removeItem("todoArchive");
+}
