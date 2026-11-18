@@ -1684,3 +1684,13 @@ const mb=$("mailButton");
 ok(!mb || mb.style.display==="none","the report mail (text body) button is hidden");
 ok(typeof w.buildReportMail==="function","the mail body builder is still there (not removed)");
 }
+
+// ---- 53) データ画面のいちばん下に、アプリの版と日付を出す(sw.js の版と同じ数字) ----
+{
+const v53=$("dtVersion"), av53=w.ctAppVersion();
+ok(!!v53 && v53.parentElement===$("dataScreen") && v53===$("dataScreen").lastElementChild,"the version line is at the bottom of the data screen");
+ok(/^v\d+$/.test(av53.version) && /^\d{4}-\d{2}-\d{2}$/.test(av53.date),"version and date have the right form");
+ok(v53.textContent==="アプリの版 "+av53.version+" ("+av53.date+")","it shows 'アプリの版 v○○ (日付)' (half-width brackets)");
+const sw53=require("fs").readFileSync(require("path").join("..","sw.js"),"utf8").match(/nippo-cache-(v\d+)/);
+ok(!!sw53 && sw53[1]===av53.version,"the number is the same as the sw.js CACHE ("+(sw53&&sw53[1])+")");
+}

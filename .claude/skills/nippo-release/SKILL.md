@@ -30,7 +30,7 @@ description: 営業日報アプリ(index.html + container.js)を「作って」�
 
 ## 3. 書き足し・版上げ
 
-1. `sw.js` の `CACHE` の版を1つ上げる(例: `nippo-cache-v8` → `v9`)。CLAUDE.md の「sw.js」と「7. 変更するときの注意」の版の数字も合わせる。
+1. `sw.js` の `CACHE` の版を1つ上げる(例: `nippo-cache-v8` → `v9`)。`container.js` の `APP_VERSION`(同じ数字。データ画面のいちばん下に出る)と `APP_DATE`(作った日)も直す。CLAUDE.md の「sw.js」「データ」の「アプリの版」「7. 変更するときの注意」の版の数字も合わせる。
 2. CLAUDE.md の「4. 仕様」に、決まったこと(数字・色・動き)を書き足す。古くなった記述は直す。テスト用に公開した `window.ctXxx` は、「container.js(追加機能)」の一覧に足す。
 3. 手順そのものが変わったときは、この SKILL.md を直す。
 

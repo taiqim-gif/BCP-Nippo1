@@ -496,6 +496,7 @@ style.textContent = `
   .dt-state{ font-size:14px; font-weight:700; color:var(--ink); margin:0 2px 12px; }
   .dt-state.warn{ color:var(--pink-ink); }
   .dt-note{ font-size:13px; font-weight:700; color:var(--pink-ink); margin:0 2px 12px; }
+  .dt-version{ font-size:12px; color:var(--ink-soft); text-align:center; margin:4px 0 24px; }
   .dt-frame.send{ background:#EEF9F5; border-color:var(--mint-dark); }
   .dt-frame.send .dt-head{ background:var(--mint); color:var(--mint-ink); }
   .dt-frame.save{ background:#EDF6FB; border-color:var(--sky-dark); }
@@ -2194,6 +2195,15 @@ backupFile.addEventListener("change", async e => {
 });
 
 /* =========================================================
+   アプリの版(データ画面のいちばん下に表示する)
+   ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
+   ・日付は、その版を作った日
+========================================================= */
+const APP_VERSION = "v13";
+const APP_DATE = "2026-11-18";
+window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
+
+/* =========================================================
    「データ」画面：送る・保存・消す をここに集める
 ========================================================= */
 const dataSection = document.createElement("section");
@@ -2303,6 +2313,8 @@ dataSection.innerHTML = `
       </div>
     </div>
   </section>
+
+  <div class="dt-version" id="dtVersion">アプリの版 ${APP_VERSION} (${APP_DATE})</div>
 `;
 document.querySelector("main").appendChild(dataSection);
 
