@@ -1772,3 +1772,48 @@ ok(w.ctMonthlyTarget().ym==="2026-10","last month not sent yet: last month comes
 w.getToday=gt56;
 w.eval("meetingLogs=[]; dailyVehicleInfo={}"); w.localStorage.removeItem("monthlyReportSent"); w.ctRenderMonthly();
 }
+
+// ---- 57) v17:顧客の設定(非表示の印・追加した顧客)を書き出して、ほかの人のスマホで取り込む(架空の顧客) ----
+{
+ok(!!$("cmShareCard") && $("cmShareOut").textContent==="顧客の設定を書き出す" && $("cmShareIn").textContent==="顧客の設定を取り込む" && $("cmShareKey").type==="password","the customer screen has the share card (key + 書き出す/取り込む)");
+const mBak57=w.localStorage.getItem("customerMaster"), hBak57=w.localStorage.getItem("customerHidden"), uBak57=w.localStorage.getItem("nippoUserName");
+w.localStorage.setItem("customerMaster",JSON.stringify({office:"架空営業所",items:[{n:"架空商事",k:"かくうしょうじ",c:"9001"},{n:"見本工業",k:"みほんこうぎょう",c:"9002"},{n:"試験産業",k:"しけんさんぎょう",c:"9003"}]}));
+w.localStorage.setItem("nippoUserName","架空太郎");
+// 送る人:非表示1件(9001)・追加した顧客2件(画面から足す)
+const add57=(n,c)=>{ $("cmAddName").value=n; $("cmAddKana").value=""; $("cmAddCode").value=c; $("cmAddBtn").click(); };
+add57("追加の店","9101"); add57("名前だけの店","");
+w.localStorage.setItem("customerHidden",JSON.stringify(["c:9001"])); w.ctCustSettingsPlan({hidden:[]});   // 印を読み直す
+const pay57=w.ctCustSettingsPayload();
+ok(pay57.kind==="customerSettings" && pay57.ver===1 && pay57.from==="架空太郎" && pay57.hidden.join()==="c:9001" && pay57.extra.some(e=>e.n==="追加の店" && e.c==="9101") && pay57.extra.some(e=>e.n==="名前だけの店"),"the payload has kind/from/hidden/extra: "+JSON.stringify(pay57.hidden));
+ok(pay57.extra.every(e=>!("id" in e)),"the payload does not carry the phone's own ids");
+// 受け取る人の状態:非表示は 9002 だけ。「追加の店」「名前だけの店」はもうある
+w.localStorage.setItem("customerHidden",JSON.stringify(["c:9002"]));
+const file57={kind:"customerSettings",ver:1,from:"架空太郎",at:"2026-11-18T09:00:00.000Z",hidden:["c:9001","n:名前だけの店","bad"],extra:[{n:"追加の店",k:"",c:"9101"},{n:"名前だけの店",k:"",c:""},{n:"新しい店",k:"あたらしいみせ",c:"9201"},{n:" 見本工業 ",k:"",c:""},{n:"",c:"9300"}]};
+const plan57=w.ctCustSettingsPlan(file57);
+ok(plan57.hidden.length===2 && !plan57.hidden.includes("bad"),"broken hidden keys are ignored");
+ok(plan57.addHide===2 && plan57.removeHide===1,"counts: newly hidden 2, shown again by 'same' 1: "+plan57.addHide+"/"+plan57.removeHide);
+ok(plan57.newExtra.map(e=>e.n).join()==="新しい店" && plan57.extraTotal===5,"only customers not here yet are added (same code or same name are skipped): "+plan57.newExtra.map(e=>e.n).join());
+// 選ぶ画面:件数と3つのボタン。「足すだけ」を押す
+w.ctShowCustSettingsChoice(plan57);
+const sh57=$("ctCsChoice"), tx57=$("ctCsText").textContent;
+ok(!sh57.hidden && tx57.includes("架空太郎さん(11/18)") && tx57.includes("非表示 2件(このスマホで新しく非表示になる 2件)") && tx57.includes("追加した顧客 5件(このスマホに足す 1件") && tx57.includes("1件は、表示に戻ります"),"the choice dialog shows who/when and the counts: "+tx57);
+ok($("ctCsAdd").textContent==="非表示を足すだけ" && $("ctCsReplace").textContent==="送った人と同じにする" && $("ctCsCancel").textContent==="やめる","3 buttons: 足すだけ / 同じにする / やめる");
+$("ctCsAdd").click();
+ok(sh57.hidden,"the dialog closes");
+const h57=JSON.parse(w.localStorage.getItem("customerHidden")).sort().join();
+ok(h57==="c:9001,c:9002,n:名前だけの店","add: the phone's own hidden mark stays: "+h57);
+const e57=JSON.parse(w.localStorage.getItem("customerExtra"));
+ok(e57.filter(e=>e.n==="新しい店" && e.c==="9201" && e.id).length===1,"the new customer is saved with its own id");
+// 同じファイルをもう一度:足すものはない。「同じにする」で、送った人と同じ非表示になる
+const plan57b=w.ctCustSettingsPlan(file57);
+ok(plan57b.newExtra.length===0 && plan57b.addHide===0,"importing the same file again adds nothing");
+w.ctShowCustSettingsChoice(plan57b); $("ctCsReplace").click();
+ok(JSON.parse(w.localStorage.getItem("customerHidden")).sort().join()==="c:9001,n:名前だけの店","replace: hidden marks become the same as the sender's");
+// やめる:何も変えない
+w.ctShowCustSettingsChoice(w.ctCustSettingsPlan({kind:"customerSettings",hidden:[],extra:[{n:"やめた店",c:"9400"}]})); $("ctCsCancel").click();
+ok(!JSON.parse(w.localStorage.getItem("customerExtra")).some(e=>e.n==="やめた店") && JSON.parse(w.localStorage.getItem("customerHidden")).length===2,"cancel changes nothing");
+// 後片付け
+if(mBak57===null) w.localStorage.removeItem("customerMaster"); else w.localStorage.setItem("customerMaster",mBak57);
+if(hBak57===null) w.localStorage.removeItem("customerHidden"); else w.localStorage.setItem("customerHidden",hBak57);
+if(uBak57===null) w.localStorage.removeItem("nippoUserName"); else w.localStorage.setItem("nippoUserName",uBak57);
+}

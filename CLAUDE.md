@@ -29,7 +29,7 @@
 |---|---|
 | `index.html` | 元のアプリ本体(利用者のもの)。ホーム/訪問入力/車両の画面、客先リスト取り込み、日報メール |
 | `container.js` | 追加機能すべて(約20万文字)。`index.html` の最後で読み込む。容器・データ・顧客の管理・天気・各種の手直し |
-| `sw.js` | オフライン用(Service Worker)。保管の名前は `nippo-cache-v16`。大きく作り替えたら、版を上げる(container.js の `APP_VERSION`・`APP_DATE` も合わせる) |
+| `sw.js` | オフライン用(Service Worker)。保管の名前は `nippo-cache-v17`。大きく作り替えたら、版を上げる(container.js の `APP_VERSION`・`APP_DATE` も合わせる) |
 | `customer_list_tool.html` | 顧客リストの暗号化ツール(管理者がPCのブラウザで開く。アプリからは読み込まない。下の「顧客リストの暗号化ツール」)。暗号のコードは `index.html` と同じ文字にする。**消さない** |
 | `manifest.webmanifest`, `icon-180/192/512.png` | ホーム画面に追加するための部品 |
 | `docs/skill-backup/` | アカウントの skill の写し(`nippo-app-change` は、削除した元の1ファイル版 `sales_report.html` 用。今は使わない) |
@@ -48,6 +48,10 @@
 - 暗号のコード(`/* ===CRYPTO-BEGIN=== */` から `CRYPTO-END` まで)は、`index.html` と**同じ文字列**にする。片方を直したら、もう片方も直す(AES-256-GCM、PBKDF2-SHA256 60万回、HKDF で暗号鍵とファイルID)。
 - キー: 全角→半角、大文字化、空白・ハイフン・長音記号を除いて整える。16文字以上。自動生成は20文字。営業所キーはスマホに保存しない。
 - **Access の「非表示」**(v10): CSV の5列目「非表示」(1・-1・True・はい・○ を非表示とみなす。なくてもよい)を読み、ファイル全体に `hidden:1`、非表示の顧客に `h:1` を付ける。画面の表に、担当ごとの非表示の件数。アプリは取り込むとき、スマホに初めて入る顧客は Access に従い、すでにある顧客でスマホの設定と違うものがあるときだけ「非表示の設定」の確認(`#ctHiddenChoice`): [スマホの設定を残す](すでにある顧客はそのまま) / [Access の設定で上書き](ファイルの全員を Access に合わせる)。違いがなければ聞かない。別の担当のリストのときは、[残して足す/入れ替える] のあとに聞く。`hidden` のない古いファイルは、非表示に手を付けない。印は、これまでどおり `customerHidden` に保存(`customerMaster` の各顧客にも `h` が残る)。
+- **顧客の設定を、ほかの人と分ける**(v17。顧客の管理の画面のいちばん下の枠「ほかの人と分ける(非表示・追加した顧客)」`#cmShareCard`): 担当キーの欄(`#cmShareKey`、16文字以上。保存しない)と [顧客の設定を書き出す] / [顧客の設定を取り込む]。同じ担当の人どうしで使う。
+  - 書き出す: `customerHidden` と `customerExtra`(id は入れない)を `{ kind:"customerSettings", ver:1, from(使う人の名前), at, hidden, extra:[{n,k,c}] }` にして、顧客リストと同じ暗号(`deriveMaster`/`encryptMaster`)で鍵をかけ、`顧客の設定_名前_日付.enc` を共有(`saveFile`)。渡すものが無いときは書き出さない。
+  - 取り込む: 担当キーで開く(開けない=「キーが違うか、選んだファイルが違います」。`kind` が違う=「顧客の設定のファイルではありません」)。選ぶ画面 `#ctCsChoice`(`.ct-mchoice`)に、だれの・いつの設定か、非表示の件数(このスマホで新しく非表示になる件数)、追加した顧客の件数(足す件数)、「同じにする」で表示に戻る件数を出し、[非表示を足すだけ](ミント) / [送った人と同じにする](ピンクの枠。非表示を置き換え) / [やめる]。追加した顧客は、顧客コードか名前(`normQ`)が同じ顧客がないものだけ、新しい id で足す。日報・車両・ToDo・容器には触らない。
+  - 顧客リストの取り込みで、このファイルを選んでも `items` が無いので受け付けない(逆も `kind` で断る)。
 - 「すべてダウンロード」: Edge・Chrome では保存先を選ぶ画面(`showDirectoryPicker`)を出し、選んだ場所に `客先名リスト_日付` のフォルダを作って全部の `.enc` を入れる(同じ名前があれば `_2`、`_3`…。今あるものは上書きしない。キーの一覧は入れない)。キャンセルなら何もしない。選べないブラウザは、1つずつダウンロード。
 - 会社語の除去: 客先名から「株式会社」など(34語)、ふりがなから「カブシキカイシャ」などを除く(画面で編集できる)。空になる名前と、同じ名前になる客先は、元のまま。
 
@@ -65,7 +69,7 @@
   - 包んでいる関数: `renderTodoList`, `renderVehicleScreen`, `saveTodos`, `buildReportMail`, `getLatestPastReturnDistance`, `attachTodoDrag`(並べ替えを置き換え), `goToVisit`, `updateNav`, `updateDate`, `deleteData`, `renderMasterUI`, `setMasterMessage`, `showToast`, `confirm`。
   - 追加している画面: `containerScreen`(容器)、`dataScreen`(データ)、`custScreen`(顧客の管理)。ヘッダーに `navContainerButton`、`navDataButton` を足している。
 - 画面の色の統一は、`#tabColors` という `<style>`(`container.js` の中で作る)で上書きしている。
-- テスト用に、`window.ctXxx`(`ctMailAllCsv`, `ctRefreshWeather`, `ctWxStep`, `ctWxView`, `ctEnsureVisible`, `ctRenderBar`, `ctApplyTab`, `ctSetSlot`, `ctSlotNow`, `ctCompactVisits`, `ctMasterMerged`, `ctAccessHiddenPlan`, `ctSetListUse`, `ctDeleteMasterSource`, `ctHomeTypeSuggest`, `ctWxTempColor`, `ctStyleTodoDates`, `ctWxInterval`, `ctWxPageIndex`, `ctWxRestart`, `ctVehicleCardColor`, `ctMailMonthCsv`, `ctMonthData`, `ctRenderMonthly`, `ctOpenUserDialog`, `ctRemoveDoneTodos`, `ctAppVersion`, `ctTodoCode`, `ctTodoFullName`, `ctBundleCsv`, `ctDeleteMonth`, `ctLastWeekday`, `ctMonthlyTarget`, `ctSetLogs`)を公開している。
+- テスト用に、`window.ctXxx`(`ctMailAllCsv`, `ctRefreshWeather`, `ctWxStep`, `ctWxView`, `ctEnsureVisible`, `ctRenderBar`, `ctApplyTab`, `ctSetSlot`, `ctSlotNow`, `ctCompactVisits`, `ctMasterMerged`, `ctAccessHiddenPlan`, `ctSetListUse`, `ctDeleteMasterSource`, `ctHomeTypeSuggest`, `ctWxTempColor`, `ctStyleTodoDates`, `ctWxInterval`, `ctWxPageIndex`, `ctWxRestart`, `ctVehicleCardColor`, `ctMailMonthCsv`, `ctMonthData`, `ctRenderMonthly`, `ctOpenUserDialog`, `ctRemoveDoneTodos`, `ctAppVersion`, `ctTodoCode`, `ctTodoFullName`, `ctBundleCsv`, `ctDeleteMonth`, `ctLastWeekday`, `ctMonthlyTarget`, `ctSetLogs`, `ctCustSettingsPayload`, `ctCustSettingsPlan`, `ctApplyCustSettings`, `ctShowCustSettingsChoice`)を公開している。
   - `#mailButton`(日報メール、本文が文字)は、v12 から**出さない**(`style.display="none"`)。送るのは CSV だけ。本文を作る `buildReportMail` は残してある。
 
 ### 保存データ(localStorage のキー)— **名前を変えない・消さない**
@@ -144,7 +148,7 @@
   - 車両の天気は、最初の言葉1つだけ。位置は「緯度,経度」を小数第5位まで。
   - **ToDoの顧客名は正式な名前**(v15。画面は短い名前のまま): `fullTarget`(短くする前の名前。長押しの編集で名前を変えたら、その名前)→ 元の訪問の訪問先(画面の名前がその短い形と同じときだけ)→ 画面の名前。
 - 「バックアップ保存/戻す」「消す」(送信済み/日報・車両/容器/ToDoリスト。普段は閉じている)。
-- **アプリの版**(v13から): データ画面のいちばん下(天気の表示の下)に、小さな灰色の文字(12px・中央)で「アプリの版 v16 (2026-11-18)」(`#dtVersion`)。数字と日付は `container.js` の `APP_VERSION`・`APP_DATE`。**`sw.js` の `CACHE` の版と同じ数字**にする(自動確認で、ずれていないか見る)。日付は、その版を作った日。iPhoneが新しい版になったかの目印に使う。
+- **アプリの版**(v13から): データ画面のいちばん下(天気の表示の下)に、小さな灰色の文字(12px・中央)で「アプリの版 v17 (2026-11-18)」(`#dtVersion`)。数字と日付は `container.js` の `APP_VERSION`・`APP_DATE`。**`sw.js` の `CACHE` の版と同じ数字**にする(自動確認で、ずれていないか見る)。日付は、その版を作った日。iPhoneが新しい版になったかの目印に使う。
 - 日報メール(ホームのボタン、本文が文字)は、**v12 でやめた**(誰も読んでいないため。ボタンを出さない)。
 - 毎日の「まだ送っていない分を送る」は**自由**(送らなくてよい)。月初の「10月分をまとめて送る」で、その月は全部そろう。
 - **使う人**(v11。データ画面の一番上の枠、ラベンダー): 名前と送り先のメールアドレスを登録(`#ctUserDlg`、`.ct-mchoice` の形)。未登録なら、アプリを開いたときに出す。「あとで」は、開き直すまで出さない(sessionStorage)。全角の英数字・空白は直す。スマホの中だけに保存。
@@ -185,6 +189,6 @@
 ## 7. 変更するときの注意(いつも守ること)
 
 - **保存データを消さない。キー名を変えない。** 変更の前に、データ画面の「バックアップ保存」を押すよう、利用者に伝える。
-- `container.js` を差し替えたら、`sw.js` の `CACHE` の版(今は v16)を上げる。`container.js` の `APP_VERSION`(同じ数字)と `APP_DATE`(作った日)も直す。
+- `container.js` を差し替えたら、`sw.js` の `CACHE` の版(今は v17)を上げる。`container.js` の `APP_VERSION`(同じ数字)と `APP_DATE`(作った日)も直す。
 - 顧客リスト(暗号化)や、顧客の実データを、GitHubに置かない。
 - 「テストで」と言われたら、テスト用のページ(作業用の枝)だけに入れる。**main に入れるのは「main に入れて」と言われたときだけ。**

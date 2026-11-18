@@ -608,6 +608,8 @@ style.textContent = `
   .cm-chk{ display:flex; align-items:center; gap:4px; font-size:12px; color:var(--ink-soft); padding:6px 4px; flex:none; white-space:nowrap; cursor:pointer; }
   .cm-row.is-hidden .cm-name{ color:var(--ink-soft); text-decoration:line-through; }
   .cm-tools{ display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; align-items:center; }
+  .cm-share-note{ font-size:12px; color:var(--ink-soft); line-height:1.6; margin-bottom:8px; }
+  .cm-share-label{ display:block; font-size:12px; color:var(--ink-soft); margin-bottom:6px; }
   .cm-count{ font-size:12px; color:var(--ink-soft); margin-left:auto; }
   .ct-gasbar-wrap{ position:relative; flex:1; min-width:0; background:#FBF1D8; border:1px solid #EEDDB4; border-radius:12px; overflow:hidden; }
   .ct-gasbar{ position:relative; display:grid; grid-auto-flow:row; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:4px; }
@@ -2274,7 +2276,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v16";
+const APP_VERSION = "v17";
 const APP_DATE = "2026-11-18";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -3460,6 +3462,15 @@ custSection.innerHTML = `
     <button type="button" class="btn btn-mint" id="cmAddBtn">追加</button>
     <button type="button" class="btn btn-outline-mint" id="cmAddCancel" style="margin-top:8px;" hidden>やめる</button>
   </div>
+  <div class="card" id="cmShareCard">
+    <div class="dt-title" style="font-size:15px;font-weight:700;margin-bottom:6px;">ほかの人と分ける(非表示・追加した顧客)</div>
+    <div class="cm-share-note">同じ担当の人に、このスマホの非表示の印と追加した顧客を、ファイルで渡します。ファイルには担当キーで鍵をかけます。</div>
+    <label for="cmShareKey" class="cm-share-label">担当キー</label>
+    <input type="password" id="cmShareKey" autocomplete="off" autocapitalize="characters" spellcheck="false" style="margin-bottom:8px;">
+    <button type="button" class="btn btn-mint" id="cmShareOut">顧客の設定を書き出す</button>
+    <button type="button" class="btn btn-outline-mint" id="cmShareIn" style="margin-top:8px;">顧客の設定を取り込む</button>
+    <input type="file" id="cmShareFile" hidden>
+  </div>
 `;
 document.querySelector("main").appendChild(custSection);
 
@@ -3635,6 +3646,141 @@ $("cmAddBtn").addEventListener("click", () => {
   refreshCustomers();
 });
 $("cmAddCancel").addEventListener("click", cmResetAddForm);
+
+/* ---------- 顧客の設定(非表示の印・追加した顧客)を、ほかの人と分ける(v17) ----------
+   ・書き出す: 非表示の印(customerHidden)と追加した顧客(customerExtra)を、担当キーで鍵をかけたファイルにして共有する
+   ・取り込む: 担当キーで開き、件数を見せて [送った人と同じにする](非表示を置き換え) / [非表示を足すだけ] / [やめる] を選ぶ
+   ・追加した顧客は、同じ顧客(顧客コードか名前が同じ)がないものだけ足す。日報・車両・ToDo・容器には触らない
+   ・ファイルの中身は { kind:"customerSettings", ver:1, from, at, hidden:[…], extra:[{n,k,c}] }(顧客リストのファイルとは kind で見分ける) */
+const CS_KIND = "customerSettings";
+function cmShareKeyOk(){
+  const raw = $("cmShareKey").value;
+  if(normalizeKey(raw).length < 16){
+    showToast("担当キーを入れてください(16文字以上)");
+    $("cmShareKey").focus();
+    return null;
+  }
+  if(!(window.crypto && window.crypto.subtle)){ showToast("この画面では鍵をかけられません。https:// のアドレスで開いてください"); return null; }
+  return raw;
+}
+function custSettingsPayload(){
+  return {
+    kind: CS_KIND, ver: 1,
+    from: (localStorage.getItem("nippoUserName") || "").trim(),
+    at: new Date().toISOString(),
+    hidden: [...custHidden],
+    extra: custExtra.map(e => ({ n: e.n, k: e.k || "", c: e.c || "" }))
+  };
+}
+window.ctCustSettingsPayload = custSettingsPayload;
+// 取り込んだときに何が変わるかを数える(まだ保存しない)
+function custSettingsPlan(data){
+  custHidden = new Set(loadJson(CH_KEY, []));                                    // 保存されている最新の印で比べる
+  const inHidden = [...new Set((Array.isArray(data.hidden) ? data.hidden : []).filter(k => typeof k === "string" && /^[cn]:./.test(k)))];
+  const inSet = new Set(inHidden);
+  const addHide = inHidden.filter(k => !custHidden.has(k)).length;                // このスマホで新しく非表示になる
+  const removeHide = [...custHidden].filter(k => !inSet.has(k)).length;           // 「同じにする」で表示に戻る
+  const all = allCustomers();
+  const codes = new Set(all.map(i => i.c).filter(Boolean));
+  const names = new Set(all.map(i => normQ(i.n)));
+  const newExtra = [];
+  const extras = Array.isArray(data.extra) ? data.extra : [];
+  extras.forEach(e => {
+    const n = String((e && e.n) || "").trim();
+    if(!n) return;
+    const c = nfkc((e && e.c) || "").trim(), k = String((e && e.k) || "").trim();
+    if((c && codes.has(c)) || names.has(normQ(n))) return;                        // 同じ顧客がある
+    newExtra.push({ n, k, c });
+    if(c) codes.add(c);
+    names.add(normQ(n));
+  });
+  return { hidden: inHidden, addHide, removeHide, newExtra, extraTotal: extras.length, from: String(data.from || ""), at: String(data.at || "") };
+}
+window.ctCustSettingsPlan = custSettingsPlan;
+// mode: "replace" = 送った人と同じにする / "add" = 非表示を足すだけ
+function applyCustSettings(plan, mode){
+  if(mode === "replace") custHidden = new Set(plan.hidden);
+  else plan.hidden.forEach(k => custHidden.add(k));
+  plan.newExtra.forEach(e => custExtra.push({ id: newId(), n: e.n, k: e.k, c: e.c }));
+  refreshCustomers();
+}
+window.ctApplyCustSettings = applyCustSettings;
+
+$("cmShareOut").addEventListener("click", async () => {
+  const key = cmShareKeyOk();
+  if(!key) return;
+  const data = custSettingsPayload();
+  if(data.hidden.length === 0 && data.extra.length === 0){ showToast("渡す非表示・追加した顧客がありません"); return; }
+  const btn = $("cmShareOut");
+  btn.disabled = true;
+  try{
+    const { aesKey } = await deriveMaster(key);
+    const bytes = await encryptMaster(aesKey, data);
+    const d = new Date(), p = v => String(v).padStart(2, "0");
+    const name = `顧客の設定_${data.from ? data.from + "_" : ""}${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.enc`;
+    const r = await saveFile(name, bytes, "application/octet-stream", false);
+    if(r) showToast(`書き出しました(非表示 ${data.hidden.length}件・追加 ${data.extra.length}件)`);
+  }catch(err){
+    showToast("書き出せませんでした");
+  }finally{
+    btn.disabled = false;
+  }
+});
+$("cmShareIn").addEventListener("click", () => {
+  if(!cmShareKeyOk()) return;
+  $("cmShareFile").click();
+});
+$("cmShareFile").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if(!file) return;
+  const key = cmShareKeyOk();
+  if(!key) return;
+  if(file.size > 20 * 1024 * 1024){ showToast("ファイルが大きすぎます。顧客の設定のファイルを選んでください"); return; }
+  let data;
+  try{
+    const { aesKey } = await deriveMaster(key);
+    data = await decryptMaster(aesKey, await file.arrayBuffer());
+  }catch(err){
+    showToast("キーが違うか、選んだファイルが違います");
+    return;
+  }
+  if(!data || data.kind !== CS_KIND){ showToast("顧客の設定のファイルではありません(顧客リストは、データ画面の顧客リストから取り込みます)"); return; }
+  showCustSettingsChoice(custSettingsPlan(data));
+});
+function showCustSettingsChoice(plan){
+  let sh = $("ctCsChoice");
+  if(!sh){
+    sh = document.createElement("div");
+    sh.id = "ctCsChoice";
+    sh.className = "ct-mchoice";
+    sh.innerHTML = '<div class="ct-mchoice-box"><h3>顧客の設定の取り込み</h3><p id="ctCsText"></p>' +
+      '<button type="button" class="btn btn-mint" id="ctCsAdd">非表示を足すだけ</button>' +
+      '<button type="button" class="btn btn-outline-pink" id="ctCsReplace">送った人と同じにする</button>' +
+      '<button type="button" class="btn-mini" id="ctCsCancel">やめる</button></div>';
+    document.body.appendChild(sh);
+  }
+  const at = plan.at ? new Date(plan.at) : null;
+  const when = (at && !isNaN(at)) ? `${at.getMonth() + 1}/${at.getDate()}` : "";
+  const who = (plan.from ? plan.from + "さん" : "送った人") + (when ? `(${when})` : "");
+  $("ctCsText").textContent =
+    `${who}の設定です。\n` +
+    `・非表示 ${plan.hidden.length.toLocaleString()}件(このスマホで新しく非表示になる ${plan.addHide.toLocaleString()}件)\n` +
+    `・追加した顧客 ${plan.extraTotal.toLocaleString()}件(このスマホに足す ${plan.newExtra.length.toLocaleString()}件。同じ顧客があるものは足しません)\n` +
+    (plan.removeHide > 0 ? `「送った人と同じにする」を選ぶと、このスマホだけで非表示にしていた ${plan.removeHide.toLocaleString()}件は、表示に戻ります。` : "非表示をどうしますか?");
+  $("ctCsText").style.whiteSpace = "pre-line";
+  const done = mode => {
+    sh.hidden = true;
+    applyCustSettings(plan, mode);
+    showToast(`取り込みました(足した顧客 ${plan.newExtra.length}件)`);
+  };
+  $("ctCsAdd").onclick = () => done("add");
+  $("ctCsReplace").onclick = () => done("replace");
+  $("ctCsCancel").onclick = () => { sh.hidden = true; };
+  sh.hidden = false;
+}
+window.ctShowCustSettingsChoice = showCustSettingsChoice;
+
 $("cmBack").addEventListener("click", () => goToData());
 $("dtCustManage").addEventListener("click", goToCust);
 

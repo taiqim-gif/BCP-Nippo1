@@ -1,11 +1,11 @@
-﻿/* =========================================================
+/* =========================================================
    営業日報アプリ Service Worker（sw.js）
    ・最初に電波のある所で開くと、アプリ本体を端末に保管する
    ・次回からは、電波がなくても保管した本体で起動する
    ・電波があるときは最新版を取りに行き、保管内容を更新する
    ※ アプリを大きく作り替えたときは、下の CACHE の v1 → v2 に変える
 ========================================================= */
-const CACHE = "nippo-cache-v16";                         // 版を上げたら、container.js の APP_VERSION・APP_DATE も合わせる
+const CACHE = "nippo-cache-v17";                         // 版を上げたら、container.js の APP_VERSION・APP_DATE も合わせる
 const FONT_CACHE = "nippo-fonts-v1";                    // Google Fonts（見た目用）を保管する入れ物
 const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
 
