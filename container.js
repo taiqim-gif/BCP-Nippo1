@@ -67,6 +67,7 @@ try{ ctLogs = JSON.parse(localStorage.getItem(CT_KEY) || "[]"); }catch(e){ ctLog
 if(!Array.isArray(ctLogs)) ctLogs = [];
 
 function ctSave(){ localStorage.setItem(CT_KEY, JSON.stringify(ctLogs)); }
+window.ctSetLogs = function(a){ ctLogs = a; ctSave(); };   // テスト用(容器ログを入れ替える)
 
 function statusName(code){
   const hit = STATUS_TABLE.find(r => r[0] === Number(code));
@@ -492,10 +493,12 @@ style.textContent = `
   .dt-body[hidden]{ display:none; }
   .dt-item{ background:#fff; border:1px solid rgba(0,0,0,0.07); border-radius:12px; padding:10px; margin-bottom:12px; }
   .dt-item .btn{ font-size:16px; padding:13px 8px; line-height:1.35; }
-  .dt-desc{ font-size:13px; color:var(--ink-soft); margin:7px 2px 0; line-height:1.5; text-align:center; }
+  .dt-desc{ font-size:13px; color:var(--ink-soft); margin:7px 2px 0; line-height:1.5; text-align:center; white-space:pre-line; }
   .dt-state{ font-size:14px; font-weight:700; color:var(--ink); margin:0 2px 12px; }
   .dt-state.warn{ color:var(--pink-ink); }
   .dt-note{ font-size:13px; font-weight:700; color:var(--pink-ink); margin:0 2px 12px; }
+  .dt-sub{ font-size:14px; font-weight:700; color:var(--ink); margin:0 2px 6px; }
+  .dt-item .btn.dt-next{ margin-top:12px; }
   .dt-version{ font-size:12px; color:var(--ink-soft); text-align:center; margin:4px 0 24px; }
   .dt-frame.send{ background:#EEF9F5; border-color:var(--mint-dark); }
   .dt-frame.send .dt-head{ background:var(--mint); color:var(--mint-ink); }
@@ -530,6 +533,9 @@ style.textContent = `
   .ct-gasdir span{ visibility:hidden; }
   .ct-gasdir span.on{ visibility:visible; animation:ctBlink 1s ease-in-out infinite; }
   @keyframes ctBlink{ 0%,100%{ opacity:1; } 50%{ opacity:.15; } }
+  /* 月分を確定して消すボタン：月末の帰社のあと・月初に点滅させる */
+  .ct-attn{ animation:ctAttn 1.2s ease-in-out infinite; }
+  @keyframes ctAttn{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
 
   .ct-hint{ display:inline-flex; align-items:center; gap:26px; }
   .ct-hint-l, .ct-hint-r{ display:inline-flex; align-items:center; gap:6px; }
@@ -1894,11 +1900,15 @@ async function saveFile(name, content, mime, withBom){
 function csvQuote(v){ const t = String(v == null ? "" : v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }
 function csvRows(head, rows){ return [head, ...rows].map(r => r.map(csvQuote).join(",")).join("\r\n"); }
 
-// 複数のCSVを、共有画面からまとめて添付する。共有画面が使えない環境では、1つずつ保存する
+// 複数のファイル(CSV・バックアップ)を、共有画面からまとめて添付する。共有画面が使えない環境では、1つずつ保存する
 async function saveFiles(files, title, text){
-  const blobs = files.map(f => ({ name:f.name, blob:new Blob(["\ufeff" + f.content], { type:"text/csv" }) }));
+  // f.mime を付けないものは CSV(先頭にBOMを付ける)。バックアップ(.json)は mime を付けて渡す(v15)
+  const blobs = files.map(f => {
+    const mime = f.mime || "text/csv";
+    return { name:f.name, mime, blob:new Blob([f.mime ? f.content : "\ufeff" + f.content], { type:mime }) };
+  });
   try{
-    const fl = blobs.map(b => new File([b.blob], b.name, { type:"text/csv" }));
+    const fl = blobs.map(b => new File([b.blob], b.name, { type:b.mime }));
     if(navigator.canShare && navigator.canShare({ files:fl })){
       await navigator.share({ files:fl, title, text });
       return "shared";
@@ -1961,7 +1971,7 @@ function todoCsv(todos){
   const nm = userName();
   return csvRows(
     ["状態","日付","顧客名","内容","対応日","ID","登録日","完了日","担当者","顧客コード"],
-    todos.map(t => [t.done ? "済" : "未対応", formatMonthDay(t.date), t.target, t.content, t.done ? formatCompletedDay(t.completedAt) : "",
+    todos.map(t => [t.done ? "済" : "未対応", formatMonthDay(t.date), todoFullName(t), t.content, t.done ? formatCompletedDay(t.completedAt) : "",
       t.id, t.date || localYmd(t.createdAt), t.done ? localYmd(t.completedAt) : "", nm, todoCode(t)]));
 }
 // ToDoの顧客コード(v14より前のToDoは、元の訪問が残っていれば、そこから。なければ空)
@@ -1973,12 +1983,47 @@ function todoCode(t){
   return log ? (log.customerCode || "") : "";
 }
 window.ctTodoCode = todoCode;
+// ToDoの正式な顧客名(v15。画面は短い名前、CSVは元の名前)。短くする前の名前 → 元の訪問の訪問先 → 画面の名前 の順
+function todoFullName(t){
+  if(t.fullTarget) return t.fullTarget;
+  if(t.source === "line" && t.sourceId){
+    const at = String(t.sourceId).slice(0, String(t.sourceId).lastIndexOf("::"));
+    const log = meetingLogs.find(l => l.createdAt === at);
+    if(log && log.target && (log.target === t.target || shortCustomer(log.target) === t.target)) return log.target;   // 手で名前を直したToDoは、そのまま
+  }
+  return t.target || "";
+}
+window.ctTodoFullName = todoFullName;
 function sortTodosForCsv(list){
   return [...list.filter(t => !t.done).sort(sortByTodoOrder),
     ...list.filter(t => t.done).sort((a, b) => (a.completedAt || a.createdAt || "").localeCompare(b.completedAt || b.createdAt || ""))];
 }
 
-/* 全データ：未送信の訪問・車両・容器と、ToDoリストを、4つのCSVにして、メールで送る(添付) */
+/* ---------- 1つのCSV(v15)：表ごとに、区切りの行 [訪問] [車両] [ToDo] [容器] を入れて、続けて書く ---------- */
+//   parts = [{ label:"訪問", n:件数, text:見出しの行つきのCSV }]。件数が0の表は入れない
+function bundleCsv(parts){
+  return parts.filter(p => p.n > 0).map(p => `[${p.label}]\r\n${p.text}`).join("\r\n");
+}
+window.ctBundleCsv = bundleCsv;
+
+/* ---------- バックアップ(v15 からメールにも添付する。「バックアップ保存」と同じ中身) ---------- */
+function backupJson(){
+  const data = {};
+  BACKUP_KEYS.forEach(k => {
+    const v = localStorage.getItem(k);
+    if(v !== null) data[k] = v;
+  });
+  return JSON.stringify({ app:"eigyo-nippo", version:1, exportedAt:new Date().toISOString(), data });
+}
+function backupPart(){
+  return { name:`営業日報バックアップ_${getToday().replace(/-/g,"")}.json`, content:backupJson(), mime:"application/json" };
+}
+function noteBackup(){
+  try{ localStorage.setItem("lastBackupAt", new Date().toISOString()); }catch(e){ /* 保存できなくても動く */ }
+  try{ renderData(); }catch(e){ /* データ画面がまだ無いとき */ }
+}
+
+/* 毎日：未送信の訪問・車両・容器と、ToDoリストを、1つのCSVにして、バックアップといっしょにメールで送る(添付) */
 const TODO_SENT_IDS_KEY = "todoLastSentIds";   // 最後に送った「完了したToDo」のID(「送信済みにする」で自動保存に移す)
 async function mailAllCsv(){
   const today = getToday(), ymd = today.replace(/-/g, ""), tag = fileTag();
@@ -1986,27 +2031,31 @@ async function mailAllCsv(){
   const vdays = Object.keys(dailyVehicleInfo).filter(k => { const v = dailyVehicleInfo[k]; return v && !v.sentAt && vehicleHasData(v); }).sort();
   const todos = sortTodosForCsv(todoItems);
   const cts = ctLogs.filter(l => !l.sentAt);
-  const files = [];
-  if(visits.length) files.push({ name:`訪問_${tag}${ymd}.csv`, content:visitCsv(visits) });
-  if(vdays.length) files.push({ name:`車両_${tag}${ymd}.csv`, content:vehicleCsv(vdays) });
-  if(todos.length) files.push({ name:`ToDo_${tag}${ymd}.csv`, content:todoCsv(todos) });
-  if(cts.length) files.push({ name:`容器ログ_${tag}${ymd}.csv`, content:csvText(cts) });
-  if(files.length === 0){ showToast("送るデータがありません"); return; }
+  if(visits.length + vdays.length + todos.length + cts.length === 0){ showToast("送るデータがありません"); return; }
+  const files = [
+    { name:`日報_${tag}${ymd}.csv`, content:bundleCsv([
+      { label:"訪問", n:visits.length, text:visits.length ? visitCsv(visits) : "" },
+      { label:"車両", n:vdays.length, text:vdays.length ? vehicleCsv(vdays) : "" },
+      { label:"ToDo", n:todos.length, text:todos.length ? todoCsv(todos) : "" },
+      { label:"容器", n:cts.length, text:cts.length ? csvText(cts) : "" }]) },
+    backupPart()];
   try{ localStorage.setItem(TODO_SENT_IDS_KEY, JSON.stringify(todos.filter(t => t.done).map(t => t.id))); }catch(e){ /* 保存できなくても送れる */ }
   const nm = userName();
   const title = `営業日報 ${today}${nm ? " " + nm : ""}`;
-  const text = `営業日報 ${today}${nm ? " " + nm : ""}\n訪問${visits.length}件・車両${vdays.length}日・ToDo${todos.length}件・容器${cts.length}本(CSVを添付)`;
+  const text = `営業日報 ${today}${nm ? " " + nm : ""}\n訪問${visits.length}件・車両${vdays.length}日・ToDo${todos.length}件・容器${cts.length}本(CSVとバックアップを添付)`;
   const copied = copyMailAddr();
   const r = await saveFiles(files, title, text);
+  if(r) noteBackup();
   if(r === "shared"){
     showToast(copied ? "宛先はコピー済み(貼り付け)。送れたら「送信済みにする」" : "送れたら「送信済みにする」を押してください");
   }else if(r === "downloaded"){
-    window.location.href = `${mailtoHead()}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + "\n(CSVはダウンロードに保存しました。添付してください)")}`;
+    window.location.href = `${mailtoHead()}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + "\n(CSVとバックアップはダウンロードに保存しました。添付してください)")}`;
   }
 }
 window.ctMailAllCsv = mailAllCsv;
 
-/* ---------- 月まとめの送信(運転管理表用)：その月の訪問・車両・ToDoを、送信済みも含めて全部送る ---------- */
+/* ---------- 月まとめの送信(運転管理表用)：その月の訪問・車両・ToDo・容器を、送信済みも含めて全部送る。
+   送れたら、その月の分をスマホから消す(まだ済んでいないToDoは残す) ---------- */
 const MONTHLY_SENT_KEY = "monthlyReportSent";   // 送ったと答えた最後の月("2026-10")
 function prevMonth(ymdStr){
   const y = Number(ymdStr.slice(0, 4)), m = Number(ymdStr.slice(5, 7));
@@ -2024,52 +2073,74 @@ function monthData(ym){
     seen.add(t.id);
     return (t.date || localYmd(t.createdAt)).startsWith(ym) || (t.done && localYmd(t.completedAt).startsWith(ym));
   }));
-  return { visits, vdays, todos };
+  const cts = ctLogs.filter(l => (l.date || "").startsWith(ym));
+  // 消してよい済ToDo：この月のCSVに入っていて、この月までに済ませたもの(今月に済ませた分は、来月の月分で送るので残す)
+  const doneTodos = todos.filter(t => t.done && (localYmd(t.completedAt) || "0000").slice(0, 7) <= ym);
+  return { visits, vdays, todos, cts, doneTodos };
 }
+
+// 月分を送れたあと：その月の訪問・車両・容器と、済ToDo(リストと自動保存の両方)を消す。未済のToDoは残す
+function deleteMonth(ym){
+  const md = monthData(ym);
+  const ids = new Set(md.doneTodos.map(t => t.id));
+  meetingLogs = meetingLogs.filter(l => !(l.date || "").startsWith(ym));
+  Object.keys(dailyVehicleInfo).forEach(k => { if(k.startsWith(ym)) delete dailyVehicleInfo[k]; });
+  ctLogs = ctLogs.filter(l => !(l.date || "").startsWith(ym));
+  persistReport();
+  ctSave();
+  if(ids.size){
+    try{ localStorage.setItem(TODO_ARCHIVE_KEY, JSON.stringify(todoArchive().filter(t => !(t && ids.has(t.id))))); }catch(e){ /* 消せなくても動く */ }
+    todoItems = todoItems.filter(t => !(t && t.done && ids.has(t.id)));
+    if(typeof saveTodos === "function") saveTodos(); else localStorage.setItem("todoItems", JSON.stringify(todoItems));
+  }
+  currentVisit = null;
+  try{ cancelEdit(); }catch(e){ /* 容器の画面がまだ無いとき */ }
+  try{ renderList(); }catch(e){ /* 同上 */ }
+  try{ renderData(); }catch(e){ /* 同上 */ }
+  if(typeof renderReportScreen === "function") try{ renderReportScreen(); }catch(e){ /* 画面がまだ無いとき */ }
+  if(typeof renderVehicleScreen === "function") try{ renderVehicleScreen(); }catch(e){ /* 同上 */ }
+  if(typeof renderTodoList === "function") try{ renderTodoList(); }catch(e){ /* 同上 */ }
+}
+window.ctDeleteMonth = deleteMonth;
 function monthLabel(ym){ return `${Number(ym.slice(5, 7))}月`; }
 async function mailMonthCsv(ym){
   ym = ym || prevMonth(getToday());
   const md = monthData(ym), tag = fileTag(), mk = ym.replace("-", "");
-  const files = [];
-  if(md.visits.length) files.push({ name:`訪問_${tag}${mk}月分.csv`, content:visitCsv(md.visits) });
-  if(md.vdays.length) files.push({ name:`車両_${tag}${mk}月分.csv`, content:vehicleCsv(md.vdays) });
-  if(md.todos.length) files.push({ name:`ToDo_${tag}${mk}月分.csv`, content:todoCsv(md.todos) });
-  if(files.length === 0){ showToast(`${monthLabel(ym)}分のデータがありません`); return; }
+  if(md.visits.length + md.vdays.length + md.todos.length + md.cts.length === 0){ showToast(`${monthLabel(ym)}分のデータがありません`); return; }
+  const files = [
+    { name:`日報_${tag}${mk}月分.csv`, content:bundleCsv([
+      { label:"訪問", n:md.visits.length, text:md.visits.length ? visitCsv(md.visits) : "" },
+      { label:"車両", n:md.vdays.length, text:md.vdays.length ? vehicleCsv(md.vdays) : "" },
+      { label:"ToDo", n:md.todos.length, text:md.todos.length ? todoCsv(md.todos) : "" },
+      { label:"容器", n:md.cts.length, text:md.cts.length ? csvText(md.cts) : "" }]) },
+    backupPart()];
   const nm = userName();
   const title = `運転日報 ${ym.slice(0, 4)}年${monthLabel(ym)}分${nm ? " " + nm : ""}`;
-  const text = `${title}\n訪問${md.visits.length}件・車両${md.vdays.length}日・ToDo${md.todos.length}件(CSVを添付)`;
+  const text = `${title}\n訪問${md.visits.length}件・車両${md.vdays.length}日・ToDo${md.todos.length}件・容器${md.cts.length}本(CSVとバックアップを添付)`;
   const copied = copyMailAddr();
   const r = await saveFiles(files, title, text);
   if(!r) return;                                  // 共有の画面を閉じただけ
+  noteBackup();
   if(r === "downloaded"){
-    window.location.href = `${mailtoHead()}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + "\n(CSVはダウンロードに保存しました。添付してください)")}`;
+    window.location.href = `${mailtoHead()}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + "\n(CSVとバックアップはダウンロードに保存しました。添付してください)")}`;
   }else if(copied){
     showToast("宛先はコピー済みです。宛先に貼り付けてください");
   }
   setTimeout(() => {
-    if(window.confirm(`${monthLabel(ym)}分の運転日報を、送れましたか?\n\n「OK」で、お知らせを消します。`)){
-      try{ if((localStorage.getItem(MONTHLY_SENT_KEY) || "") < ym) localStorage.setItem(MONTHLY_SENT_KEY, ym); }catch(e){ /* 保存できなくても動く */ }
-      renderMonthly();
+    if(!window.confirm(`${monthLabel(ym)}分の運転日報を、送れましたか?\n\n「OK」で、お知らせを消します。`)) return;
+    try{ if((localStorage.getItem(MONTHLY_SENT_KEY) || "") < ym) localStorage.setItem(MONTHLY_SENT_KEY, ym); }catch(e){ /* 保存できなくても動く */ }
+    renderMonthly();
+    // 送れたら、その月の分をスマホから消す(キャンセルなら何も消さない)
+    const d = monthData(ym);
+    if(d.visits.length + d.vdays.length + d.cts.length + d.doneTodos.length === 0) return;
+    if(window.confirm(`${monthLabel(ym)}分を、スマホから消します。\n訪問 ${d.visits.length}件・車両 ${d.vdays.length}日・容器 ${d.cts.length}本・済ToDo ${d.doneTodos.length}件\n(まだ済んでいないToDoは残します)\n\nバックアップは、いま送ったメールに添付しています。\n消しますか?`)){
+      deleteMonth(ym);
+      showToast(`${monthLabel(ym)}分を消しました`);
     }
   }, r === "downloaded" ? 1500 : 300);
 }
 window.ctMailMonthCsv = mailMonthCsv;
 window.ctMonthData = monthData;
-
-/* 容器ログ：未送信の分をCSVにして、共有画面からメールで送る(添付)。共有画面が使えない環境では、保存してメールの下書きを開く */
-async function mailContainerCsv(){
-  const logs = ctLogs.filter(l => !l.sentAt);
-  if(logs.length === 0){ showToast("未送信の容器はありません"); return; }
-  const name = `容器ログ_${getToday().replace(/-/g,"")}.csv`;
-  const r = await saveFile(name, csvText(logs), "text/csv", true);
-  if(r === "shared"){
-    showToast("送れたら「送信済みにする」を押してください");
-  }else if(r === "downloaded"){
-    const subject = `容器ログ ${getToday()}`;
-    const body = "容器ログのCSVを添付してください(ダウンロードに保存しました)";
-    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  }
-}
 
 // 緯度,経度を、小数第5位(約1メートル)までの数字にする。取れていないときは空欄
 function posText(lat, lng, loc){
@@ -2162,14 +2233,9 @@ window.deleteData = function(keepTodos){
    バックアップ(ホーム画面の下部にボタンを追加)
 ========================================================= */
 async function backupExport(){
-  const data = {};
-  BACKUP_KEYS.forEach(k => {
-    const v = localStorage.getItem(k);
-    if(v !== null) data[k] = v;
-  });
-  const obj = { app:"eigyo-nippo", version:1, exportedAt:new Date().toISOString(), data };
-  const r = await saveFile(`営業日報バックアップ_${getToday().replace(/-/g,"")}.json`, JSON.stringify(obj), "application/json", false);
-  if(r){ try{ localStorage.setItem("lastBackupAt", new Date().toISOString()); }catch(e){} renderData(); }
+  const b = backupPart();
+  const r = await saveFile(b.name, b.content, b.mime, false);
+  if(r) noteBackup();
 }
 
 const backupFile = document.createElement("input");
@@ -2208,7 +2274,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v14";
+const APP_VERSION = "v16";
 const APP_DATE = "2026-11-18";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -2242,25 +2308,17 @@ dataSection.innerHTML = `
   <section class="dt-frame send">
     <div class="dt-head">送る</div>
     <div class="dt-body">
+      <div class="dt-sub">毎日(まとめてでもよい)</div>
       <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtMailReport">全データをメール送信<br>(CSV添付)</button>
-        <div class="dt-desc">未送信の全データを送る</div>
+        <button class="btn btn-outline-mint" id="dtMailReport">まだ送っていない分を送る<br>(CSV・バックアップ添付)</button>
+        <div class="dt-desc" id="dtMailReportDesc"></div>
+        <button class="btn btn-mint dt-next" id="dtMarkSent">送れたら押す：送信済みにする</button>
+        <div class="dt-desc">次から送りません(スマホには残ります)</div>
       </div>
+      <div class="dt-sub">月に1回(月初)</div>
       <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtMailMonth">先月分をメール送信<br>(CSV添付)</button>
+        <button class="btn btn-outline-mint" id="dtMailMonth"></button>
         <div class="dt-desc" id="dtMailMonthDesc"></div>
-      </div>
-      <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtMailCsv">容器だけメール送信<br>(CSV添付)</button>
-        <div class="dt-desc" id="dtMailCsvDesc"></div>
-      </div>
-      <div class="dt-item">
-        <button class="btn btn-outline-mint" id="dtCsv">容器だけスマホ保存<br>(CSV保存)</button>
-        <div class="dt-desc" id="dtCsvDesc"></div>
-      </div>
-      <div class="dt-item">
-        <button class="btn btn-mint" id="dtMarkSent">送信済みにする</button>
-        <div class="dt-desc">送ったあとに押す。次から送らない</div>
       </div>
     </div>
   </section>
@@ -3310,6 +3368,7 @@ todoEdit.addEventListener("click", e => {
     const newTarget = $("teTarget").value.trim();
     if(newTarget !== t.target){                    // 顧客名を変えたら、顧客コードも、その名前のコードにする(分からなければ空)
       t.customerCode = typeof resolveCustomerCode === "function" ? resolveCustomerCode(newTarget) : "";
+      t.fullTarget = newTarget;                    // CSVに出す正式な顧客名も、直した名前にする(v15)
     }
     t.target = newTarget;
     t.content = content;
@@ -3767,8 +3826,7 @@ function renderData(){
   $("dtChipV").textContent = `訪問 ${c.visitsUnsent}`;
   $("dtChipD").textContent = `車両 ${c.vehUnsent}`;
   $("dtChipC").textContent = `容器 ${c.ctUnsent}`;
-  $("dtMailCsvDesc").textContent = `未送信 ${c.ctUnsent}本`;
-  $("dtCsvDesc").textContent = `全件 ${c.ct}本を保存`;
+  $("dtMailReportDesc").textContent = `訪問 ${c.visitsUnsent}件・車両 ${c.vehUnsent}日・容器 ${c.ctUnsent}本・ToDo ${c.todoPending + c.todoDone}件`;
   const last = localStorage.getItem("lastBackupAt");
   const el = $("dtLastBackup");
   if(last){
@@ -3787,8 +3845,7 @@ function renderData(){
   $("dtDelContainerDesc").textContent = `${c.ct}本(未送信 ${c.ctUnsent})`;
   $("dtDelTodoDesc").textContent = `未完了 ${c.todoPending}・完了 ${c.todoDone}`;
   renderUserState();
-  const pm = prevMonth(getToday()), pmd = monthData(pm);
-  $("dtMailMonthDesc").textContent = `${monthLabel(pm)}分(運転管理表用)　訪問 ${pmd.visits.length}・車両 ${pmd.vdays.length}`;
+  renderMonthly();                    // 月分のボタン(名前・件数・点滅)は、お知らせと同じ処理で出す
 }
 
 // 「消す」の枠は、見出しをタップして開く（押し間違い防止。画面を開くたびに閉じる）
@@ -3877,13 +3934,8 @@ function delTodo(){
 }
 
 $("dtMailReport").addEventListener("click", mailAllCsv);
-$("dtMailMonth").addEventListener("click", () => mailMonthCsv());
+$("dtMailMonth").addEventListener("click", () => { const t = monthlyTarget(); mailMonthCsv(t ? t.ym : prevMonth(getToday())); });
 $("dtUserEdit").addEventListener("click", () => openUserDialog());
-$("dtMailCsv").addEventListener("click", mailContainerCsv);
-$("dtCsv").addEventListener("click", async () => {
-  if(ctLogs.length === 0){ showToast("容器がありません"); return; }
-  await saveFile(`容器ログ全件_${getToday().replace(/-/g,"")}.csv`, csvText(ctLogs), "text/csv", true);
-});
 $("dtMarkSent").addEventListener("click", markAllSent);
 $("dtBackup").addEventListener("click", backupExport);
 $("dtRestore").addEventListener("click", () => backupFile.click());
@@ -4295,6 +4347,7 @@ if(typeof origRenderVehicleScreen === "function"){
     }catch(e){ /* 初期値を入れられなくても、画面は表示する */ }
     origRenderVehicleScreen();
     applyVehicleCardColor();
+    try{ renderMonthly(); }catch(e){ /* 月末の帰社のあと、月分のボタンを点滅させる(出せなくても画面は動く) */ }
   };
 }
 if($("vehicleDistance")){
@@ -4657,12 +4710,34 @@ renderUserState();
 })();
 
 // 月初のお知らせ：先月の訪問・車両があり、まだ「送った」と答えていないとき、ホームと車両の上に出す
-function renderMonthly(){
-  const pm = prevMonth(getToday());
+// 月の最後の平日(土日を除く。会社の休みはアプリでは分からない)。ym="2026-11" → "2026-11-30"
+function lastWeekday(ym){
+  const y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7));
+  const d = new Date(y, m, 0);                       // その月の末日
+  while(d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+  return `${ym}-${String(d.getDate()).padStart(2,"0")}`;
+}
+window.ctLastWeekday = lastWeekday;
+// 確定して消す月と、点滅させるか。なければ null
+//   月初：先月の分が残っていて、まだ送っていない → 先月(送るまで点滅)
+//   月末：最後の平日に帰社を入れた(または、その日を過ぎた) → 今月(点滅)
+function monthlyTarget(){
+  const today = getToday(), pm = prevMonth(today), cm = today.slice(0, 7);
   let sent = "";
   try{ sent = localStorage.getItem(MONTHLY_SENT_KEY) || ""; }catch(e){ sent = ""; }
-  const md = monthData(pm);
-  const show = sent < pm && (md.visits.length + md.vdays.length) > 0;
+  const has = ym => { const md = monthData(ym); return (md.visits.length + md.vdays.length + md.cts.length) > 0; };
+  if(sent < pm && has(pm)) return { ym:pm, blink:true };      // 先月を先に(今月を送ると、先月のお知らせが出なくなるため)
+  const lw = lastWeekday(cm), v = dailyVehicleInfo[lw];
+  const back = today > lw || !!(v && v.return && v.return.time);
+  if(today >= lw && back && sent < cm && has(cm)) return { ym:cm, blink:true };
+  return null;
+}
+window.ctMonthlyTarget = monthlyTarget;
+function monthlyBtnText(ym){ return `${monthLabel(ym)}分を確定して、スマホから消す`; }
+function renderMonthly(){
+  const tg = monthlyTarget();
+  const pm = tg ? tg.ym : prevMonth(getToday());
+  const show = !!tg;
   ["reportScreen", "vehicleScreen"].forEach(id => {
     const scr = $(id);
     if(!scr) return;
@@ -4671,13 +4746,23 @@ function renderMonthly(){
       b = document.createElement("div");
       b.className = "ct-monthly";
       b.innerHTML = '<div class="ct-monthly-text"></div><button type="button" class="btn btn-mint ct-monthly-send"></button>';
-      b.querySelector(".ct-monthly-send").addEventListener("click", () => mailMonthCsv(prevMonth(getToday())));
+      b.querySelector(".ct-monthly-send").addEventListener("click", () => { const t = monthlyTarget(); mailMonthCsv(t ? t.ym : prevMonth(getToday())); });
       scr.insertBefore(b, scr.firstChild);
     }
     b.hidden = !show;
     b.querySelector(".ct-monthly-text").textContent = `${monthLabel(pm)}分の運転日報を、メールで送ってください`;
-    b.querySelector(".ct-monthly-send").textContent = `${monthLabel(pm)}分を送る(CSV添付)`;
+    const sb = b.querySelector(".ct-monthly-send");
+    sb.textContent = monthlyBtnText(pm);
+    sb.classList.toggle("ct-attn", show);
   });
+  // 送るタブのボタンも、同じ月・同じ点滅にする
+  const mb = $("dtMailMonth");
+  if(mb){
+    mb.innerHTML = `${monthlyBtnText(pm)}<br>(CSV・バックアップ添付)`;
+    mb.classList.toggle("ct-attn", show);
+    const md = monthData(pm);
+    $("dtMailMonthDesc").textContent = `運転管理表用　訪問 ${md.visits.length}・車両 ${md.vdays.length}・容器 ${md.cts.length}・ToDo ${md.todos.length}\n送れたら、${monthLabel(pm)}分をスマホから消します`;
+  }
 }
 window.ctRenderMonthly = renderMonthly;
 renderMonthly();

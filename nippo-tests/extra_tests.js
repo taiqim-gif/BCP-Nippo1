@@ -1707,3 +1707,68 @@ ok(w.ctTodoCode({id:"old",source:"line",sourceId:"vx54::0",target:"架空"})==="
 ok(w.ctTodoCode({id:"old2",source:"line",sourceId:"gone::0",target:"架空"})==="","…and empty when the visit is gone");
 w.eval("todoItems=[]; meetingLogs=[]"); w.localStorage.setItem("todoItems","[]");
 }
+
+// ---- 55) v15:送る枠・1つのCSV・ToDoの正式な顧客名・月分を送ったあとに、その月を消す ----
+{
+$("navDataButton").click();
+const it55=$("dtMailReport").closest(".dt-item");
+ok(it55===$("dtMarkSent").closest(".dt-item"),"「送れたら押す：送信済みにする」 is in the same box as the send button");
+ok([...d.querySelectorAll("#dataScreen .dt-frame.send .dt-sub")].map(e=>e.textContent).join("|")==="毎日(まとめてでもよい)|月に1回(月初)","the send frame has 2 small headings: 毎日 / 月に1回");
+ok(w.ctBundleCsv([{label:"訪問",n:1,text:"a,b\r\n1,2"},{label:"車両",n:0,text:""},{label:"容器",n:1,text:"x"}])==="[訪問]\r\na,b\r\n1,2\r\n[容器]\r\nx","bundle: a section line before each table; empty tables are left out");
+// ToDoの正式な顧客名
+w.eval('meetingLogs=[{createdAt:"vx55",date:"2026-11-04",number:1,target:"架空商事株式会社",content:"見積"}]');
+ok(w.ctTodoFullName({target:"架空商",fullTarget:"架空商事株式会社"})==="架空商事株式会社","the CSV uses the name before shortening");
+ok(w.ctTodoFullName({target:"架空商",source:"line",sourceId:"vx55::0"})==="架空商事株式会社","an older ToDo gets the full name from its visit");
+ok(w.ctTodoFullName({target:"別の名前",source:"line",sourceId:"vx55::0"})==="別の名前","a ToDo whose name was changed by hand keeps that name");
+ok(w.ctTodoFullName({target:"手書き"})==="手書き","a hand-written ToDo keeps its name");
+// 月分を送ったあとに消す:その月だけ。未済のToDoと、来月に済ませたToDoは残す
+w.eval('meetingLogs=[{createdAt:"s1",date:"2026-09-03",number:1,target:"A"},{createdAt:"s2",date:"2026-10-01",number:1,target:"B"}]');
+w.eval('dailyVehicleInfo={"2026-09-03":{departure:{time:"2026-09-03T08:00",distance:"10"}},"2026-10-01":{departure:{time:"2026-10-01T08:00",distance:"20"}}}');
+w.ctSetLogs(eval('[{id:"k1",date:"2026-09-03",time:"10:00",status:"2",symbol:"A",number:"1",customer:"A",gas:"酸素",gasCode:"O2",capacity:"7",unit:"㎥"},{id:"k2",date:"2026-10-02",time:"10:00",status:"2",symbol:"A",number:"2",customer:"B",gas:"酸素",gasCode:"O2",capacity:"7",unit:"㎥"}]'));
+w.eval('todoItems=[{id:"p1",date:"2026-09-02",target:"A",content:"未",done:false,order:1},{id:"p2",date:"2026-09-02",target:"A",content:"済9月",done:true,order:2,completedAt:"2026-09-05T03:00:00.000Z"},{id:"p3",date:"2026-09-02",target:"A",content:"済10月",done:true,order:3,completedAt:"2026-10-05T03:00:00.000Z"}]');
+w.localStorage.setItem("todoArchive",JSON.stringify([{id:"q1",date:"2026-09-01",done:true,completedAt:"2026-09-02T03:00:00.000Z"},{id:"q2",date:"2026-10-01",done:true,completedAt:"2026-10-02T03:00:00.000Z"}]));
+const md55=w.ctMonthData("2026-09");
+ok(md55.cts.length===1 && md55.doneTodos.map(t=>t.id).sort().join()==="p2,q1","the month data has the container logs; deletable = finished by the end of the month: "+md55.doneTodos.map(t=>t.id).join());
+w.ctDeleteMonth("2026-09");
+ok(w.eval("meetingLogs").map(l=>l.createdAt).join()==="s2" && Object.keys(w.eval("dailyVehicleInfo")).filter(k=>k<"2026-10-02").join()==="2026-10-01" && JSON.parse(w.localStorage.getItem("containerLogs")).map(l=>l.id).join()==="k2","only that month's visits, vehicle days and container logs are deleted");
+ok(w.eval("todoItems").map(t=>t.id).join()==="p1,p3" && JSON.parse(w.localStorage.getItem("todoArchive")).map(t=>t.id).join()==="q2","unfinished ToDos stay; ToDos finished next month stay");
+ok(JSON.parse(w.localStorage.getItem("containerLogs")).map(l=>l.id).join()==="k2" && JSON.parse(w.localStorage.getItem("todoItems")).map(t=>t.id).join()==="p1,p3","the deletion is saved");
+w.eval("todoItems=[]; meetingLogs=[]; dailyVehicleInfo={}"); w.ctSetLogs([]); w.localStorage.setItem("todoItems","[]"); w.localStorage.removeItem("todoArchive");
+}
+
+// ---- 56) v16:月分のボタン「○月分を確定して、スマホから消す」。月末の最後の平日に帰社を入れたら・月初は送るまで点滅 ----
+{
+ok(w.ctLastWeekday("2026-10")==="2026-10-30" && w.ctLastWeekday("2026-11")==="2026-11-30" && w.ctLastWeekday("2027-01")==="2027-01-29","the last weekday of the month (Sat/Sun are skipped)");
+const gt56=w.getToday; let today56="2026-10-30"; w.getToday=()=>today56;
+w.localStorage.setItem("monthlyReportSent","2026-09");
+w.eval('meetingLogs=[{createdAt:"t1",date:"2026-10-30",number:1,target:"A"}]');
+w.eval('dailyVehicleInfo={"2026-10-30":{departure:{time:"2026-10-30T08:00",distance:"10"},return:{}}}');
+w.ctRenderMonthly();
+const bn56=$("reportScreen").querySelector(".ct-monthly");
+ok(w.ctMonthlyTarget()===null && bn56.hidden,"the last weekday, before 帰社: no notice");
+w.eval('dailyVehicleInfo["2026-10-30"].return={time:"2026-10-30T17:00",distance:"50"}');
+w.renderVehicleScreen();
+const t56=w.ctMonthlyTarget();
+ok(!!t56 && t56.ym==="2026-10" && t56.blink,"after 帰社 on the last weekday: this month, blinking");
+const sb56=bn56.querySelector(".ct-monthly-send");
+ok(!bn56.hidden && sb56.textContent==="10月分を確定して、スマホから消す" && sb56.classList.contains("ct-attn"),"the notice button has the new name and blinks: "+sb56.textContent);
+$("navDataButton").click();
+ok($("dtMailMonth").innerHTML==="10月分を確定して、スマホから消す<br>(CSV・バックアップ添付)" && $("dtMailMonth").classList.contains("ct-attn"),"the 送る tab button: same name, blinking: "+$("dtMailMonth").innerHTML);
+today56="2026-10-29"; w.ctRenderMonthly();
+ok(w.ctMonthlyTarget()===null && !$("dtMailMonth").classList.contains("ct-attn") && $("dtMailMonth").innerHTML.startsWith("9月分を確定して"),"a day before: no blink (the button is for last month)");
+today56="2026-10-31"; w.eval('dailyVehicleInfo["2026-10-30"].return={}');
+ok(!!w.ctMonthlyTarget() && w.ctMonthlyTarget().ym==="2026-10","the day after the last weekday: blinking even without 帰社");
+// 月初:先月が残っていれば、出発を入れたあとも、送るまで点滅
+today56="2026-11-02"; w.eval('dailyVehicleInfo["2026-11-02"]={departure:{time:"2026-11-02T08:00",distance:"60"},return:{}}');
+w.ctRenderMonthly();
+ok(w.ctMonthlyTarget().ym==="2026-10" && sb56.classList.contains("ct-attn") && !bn56.hidden,"month start, after 出発: still blinking for last month");
+// 月末に送ったら、翌月の初めには出さない
+w.localStorage.setItem("monthlyReportSent","2026-10"); w.ctRenderMonthly();
+ok(w.ctMonthlyTarget()===null && bn56.hidden && !$("dtMailMonth").classList.contains("ct-attn"),"sent at month-end: no notice at the start of next month");
+// 先月が残っているときは、月末でも先月を先に
+today56="2026-11-30"; w.localStorage.setItem("monthlyReportSent","2026-09");
+w.eval('dailyVehicleInfo["2026-11-30"]={departure:{time:"2026-11-30T08:00",distance:"60"},return:{time:"2026-11-30T17:00",distance:"90"}}');
+ok(w.ctMonthlyTarget().ym==="2026-10","last month not sent yet: last month comes first");
+w.getToday=gt56;
+w.eval("meetingLogs=[]; dailyVehicleInfo={}"); w.localStorage.removeItem("monthlyReportSent"); w.ctRenderMonthly();
+}
