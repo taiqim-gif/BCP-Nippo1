@@ -2276,7 +2276,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v17";
+const APP_VERSION = "v18";
 const APP_DATE = "2026-11-18";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -3463,8 +3463,8 @@ custSection.innerHTML = `
     <button type="button" class="btn btn-outline-mint" id="cmAddCancel" style="margin-top:8px;" hidden>やめる</button>
   </div>
   <div class="card" id="cmShareCard">
-    <div class="dt-title" style="font-size:15px;font-weight:700;margin-bottom:6px;">ほかの人と分ける(非表示・追加した顧客)</div>
-    <div class="cm-share-note">同じ担当の人に、このスマホの非表示の印と追加した顧客を、ファイルで渡します。ファイルには担当キーで鍵をかけます。</div>
+    <div class="dt-title" style="font-size:15px;font-weight:700;margin-bottom:6px;">他の人にコピーする(顧客リスト・非表示・追加した顧客)</div>
+    <div class="cm-share-note">このスマホの顧客リスト・非表示の印・追加した顧客を、ファイルにして、同じ担当の人や新しいスマホにコピーします。取り込む側は、無いものだけ足します。ファイルには担当キーで鍵をかけます。</div>
     <label for="cmShareKey" class="cm-share-label">担当キー</label>
     <input type="password" id="cmShareKey" autocomplete="off" autocapitalize="characters" spellcheck="false" style="margin-bottom:8px;">
     <button type="button" class="btn btn-mint" id="cmShareOut">顧客の設定を書き出す</button>
@@ -3647,11 +3647,13 @@ $("cmAddBtn").addEventListener("click", () => {
 });
 $("cmAddCancel").addEventListener("click", cmResetAddForm);
 
-/* ---------- 顧客の設定(非表示の印・追加した顧客)を、ほかの人と分ける(v17) ----------
-   ・書き出す: 非表示の印(customerHidden)と追加した顧客(customerExtra)を、担当キーで鍵をかけたファイルにして共有する
+/* ---------- 顧客の設定(顧客リスト・非表示の印・追加した顧客)を、他の人にコピーする(v17、v18で顧客リストも) ----------
+   ・書き出す: 顧客リスト(customerMaster)・非表示の印(customerHidden)・追加した顧客(customerExtra)を、担当キーで鍵をかけたファイルにして共有する
    ・取り込む: 担当キーで開き、件数を見せて [送った人と同じにする](非表示を置き換え) / [非表示を足すだけ] / [やめる] を選ぶ
-   ・追加した顧客は、同じ顧客(顧客コードか名前が同じ)がないものだけ足す。日報・車両・ToDo・容器には触らない
-   ・ファイルの中身は { kind:"customerSettings", ver:1, from, at, hidden:[…], extra:[{n,k,c}] }(顧客リストのファイルとは kind で見分ける) */
+   ・顧客リストと追加した顧客は、どちらを選んでも、同じ顧客(顧客コードか名前が同じ)がないものだけ足す(このスマホの顧客は残す)
+   ・日報・車両・ToDo・容器には触らない
+   ・ファイルの中身は { kind:"customerSettings", ver:2, from, at, hidden:[…], extra:[{n,k,c}], master:{office,updated,items,sources} }
+     (顧客リストのファイルとは kind で見分ける。master の無い v17 のファイルも取り込める) */
 const CS_KIND = "customerSettings";
 function cmShareKeyOk(){
   const raw = $("cmShareKey").value;
@@ -3664,13 +3666,16 @@ function cmShareKeyOk(){
   return raw;
 }
 function custSettingsPayload(){
-  return {
-    kind: CS_KIND, ver: 1,
+  const raw = rawMaster();
+  const data = {
+    kind: CS_KIND, ver: 2,
     from: (localStorage.getItem("nippoUserName") || "").trim(),
     at: new Date().toISOString(),
     hidden: [...custHidden],
     extra: custExtra.map(e => ({ n: e.n, k: e.k || "", c: e.c || "" }))
   };
+  if(raw && Array.isArray(raw.items) && raw.items.length) data.master = raw;     // 顧客リスト(全部の顧客。リストごとの印も)
+  return data;
 }
 window.ctCustSettingsPayload = custSettingsPayload;
 // 取り込んだときに何が変わるかを数える(まだ保存しない)
@@ -3683,6 +3688,28 @@ function custSettingsPlan(data){
   const all = allCustomers();
   const codes = new Set(all.map(i => i.c).filter(Boolean));
   const names = new Set(all.map(i => normQ(i.n)));
+  // 顧客リスト(v18):このスマホに無い顧客(顧客コードも名前も違う)だけ足す
+  const masterAdd = [];
+  let masterSrcs = [], masterTotal = 0;
+  const sm = data.master;
+  if(sm && Array.isArray(sm.items) && sm.items.length){
+    masterSrcs = masterSources(sm).filter(x => x && typeof x === "object").map(x => ({ office: String(x.office || ""), updated: String(x.updated || "") }));
+    if(!masterSrcs.length) masterSrcs = [{ office: "", updated: "" }];
+    const offices = new Set(masterSrcs.map(x => x.office)), first = masterSrcs[0].office;
+    sm.items.forEach(i => {
+      const n = String((i && i.n) || "").trim();
+      if(!n) return;
+      masterTotal++;
+      const c = String(i.c || "").trim();
+      if((c && codes.has(c)) || names.has(normQ(n))) return;                     // 同じ顧客がある(このスマホの方を残す)
+      const o = (i.o != null && offices.has(String(i.o))) ? String(i.o) : first;
+      const item = { n, k: String(i.k || ""), c, o };
+      if(i.h) item.h = 1;
+      masterAdd.push(item);
+      if(c) codes.add(c);
+      names.add(normQ(n));
+    });
+  }
   const newExtra = [];
   const extras = Array.isArray(data.extra) ? data.extra : [];
   extras.forEach(e => {
@@ -3694,11 +3721,19 @@ function custSettingsPlan(data){
     if(c) codes.add(c);
     names.add(normQ(n));
   });
-  return { hidden: inHidden, addHide, removeHide, newExtra, extraTotal: extras.length, from: String(data.from || ""), at: String(data.at || "") };
+  return { hidden: inHidden, addHide, removeHide, newExtra, extraTotal: extras.length, masterAdd, masterSrcs, masterTotal, from: String(data.from || ""), at: String(data.at || "") };
 }
 window.ctCustSettingsPlan = custSettingsPlan;
-// mode: "replace" = 送った人と同じにする / "add" = 非表示を足すだけ
+// mode: "replace" = 送った人と同じにする / "add" = 非表示を足すだけ(顧客リストは、どちらでも足すだけ)
 function applyCustSettings(plan, mode){
+  if(plan.masterAdd && plan.masterAdd.length){
+    const prev = rawMaster(), has = !!(prev && Array.isArray(prev.items) && prev.items.length);
+    const pSrcs = has ? masterSources(prev) : [], pFirst = pSrcs[0] ? pSrcs[0].office : "";
+    const base = has ? prev.items.map(i => Object.assign({}, i, { o: i.o != null ? i.o : pFirst })) : [];
+    const srcs = pSrcs.map(x => ({ office: x.office, updated: x.updated })).concat(plan.masterSrcs.filter(x => !pSrcs.some(p => p.office === x.office)));
+    try{ localStorage.setItem("customerMaster", JSON.stringify(buildMaster(srcs, base.concat(plan.masterAdd)))); }
+    catch(e){ showToast("顧客リストを保存できませんでした(スマホの空きが足りないかもしれません)"); }
+  }
   if(mode === "replace") custHidden = new Set(plan.hidden);
   else plan.hidden.forEach(k => custHidden.add(k));
   plan.newExtra.forEach(e => custExtra.push({ id: newId(), n: e.n, k: e.k, c: e.c }));
@@ -3710,7 +3745,7 @@ $("cmShareOut").addEventListener("click", async () => {
   const key = cmShareKeyOk();
   if(!key) return;
   const data = custSettingsPayload();
-  if(data.hidden.length === 0 && data.extra.length === 0){ showToast("渡す非表示・追加した顧客がありません"); return; }
+  if(!data.master && data.hidden.length === 0 && data.extra.length === 0){ showToast("コピーする顧客リスト・非表示・追加した顧客がありません"); return; }
   const btn = $("cmShareOut");
   btn.disabled = true;
   try{
@@ -3719,7 +3754,7 @@ $("cmShareOut").addEventListener("click", async () => {
     const d = new Date(), p = v => String(v).padStart(2, "0");
     const name = `顧客の設定_${data.from ? data.from + "_" : ""}${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.enc`;
     const r = await saveFile(name, bytes, "application/octet-stream", false);
-    if(r) showToast(`書き出しました(非表示 ${data.hidden.length}件・追加 ${data.extra.length}件)`);
+    if(r) showToast(`書き出しました(顧客リスト ${data.master ? data.master.items.length : 0}件・非表示 ${data.hidden.length}件・追加 ${data.extra.length}件)`);
   }catch(err){
     showToast("書き出せませんでした");
   }finally{
@@ -3765,6 +3800,7 @@ function showCustSettingsChoice(plan){
   const who = (plan.from ? plan.from + "さん" : "送った人") + (when ? `(${when})` : "");
   $("ctCsText").textContent =
     `${who}の設定です。\n` +
+    (plan.masterTotal > 0 ? `・顧客リスト ${plan.masterTotal.toLocaleString()}件(このスマホに足す ${plan.masterAdd.length.toLocaleString()}件。同じ顧客があるものは足しません)\n` : "") +
     `・非表示 ${plan.hidden.length.toLocaleString()}件(このスマホで新しく非表示になる ${plan.addHide.toLocaleString()}件)\n` +
     `・追加した顧客 ${plan.extraTotal.toLocaleString()}件(このスマホに足す ${plan.newExtra.length.toLocaleString()}件。同じ顧客があるものは足しません)\n` +
     (plan.removeHide > 0 ? `「送った人と同じにする」を選ぶと、このスマホだけで非表示にしていた ${plan.removeHide.toLocaleString()}件は、表示に戻ります。` : "非表示をどうしますか?");
@@ -3772,7 +3808,7 @@ function showCustSettingsChoice(plan){
   const done = mode => {
     sh.hidden = true;
     applyCustSettings(plan, mode);
-    showToast(`取り込みました(足した顧客 ${plan.newExtra.length}件)`);
+    showToast(plan.masterTotal > 0 ? `取り込みました(顧客リストに足した ${plan.masterAdd.length}件・追加した顧客 ${plan.newExtra.length}件)` : `取り込みました(足した顧客 ${plan.newExtra.length}件)`);
   };
   $("ctCsAdd").onclick = () => done("add");
   $("ctCsReplace").onclick = () => done("replace");
