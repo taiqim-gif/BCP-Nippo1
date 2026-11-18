@@ -952,7 +952,7 @@ const csv31=await Promise.all(shared31.files.map(rd31));
 ok(csv31[0].split("\r\n")[0]==="日付,番号,顧客コード,訪問先,開始時刻,終了時刻,面談者,敬称,内容,特記事項,開始位置,終了位置,ID,担当者","訪問.csv header (ID and 担当者 at the end)");
 ok(csv31[0].includes('"配達：A,B\n""重要"""') && csv31[0].includes('"43.06212,141.35424","43.06230,141.35401"') && !csv31[0].includes("送信済み商店"),"訪問.csv: commas/newlines/quotes are quoted; positions included; already-sent visits are left out");
 ok(csv31[1].split("\r\n")[0]==="日付,出発時刻,出発距離,帰社時刻,帰社距離,給油量,出発位置,帰社位置,天気,担当者" && csv31[1].includes('2026-10-08,08:00,1000,17:00,1100,20,"43.10000,141.20000",,くもり,') && !/最高|最低|晴れ/.test(csv31[1]),"車両.csv: times, distances, fuel, positions and ONE weather word (くもり) - even from an older saved record");
-ok(csv31[2].split("\r\n")[0]==="状態,日付,顧客名,内容,対応日,ID,登録日,完了日,担当者" && csv31[2].includes("未対応,10/8,北ガス,配達,,t1,2026-10-08,,") && /済,10\/7,札ガス,見積,\d+\/\d+/.test(csv31[2]),"ToDo.csv: unfinished and finished items");
+ok(csv31[2].split("\r\n")[0]==="状態,日付,顧客名,内容,対応日,ID,登録日,完了日,担当者,顧客コード" && csv31[2].includes("未対応,10/8,北ガス,配達,,t1,2026-10-08,,") && /済,10\/7,札ガス,見積,\d+\/\d+/.test(csv31[2]),"ToDo.csv: unfinished and finished items");
 ok(csv31[3].split("\r\n")[0]==="日付,時刻,区分コード,区分,記号,番号,顧客コード,顧客名,ガス種コード,ガス種,容量,単位" && csv31[3].includes("山田ガス店"),"容器ログ.csv: the same format as the container-only CSV");
 const bom31=await new Promise(r=>{ const fr=new w.FileReader(); fr.onload=()=>r([...new Uint8Array(fr.result).slice(0,3)]); fr.readAsArrayBuffer(shared31.files[0]); });
 ok(bom31.join()==="239,187,191","files start with a BOM (Excel opens the Japanese text correctly)");
@@ -1693,4 +1693,17 @@ ok(/^v\d+$/.test(av53.version) && /^\d{4}-\d{2}-\d{2}$/.test(av53.date),"version
 ok(v53.textContent==="アプリの版 "+av53.version+" ("+av53.date+")","it shows 'アプリの版 v○○ (日付)' (half-width brackets)");
 const sw53=require("fs").readFileSync(require("path").join("..","sw.js"),"utf8").match(/nippo-cache-(v\d+)/);
 ok(!!sw53 && sw53[1]===av53.version,"the number is the same as the sw.js CACHE ("+(sw53&&sw53[1])+")");
+}
+// ---- 54) ToDoの顧客コード(v14):訪問の内容から作ったToDoは、その訪問の顧客コードを覚え、ToDo.csv の右端に出す ----
+{
+w.eval('meetingLogs=[{createdAt:"vx54",date:"2026-11-04",number:1,target:"架空商事株式会社",customerCode:"5005",content:"見積を出す"}]');
+w.eval('todoItems=[{id:"c1",date:"2026-11-04",target:"架空商事株式会社",content:"見積を出す",done:false,source:"line",sourceId:"vx54::0",order:1,createdAt:new Date().toISOString()},{id:"c2",date:"2026-11-04",target:"",content:"手で書いた",done:false,source:"manual",order:2}]');
+w.saveTodos();
+const c54=w.eval('todoItems.find(t=>t.id==="c1")');
+ok(c54.customerCode==="5005","a ToDo made from a visit line keeps the visit's customer code");
+ok(c54.target!=="架空商事株式会社","(the customer name is still shortened as before: "+c54.target+")");
+ok(w.ctTodoCode(w.eval('todoItems.find(t=>t.id==="c2")'))==="","a hand-written ToDo has no code");
+ok(w.ctTodoCode({id:"old",source:"line",sourceId:"vx54::0",target:"架空"})==="5005","an older ToDo (no code saved) gets the code from its visit if the visit is still there");
+ok(w.ctTodoCode({id:"old2",source:"line",sourceId:"gone::0",target:"架空"})==="","…and empty when the visit is gone");
+w.eval("todoItems=[]; meetingLogs=[]"); w.localStorage.setItem("todoItems","[]");
 }
