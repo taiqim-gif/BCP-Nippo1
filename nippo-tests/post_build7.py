@@ -83,7 +83,7 @@ ok(w.localStorage.getItem("monthlyReportSent")===pm50 && bnH.hidden && bnV.hidde
 $("navDataButton").click();
 ok(/訪問 1・車両 1/.test($("dtMailMonthDesc").textContent),"データ → 先月分をメール送信 shows the counts: "+$("dtMailMonthDesc").textContent);''', r'''$("navDataButton").click();
 ok(/訪問 1・車両 1・容器 \d+・ToDo 1/.test($("dtMailMonthDesc").textContent) && /スマホから消します/.test($("dtMailMonthDesc").textContent),"データ → the monthly button shows the counts: "+$("dtMailMonthDesc").textContent);
-ok($("dtMailMonth").innerHTML===`${pmLabel}分をまとめて送る<br>(CSV・バックアップ添付)`,"the monthly button has the month name: "+$("dtMailMonth").innerHTML);
+ok($("dtMailMonth").innerHTML===`${pmLabel}分を確定して、スマホから消す<br>(CSV・バックアップ添付)`,"the monthly button has the month name (v16): "+$("dtMailMonth").innerHTML);
 confirmAnswer=true; const c50c=confirms.length;
 bnH.querySelector(".ct-monthly-send").click(); await sleep(600);
 ok(w.localStorage.getItem("monthlyReportSent")===pm50 && bnH.hidden && bnV.hidden,"'OK' hides the notice until the next month");

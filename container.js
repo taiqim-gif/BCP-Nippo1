@@ -533,6 +533,9 @@ style.textContent = `
   .ct-gasdir span{ visibility:hidden; }
   .ct-gasdir span.on{ visibility:visible; animation:ctBlink 1s ease-in-out infinite; }
   @keyframes ctBlink{ 0%,100%{ opacity:1; } 50%{ opacity:.15; } }
+  /* 月分を確定して消すボタン：月末の帰社のあと・月初に点滅させる */
+  .ct-attn{ animation:ctAttn 1.2s ease-in-out infinite; }
+  @keyframes ctAttn{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
 
   .ct-hint{ display:inline-flex; align-items:center; gap:26px; }
   .ct-hint-l, .ct-hint-r{ display:inline-flex; align-items:center; gap:6px; }
@@ -2271,7 +2274,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v15";
+const APP_VERSION = "v16";
 const APP_DATE = "2026-11-18";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -3842,9 +3845,7 @@ function renderData(){
   $("dtDelContainerDesc").textContent = `${c.ct}本(未送信 ${c.ctUnsent})`;
   $("dtDelTodoDesc").textContent = `未完了 ${c.todoPending}・完了 ${c.todoDone}`;
   renderUserState();
-  const pm = prevMonth(getToday()), pmd = monthData(pm);
-  $("dtMailMonth").innerHTML = `${monthLabel(pm)}分をまとめて送る<br>(CSV・バックアップ添付)`;
-  $("dtMailMonthDesc").textContent = `運転管理表用　訪問 ${pmd.visits.length}・車両 ${pmd.vdays.length}・容器 ${pmd.cts.length}・ToDo ${pmd.todos.length}\n送れたら、${monthLabel(pm)}分をスマホから消します`;
+  renderMonthly();                    // 月分のボタン(名前・件数・点滅)は、お知らせと同じ処理で出す
 }
 
 // 「消す」の枠は、見出しをタップして開く（押し間違い防止。画面を開くたびに閉じる）
@@ -3933,7 +3934,7 @@ function delTodo(){
 }
 
 $("dtMailReport").addEventListener("click", mailAllCsv);
-$("dtMailMonth").addEventListener("click", () => mailMonthCsv());
+$("dtMailMonth").addEventListener("click", () => { const t = monthlyTarget(); mailMonthCsv(t ? t.ym : prevMonth(getToday())); });
 $("dtUserEdit").addEventListener("click", () => openUserDialog());
 $("dtMarkSent").addEventListener("click", markAllSent);
 $("dtBackup").addEventListener("click", backupExport);
@@ -4346,6 +4347,7 @@ if(typeof origRenderVehicleScreen === "function"){
     }catch(e){ /* 初期値を入れられなくても、画面は表示する */ }
     origRenderVehicleScreen();
     applyVehicleCardColor();
+    try{ renderMonthly(); }catch(e){ /* 月末の帰社のあと、月分のボタンを点滅させる(出せなくても画面は動く) */ }
   };
 }
 if($("vehicleDistance")){
@@ -4708,12 +4710,34 @@ renderUserState();
 })();
 
 // 月初のお知らせ：先月の訪問・車両があり、まだ「送った」と答えていないとき、ホームと車両の上に出す
-function renderMonthly(){
-  const pm = prevMonth(getToday());
+// 月の最後の平日(土日を除く。会社の休みはアプリでは分からない)。ym="2026-11" → "2026-11-30"
+function lastWeekday(ym){
+  const y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7));
+  const d = new Date(y, m, 0);                       // その月の末日
+  while(d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+  return `${ym}-${String(d.getDate()).padStart(2,"0")}`;
+}
+window.ctLastWeekday = lastWeekday;
+// 確定して消す月と、点滅させるか。なければ null
+//   月初：先月の分が残っていて、まだ送っていない → 先月(送るまで点滅)
+//   月末：最後の平日に帰社を入れた(または、その日を過ぎた) → 今月(点滅)
+function monthlyTarget(){
+  const today = getToday(), pm = prevMonth(today), cm = today.slice(0, 7);
   let sent = "";
   try{ sent = localStorage.getItem(MONTHLY_SENT_KEY) || ""; }catch(e){ sent = ""; }
-  const md = monthData(pm);
-  const show = sent < pm && (md.visits.length + md.vdays.length) > 0;
+  const has = ym => { const md = monthData(ym); return (md.visits.length + md.vdays.length + md.cts.length) > 0; };
+  if(sent < pm && has(pm)) return { ym:pm, blink:true };      // 先月を先に(今月を送ると、先月のお知らせが出なくなるため)
+  const lw = lastWeekday(cm), v = dailyVehicleInfo[lw];
+  const back = today > lw || !!(v && v.return && v.return.time);
+  if(today >= lw && back && sent < cm && has(cm)) return { ym:cm, blink:true };
+  return null;
+}
+window.ctMonthlyTarget = monthlyTarget;
+function monthlyBtnText(ym){ return `${monthLabel(ym)}分を確定して、スマホから消す`; }
+function renderMonthly(){
+  const tg = monthlyTarget();
+  const pm = tg ? tg.ym : prevMonth(getToday());
+  const show = !!tg;
   ["reportScreen", "vehicleScreen"].forEach(id => {
     const scr = $(id);
     if(!scr) return;
@@ -4722,13 +4746,23 @@ function renderMonthly(){
       b = document.createElement("div");
       b.className = "ct-monthly";
       b.innerHTML = '<div class="ct-monthly-text"></div><button type="button" class="btn btn-mint ct-monthly-send"></button>';
-      b.querySelector(".ct-monthly-send").addEventListener("click", () => mailMonthCsv(prevMonth(getToday())));
+      b.querySelector(".ct-monthly-send").addEventListener("click", () => { const t = monthlyTarget(); mailMonthCsv(t ? t.ym : prevMonth(getToday())); });
       scr.insertBefore(b, scr.firstChild);
     }
     b.hidden = !show;
     b.querySelector(".ct-monthly-text").textContent = `${monthLabel(pm)}分の運転日報を、メールで送ってください`;
-    b.querySelector(".ct-monthly-send").textContent = `${monthLabel(pm)}分をまとめて送る(CSV添付)`;
+    const sb = b.querySelector(".ct-monthly-send");
+    sb.textContent = monthlyBtnText(pm);
+    sb.classList.toggle("ct-attn", show);
   });
+  // 送るタブのボタンも、同じ月・同じ点滅にする
+  const mb = $("dtMailMonth");
+  if(mb){
+    mb.innerHTML = `${monthlyBtnText(pm)}<br>(CSV・バックアップ添付)`;
+    mb.classList.toggle("ct-attn", show);
+    const md = monthData(pm);
+    $("dtMailMonthDesc").textContent = `運転管理表用　訪問 ${md.visits.length}・車両 ${md.vdays.length}・容器 ${md.cts.length}・ToDo ${md.todos.length}\n送れたら、${monthLabel(pm)}分をスマホから消します`;
+  }
 }
 window.ctRenderMonthly = renderMonthly;
 renderMonthly();
