@@ -1956,14 +1956,23 @@ function vehicleCsv(vdays){
     vdays.map(k => { const v = dailyVehicleInfo[k], d = v.departure || {}, r = v.return || {}, w = wx[k] || {};
       return [k, formatTimeOnly(d.time), d.distance, formatTimeOnly(r.time), r.distance, r.fuel, posText(d.lat, d.lng, d.location), posText(r.lat, r.lng, r.location), wxFirstWord(w.text), nm]; }));
 }
-// ToDo：右の4列(ID・登録日・完了日・担当者)は、パソコンの取り込みツール用(年まで入れる。同じToDoを二重に入れない)
+// ToDo：右の5列(ID・登録日・完了日・担当者・顧客コード)は、パソコンの取り込みツール用(年まで入れる。同じToDoを二重に入れない)
 function todoCsv(todos){
   const nm = userName();
   return csvRows(
-    ["状態","日付","顧客名","内容","対応日","ID","登録日","完了日","担当者"],
+    ["状態","日付","顧客名","内容","対応日","ID","登録日","完了日","担当者","顧客コード"],
     todos.map(t => [t.done ? "済" : "未対応", formatMonthDay(t.date), t.target, t.content, t.done ? formatCompletedDay(t.completedAt) : "",
-      t.id, t.date || localYmd(t.createdAt), t.done ? localYmd(t.completedAt) : "", nm]));
+      t.id, t.date || localYmd(t.createdAt), t.done ? localYmd(t.completedAt) : "", nm, todoCode(t)]));
 }
+// ToDoの顧客コード(v14より前のToDoは、元の訪問が残っていれば、そこから。なければ空)
+function todoCode(t){
+  if(t.customerCode !== undefined) return t.customerCode || "";
+  if(t.source !== "line" || !t.sourceId) return "";
+  const at = String(t.sourceId).slice(0, String(t.sourceId).lastIndexOf("::"));
+  const log = meetingLogs.find(l => l.createdAt === at);
+  return log ? (log.customerCode || "") : "";
+}
+window.ctTodoCode = todoCode;
 function sortTodosForCsv(list){
   return [...list.filter(t => !t.done).sort(sortByTodoOrder),
     ...list.filter(t => t.done).sort((a, b) => (a.completedAt || a.createdAt || "").localeCompare(b.completedAt || b.createdAt || ""))];
@@ -2199,7 +2208,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v13";
+const APP_VERSION = "v14";
 const APP_DATE = "2026-11-18";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -3298,7 +3307,11 @@ todoEdit.addEventListener("click", e => {
   if(e.target.closest("#teSave")){
     const content = $("teContent").value.trim();
     if(!content){ showToast("内容を入力してください"); return; }
-    t.target = $("teTarget").value.trim();
+    const newTarget = $("teTarget").value.trim();
+    if(newTarget !== t.target){                    // 顧客名を変えたら、顧客コードも、その名前のコードにする(分からなければ空)
+      t.customerCode = typeof resolveCustomerCode === "function" ? resolveCustomerCode(newTarget) : "";
+    }
+    t.target = newTarget;
     t.content = content;
     t.shortDone = true;                            // 自分で直した顧客名は、短く変えない
     afterTodoEdit("更新しました");
@@ -4349,6 +4362,12 @@ const origSaveTodos = window.saveTodos;
 if(typeof origSaveTodos === "function"){
   window.saveTodos = function(){
     todoItems.forEach(t => {
+      // 顧客コード(v14):訪問の内容から作ったToDoは、その訪問の顧客コードを覚える(顧客名は短くするので、パソコンでつなぐ目印にする)
+      if(t && t.customerCode === undefined && t.source === "line" && t.sourceId){
+        const at = String(t.sourceId).slice(0, String(t.sourceId).lastIndexOf("::"));
+        const log = (typeof meetingLogs !== "undefined" ? meetingLogs : []).find(l => l.createdAt === at);
+        if(log) t.customerCode = log.customerCode || "";
+      }
       if(t && t.source === "line" && !t.shortDone && (t.createdAt || "") >= todoShortFrom){
         t.fullTarget = t.target;
         t.target = shortCustomer(t.target);
