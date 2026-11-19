@@ -2091,3 +2091,27 @@ ok(osc63===1 && vib63.join()==="8","switching tabs: a small コッ and an 8ms bu
 $("navHomeButton").click();
 delete w.navigator.vibrate;
 }
+
+// ---- 64) v24:画面に戻ったあと・起こしても動かないときは、音の部品を作り直す ----
+{
+let made64=0, closed64=0, osc64=0, nextState64="running";
+const P64={setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}};
+w.AudioContext=class{ constructor(){ made64++; this.currentTime=0; this.destination={}; this.state=nextState64; }
+  createOscillator(){ osc64++; return {frequency:P64,connect(){},start(){},stop(){}}; } createGain(){ return {gain:P64,connect(){}}; } createBiquadFilter(){ return {frequency:P64,connect(){}}; }
+  resume(){ return w.Promise.resolve(); } close(){ closed64++; this.state="closed"; return w.Promise.resolve(); } };
+w.ctFxReset(); w.localStorage.removeItem("fxSound"); w.localStorage.removeItem("fxVibe");
+w.ctPlayFx("coin");
+ok(made64===1 && osc64===3,"first sound makes one audio part");
+d.body.click();
+ok(made64===1 && closed64===0,"a tap without returning to the app keeps the same part");
+w.ctFxMarkStale(); d.body.click();
+ok(made64===2 && closed64===1,"after returning to the app, the first tap makes a new part (the old one is closed)");
+osc64=0; w.ctPlayFx("coin");
+ok(made64===2 && osc64===3,"the sound plays on the new part");
+// 起こしても動かない(resume のあとも interrupted のまま)→ 作り直して鳴らす
+w.ctFxReset(); made64=0; closed64=0; osc64=0;
+nextState64="interrupted"; w.ctPlayFx("coin"); nextState64="running";
+ok(osc64===0,"nothing is scheduled on a part that is not running");
+await sleep(10);
+ok(made64===2 && closed64===1 && osc64===3,"a part that will not wake up is replaced and the sound still plays");
+}
