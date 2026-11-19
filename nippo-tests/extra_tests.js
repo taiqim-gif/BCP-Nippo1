@@ -2006,3 +2006,32 @@ ok(osc60.length===0,"やり直す with nothing recorded: no sound");
 w.confirm=cf60; w.eval('vehicleViewMode="x"');
 delete w.navigator.vibrate;
 }
+
+// ---- 61) v21:訪問履歴の□(ToDoに追加/外す)の音、起こし直してから鳴らす ----
+{
+let osc61=0, vib61=[], st61="running", pend61=null;
+class FN61{ constructor(){ const p={setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}}; this.frequency=p; this.gain=p; } connect(){} start(){} stop(){} }
+w.AudioContext=class{ constructor(){ this.currentTime=0; this.destination={}; } get state(){ return st61; } createOscillator(){ osc61++; return new FN61(); } createGain(){ return new FN61(); } createBiquadFilter(){ return new FN61(); } resume(){ return new w.Promise(res=>{ pend61=()=>{ st61="running"; res(); }; }); } };
+Object.defineProperty(w.navigator,"vibrate",{value:p=>{ vib61.push(JSON.stringify(p)); return true; },configurable:true});
+w.ctFxReset();
+w.localStorage.removeItem("fxSound"); w.localStorage.removeItem("fxVibe");
+const box61=d.createElement("div"); d.body.appendChild(box61);
+box61.innerHTML='<input type="checkbox" class="content-line-checkbox" data-source="x::0">';
+box61.addEventListener("change",e=>e.stopPropagation(),true);   // 元のアプリの処理は動かさない
+const cb61=box61.querySelector("input");
+osc61=0; vib61=[]; cb61.checked=true; cb61.dispatchEvent(new w.Event("change",{bubbles:true}));
+ok(osc61===2 && vib61.join()==="20","visit line □ on (ToDo added): ピコン and a 20ms buzz");
+osc61=0; vib61=[]; cb61.checked=false; cb61.dispatchEvent(new w.Event("change",{bubbles:true}));
+ok(osc61===2 && vib61.join()==="10","visit line □ off (ToDo removed): ポロン and a 10ms buzz");
+w.localStorage.setItem("fxSound","0");
+osc61=0; cb61.checked=true; cb61.dispatchEvent(new w.Event("change",{bubbles:true}));
+ok(osc61===0,"sound OFF: the visit line □ is silent");
+w.localStorage.removeItem("fxSound");
+box61.remove();
+// 止まっている(interrupted)ときは、起きてから鳴らす
+st61="interrupted"; osc61=0; w.ctPlayFx("record");
+ok(osc61===0,"while the audio is waking up, nothing is scheduled yet");
+pend61(); await sleep(10);
+ok(osc61===2,"after waking up, the sound plays");
+delete w.navigator.vibrate;
+}

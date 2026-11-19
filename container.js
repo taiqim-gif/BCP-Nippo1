@@ -2283,7 +2283,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v20";
+const APP_VERSION = "v21";
 const APP_DATE = "2026-11-19";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -5082,18 +5082,31 @@ const FX_SOUNDS = {
     { type:"sine", f0:3136, at:0.24, dur:0.25, vol:0.03 }],
   redo: [   // 車両の「やり直す」：巻き戻す「ピュルッ↓」(v20)
     { type:"sine", f0:1400, f1:500, at:0, dur:0.20, vol:0.14 },
-    { type:"sine", f0:700, f1:350, at:0.18, dur:0.15, vol:0.10 }]
+    { type:"sine", f0:700, f1:350, at:0.18, dur:0.15, vol:0.10 }],
+  lineAdd: [    // 訪問履歴の□で ToDo に追加：「ピコン↑」(v21)
+    { type:"sine", f0:784, f1:1175, at:0, dur:0.08, glide:0.06, vol:0.16 },
+    { type:"sine", f0:1568, at:0.08, dur:0.16, vol:0.12 }],
+  lineRemove: [ // 訪問履歴の□を外して ToDo から消す：「ポロン↓」(v21)
+    { type:"triangle", f0:988, f1:659, at:0, dur:0.10, vol:0.16 },
+    { type:"triangle", f0:523, at:0.09, dur:0.18, vol:0.12 }]
 };
 function fxSound(kind){
   const list = FX_SOUNDS[kind];
   if(!list) return;
   const ctx = fxAudio();
   if(!ctx) return;
-  try{ list.forEach(o => fxTone(ctx, o)); }catch(e){ /* 鳴らなくても続ける */ }
+  const play = () => { try{ list.forEach(o => fxTone(ctx, o)); }catch(e){ /* 鳴らなくても続ける */ } };
+  // 起こし直している途中(iPhone)は、起きてから鳴らす(v21。止まったままの時計に予定を入れると、鳴らないことがある)
+  if(ctx.state !== "running" && typeof ctx.resume === "function"){
+    let p = null;
+    try{ p = ctx.resume(); }catch(e){ p = null; }
+    if(p && typeof p.then === "function"){ p.then(play, play); return; }
+  }
+  play();
 }
 
 // バイブ
-const FX_VIBES = { coin:30, undo:15, depart:[30, 50, 60], return:[60, 50, 30], record:25, send:[20, 40, 20], redo:[15, 30, 15] };
+const FX_VIBES = { coin:30, undo:15, depart:[30, 50, 60], return:[60, 50, 30], record:25, send:[20, 40, 20], redo:[15, 30, 15], lineAdd:20, lineRemove:10 };
 const fxIsIOS = /iPhone|iPad|iPod/.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 let fxTap = null;
 function fxIosTap(){
@@ -5135,6 +5148,7 @@ document.addEventListener("change", e => {
   if(!t || !t.classList) return;
   if(t.classList.contains("todo-complete") && t.checked) playFx("coin");       // ToDoを実行済に
   else if(t.classList.contains("todo-undo") && !t.checked) playFx("undo");     // 終了したToDoを戻す
+  else if(t.classList.contains("content-line-checkbox")) playFx(t.checked ? "lineAdd" : "lineRemove");   // 訪問履歴の□(v21)
 }, true);
 document.addEventListener("click", e => {
   const el = e.target && e.target.closest ? e.target.closest("#homeStartButton, #endButton, #vehicleSaveButton") : null;
