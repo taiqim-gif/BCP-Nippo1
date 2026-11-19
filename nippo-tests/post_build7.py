@@ -116,3 +116,10 @@ a='<input type="text" id="homeVisitTarget" placeholder="例：〇〇商店"></di
 assert h.count(a)==1, h.count(a)
 h=h.replace(a,a+'<div class="customer-list" id="customerList" style="display:none;"></div>')
 open("harness4.html","w",encoding="utf-8").write(h)
+
+# v20: 車両の「やり直す」ボタン(本物の index.html と同じ働き:確認 OK で、今の区分の時刻を消す)
+h=open("harness4.html",encoding="utf-8").read()
+a='<button id="endButton">記録終了</button>'
+assert h.count(a)==1, h.count(a)
+h=h.replace(a,a+'<button id="vehicleResetButton">やり直す</button><script>document.getElementById("vehicleResetButton").addEventListener("click",()=>{ if(!window.confirm("やり直しますか？")) return; const v=getTodayVehicle(); const leg=v[vehicleViewMode]; leg.time=""; leg.location=""; });</script>')
+open("harness4.html","w",encoding="utf-8").write(h)

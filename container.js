@@ -1403,6 +1403,7 @@ function saveFromForm(){
     ctLogs.push(Object.assign({ id:newId(), time:nowHM() }, f, { customerCode: code, customerKana: kana, createdAt:new Date().toISOString() }));
     showToast(`${statusName(f.status)}を記録しました`);
   }
+  playFx("record");                      // v20：記録・更新できたら「ポコン♪」
   ctSave();
   trackCustomer(f.customer);
   const fg = GAS_TABLE.find(g => g.code === f.gasCode);
@@ -2037,6 +2038,7 @@ async function mailAllCsv(){
   const todos = sortTodosForCsv(todoItems);
   const cts = ctLogs.filter(l => !l.sentAt);
   if(visits.length + vdays.length + todos.length + cts.length === 0){ showToast("送るデータがありません"); return; }
+  playFx("send");                                  // v20：送る音(送るデータがあるときだけ)
   const files = [
     { name:`日報_${tag}${ymd}.csv`, content:bundleCsv([
       { label:"訪問", n:visits.length, text:visits.length ? visitCsv(visits) : "" },
@@ -2112,6 +2114,7 @@ async function mailMonthCsv(ym){
   ym = ym || prevMonth(getToday());
   const md = monthData(ym), tag = fileTag(), mk = ym.replace("-", "");
   if(md.visits.length + md.vdays.length + md.todos.length + md.cts.length === 0){ showToast(`${monthLabel(ym)}分のデータがありません`); return; }
+  playFx("send");                                  // v20：送る音
   const files = [
     { name:`日報_${tag}${mk}月分.csv`, content:bundleCsv([
       { label:"訪問", n:md.visits.length, text:md.visits.length ? visitCsv(md.visits) : "" },
@@ -2280,7 +2283,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v19";
+const APP_VERSION = "v20";
 const APP_DATE = "2026-11-19";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -5027,7 +5030,9 @@ function fxAudio(){
   const AC = window.AudioContext || window.webkitAudioContext;
   if(!AC) return null;
   if(!fxCtx){ try{ fxCtx = new AC(); }catch(e){ return null; } }
-  if(fxCtx.state === "suspended"){ try{ fxCtx.resume(); }catch(e){ /* 鳴らなくても続ける */ } }
+  if(fxCtx.state === "closed"){ try{ fxCtx = new AC(); }catch(e){ return null; } }
+  // iPhoneは、確認の画面(OK/キャンセル)のあと "interrupted" になって鳴らなくなる。running 以外は起こし直す(v20)
+  if(fxCtx.state !== "running"){ try{ fxCtx.resume(); }catch(e){ /* 鳴らなくても続ける */ } }
   return fxCtx;
 }
 // 1つの音：type=波の形、f0→f1(高さを滑らせる)、at=始まり(秒)、dur=長さ、vol=大きさ、lp=[こもり具合の始め,終わり]
@@ -5059,15 +5064,25 @@ const FX_SOUNDS = {
   undo: [   // 明るく短い「ピロッ♪」
     { type:"sine", f0:1047, f1:1397, at:0, dur:0.08, vol:0.16 },
     { type:"sine", f0:1568, at:0.085, dur:0.14, vol:0.14 }],
-  depart: [ // 未来風の上がる音(起動していく感じ)
-    { type:"sawtooth", f0:180, f1:1250, at:0, dur:0.62, glide:0.55, vol:0.08, lp:[500, 4500] },
-    { type:"sine", f0:362, f1:2500, at:0, dur:0.62, glide:0.55, vol:0.05 },
-    { type:"triangle", f0:1568, at:0.55, dur:0.32, vol:0.08 },
-    { type:"sine", f0:2349, at:0.55, dur:0.36, vol:0.04 }],
-  return: [ // 未来風の下がる音(着陸・停止する感じ)
-    { type:"sawtooth", f0:1250, f1:160, at:0, dur:0.75, glide:0.70, vol:0.08, lp:[4500, 450] },
-    { type:"sine", f0:2500, f1:322, at:0, dur:0.75, glide:0.70, vol:0.05 },
-    { type:"sine", f0:196, at:0.66, dur:0.40, vol:0.10 }]
+  depart: [ // 未来風の上がる音(起動していく感じ)。v20 で約2倍の大きさに
+    { type:"sawtooth", f0:180, f1:1250, at:0, dur:0.62, glide:0.55, vol:0.16, lp:[500, 4500] },
+    { type:"sine", f0:362, f1:2500, at:0, dur:0.62, glide:0.55, vol:0.10 },
+    { type:"triangle", f0:1568, at:0.55, dur:0.32, vol:0.16 },
+    { type:"sine", f0:2349, at:0.55, dur:0.36, vol:0.08 }],
+  return: [ // 未来風の下がる音(着陸・停止する感じ)。v20 で約2倍の大きさに
+    { type:"sawtooth", f0:1250, f1:160, at:0, dur:0.75, glide:0.70, vol:0.16, lp:[4500, 450] },
+    { type:"sine", f0:2500, f1:322, at:0, dur:0.75, glide:0.70, vol:0.10 },
+    { type:"sine", f0:196, at:0.66, dur:0.40, vol:0.20 }],
+  record: [ // 容器の「記録する」：はずむ「ポコン♪」(v20)
+    { type:"sine", f0:587, f1:880, at:0, dur:0.09, glide:0.05, vol:0.18 },
+    { type:"triangle", f0:1175, at:0.07, dur:0.16, vol:0.12 }],
+  send: [   // メール送信：上へ飛んでいく「シュワーン♪」(v20)
+    { type:"sine", f0:500, f1:2000, at:0, dur:0.30, glide:0.25, vol:0.10 },
+    { type:"triangle", f0:2093, at:0.24, dur:0.30, vol:0.08 },
+    { type:"sine", f0:3136, at:0.24, dur:0.25, vol:0.03 }],
+  redo: [   // 車両の「やり直す」：巻き戻す「ピュルッ↓」(v20)
+    { type:"sine", f0:1400, f1:500, at:0, dur:0.20, vol:0.14 },
+    { type:"sine", f0:700, f1:350, at:0.18, dur:0.15, vol:0.10 }]
 };
 function fxSound(kind){
   const list = FX_SOUNDS[kind];
@@ -5078,7 +5093,7 @@ function fxSound(kind){
 }
 
 // バイブ
-const FX_VIBES = { coin:30, undo:15, depart:[30, 50, 60], return:[60, 50, 30] };
+const FX_VIBES = { coin:30, undo:15, depart:[30, 50, 60], return:[60, 50, 30], record:25, send:[20, 40, 20], redo:[15, 30, 15] };
 const fxIsIOS = /iPhone|iPad|iPod/.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 let fxTap = null;
 function fxIosTap(){
@@ -5112,6 +5127,7 @@ function playFx(kind){
   if(fxOn(FX_VIBE_KEY)) fxVibe(kind);
 }
 window.ctPlayFx = playFx;
+window.ctFxReset = function(){ fxCtx = null; };   // テスト用(音の部品を作り直す)
 
 // いつ鳴らすか(元のアプリの処理より先に聞く＝指で押したその時に鳴らす)
 document.addEventListener("change", e => {
@@ -5132,6 +5148,15 @@ document.addEventListener("click", e => {
     playFx(typeof vehicleViewMode !== "undefined" && vehicleViewMode === "return" ? "return" : "depart");   // 出発・帰社
   }
 }, true);
+// 車両の「やり直す」(v20)：確認で OK を押して、記録の時刻が消えたときだけ鳴らす
+(function(){
+  const btn = $("vehicleResetButton");
+  if(!btn) return;
+  let had = false;
+  const legTime = () => { try{ const v = getTodayVehicle(); const leg = v && v[vehicleViewMode]; return leg ? (leg.time || "") : ""; }catch(e){ return ""; } };
+  document.addEventListener("click", e => { if(e.target === btn || (e.target.closest && e.target.closest("#vehicleResetButton"))) had = !!legTime(); }, true);   // 元の処理の前
+  btn.addEventListener("click", () => { if(had && !legTime()) playFx("redo"); had = false; });                                   // 元の処理の後
+})();
 
 // データ画面の切り替えボタン
 function renderFxButtons(){
