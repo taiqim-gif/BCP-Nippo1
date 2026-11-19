@@ -2283,7 +2283,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v21";
+const APP_VERSION = "v22";
 const APP_DATE = "2026-11-19";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -5036,7 +5036,7 @@ function fxAudio(){
   return fxCtx;
 }
 // 1つの音：type=波の形、f0→f1(高さを滑らせる)、at=始まり(秒)、dur=長さ、vol=大きさ、lp=[こもり具合の始め,終わり]
-function fxTone(ctx, o){
+function fxTone(ctx, o, dest){
   const t = ctx.currentTime + (o.at || 0), end = t + o.dur;
   const osc = ctx.createOscillator(), g = ctx.createGain();
   osc.type = o.type || "sine";
@@ -5053,7 +5053,7 @@ function fxTone(ctx, o){
     f.frequency.exponentialRampToValueAtTime(o.lp[1], end);
     osc.connect(f); last = f;
   }
-  last.connect(g); g.connect(ctx.destination);
+  last.connect(g); g.connect(dest || ctx.destination);
   osc.start(t); osc.stop(end + 0.02);
 }
 const FX_SOUNDS = {
@@ -5064,15 +5064,15 @@ const FX_SOUNDS = {
   undo: [   // 明るく短い「ピロッ♪」
     { type:"sine", f0:1047, f1:1397, at:0, dur:0.08, vol:0.16 },
     { type:"sine", f0:1568, at:0.085, dur:0.14, vol:0.14 }],
-  depart: [ // 未来風の上がる音(起動していく感じ)。v20 で約2倍の大きさに
-    { type:"sawtooth", f0:180, f1:1250, at:0, dur:0.62, glide:0.55, vol:0.16, lp:[500, 4500] },
-    { type:"sine", f0:362, f1:2500, at:0, dur:0.62, glide:0.55, vol:0.10 },
-    { type:"triangle", f0:1568, at:0.55, dur:0.32, vol:0.16 },
-    { type:"sine", f0:2349, at:0.55, dur:0.36, vol:0.08 }],
-  return: [ // 未来風の下がる音(着陸・停止する感じ)。v20 で約2倍の大きさに
-    { type:"sawtooth", f0:1250, f1:160, at:0, dur:0.75, glide:0.70, vol:0.16, lp:[4500, 450] },
-    { type:"sine", f0:2500, f1:322, at:0, dur:0.75, glide:0.70, vol:0.10 },
-    { type:"sine", f0:196, at:0.66, dur:0.40, vol:0.20 }],
+  depart: [ // 未来風の上がる音(起動していく感じ)。v22 で最初の約3倍の大きさ(割れないよう、抑える部品を通す)
+    { type:"sawtooth", f0:180, f1:1250, at:0, dur:0.62, glide:0.55, vol:0.24, lp:[500, 4500] },
+    { type:"sine", f0:362, f1:2500, at:0, dur:0.62, glide:0.55, vol:0.15 },
+    { type:"triangle", f0:1568, at:0.55, dur:0.32, vol:0.24 },
+    { type:"sine", f0:2349, at:0.55, dur:0.36, vol:0.12 }],
+  return: [ // 未来風の下がる音(着陸・停止する感じ)。v22 で最初の約3倍の大きさ(同上)
+    { type:"sawtooth", f0:1250, f1:160, at:0, dur:0.75, glide:0.70, vol:0.24, lp:[4500, 450] },
+    { type:"sine", f0:2500, f1:322, at:0, dur:0.75, glide:0.70, vol:0.15 },
+    { type:"sine", f0:196, at:0.66, dur:0.40, vol:0.30 }],
   record: [ // 容器の「記録する」：はずむ「ポコン♪」(v20)
     { type:"sine", f0:587, f1:880, at:0, dur:0.09, glide:0.05, vol:0.18 },
     { type:"triangle", f0:1175, at:0.07, dur:0.16, vol:0.12 }],
@@ -5095,7 +5095,19 @@ function fxSound(kind){
   if(!list) return;
   const ctx = fxAudio();
   if(!ctx) return;
-  const play = () => { try{ list.forEach(o => fxTone(ctx, o)); }catch(e){ /* 鳴らなくても続ける */ } };
+  const play = () => {
+    try{
+      let dest = null;
+      // 大きい音(出発・帰社)は、割れないように抑える部品を通す(v22)
+      if((kind === "depart" || kind === "return") && typeof ctx.createDynamicsCompressor === "function"){
+        dest = ctx.createDynamicsCompressor();
+        dest.threshold.value = -10; dest.knee.value = 6; dest.ratio.value = 12;
+        dest.attack.value = 0.003; dest.release.value = 0.25;
+        dest.connect(ctx.destination);
+      }
+      list.forEach(o => fxTone(ctx, o, dest));
+    }catch(e){ /* 鳴らなくても続ける */ }
+  };
   // 起こし直している途中(iPhone)は、起きてから鳴らす(v21。止まったままの時計に予定を入れると、鳴らないことがある)
   if(ctx.state !== "running" && typeof ctx.resume === "function"){
     let p = null;
