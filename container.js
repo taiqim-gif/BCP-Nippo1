@@ -2283,7 +2283,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v22";
+const APP_VERSION = "v23";
 const APP_DATE = "2026-11-19";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -5088,7 +5088,17 @@ const FX_SOUNDS = {
     { type:"sine", f0:1568, at:0.08, dur:0.16, vol:0.12 }],
   lineRemove: [ // 訪問履歴の□を外して ToDo から消す：「ポロン↓」(v21)
     { type:"triangle", f0:988, f1:659, at:0, dur:0.10, vol:0.16 },
-    { type:"triangle", f0:523, at:0.09, dur:0.18, vol:0.12 }]
+    { type:"triangle", f0:523, at:0.09, dur:0.18, vol:0.12 }],
+  add: [    // 追加：明るく短い「ポンッ↑」(v23)
+    { type:"sine", f0:660, f1:990, at:0, dur:0.10, glide:0.04, vol:0.18 },
+    { type:"sine", f0:1320, at:0.05, dur:0.10, vol:0.08 }],
+  edit: [   // 修正：2回の短い「ピピッ」(v23)
+    { type:"sine", f0:1760, at:0, dur:0.05, vol:0.12 },
+    { type:"sine", f0:1760, at:0.09, dur:0.06, vol:0.12 }],
+  del: [    // 削除：下がるやわらかい「シュッ↓」(v23)
+    { type:"triangle", f0:900, f1:200, at:0, dur:0.18, vol:0.16, lp:[3000, 400] }],
+  tab: [    // タブの切り替え：小さな「コッ」(v23)
+    { type:"sine", f0:1000, f1:700, at:0, dur:0.04, vol:0.10 }]
 };
 function fxSound(kind){
   const list = FX_SOUNDS[kind];
@@ -5118,7 +5128,8 @@ function fxSound(kind){
 }
 
 // バイブ
-const FX_VIBES = { coin:30, undo:15, depart:[30, 50, 60], return:[60, 50, 30], record:25, send:[20, 40, 20], redo:[15, 30, 15], lineAdd:20, lineRemove:10 };
+const FX_VIBES = { coin:30, undo:15, depart:[30, 50, 60], return:[60, 50, 30], record:25, send:[20, 40, 20], redo:[15, 30, 15], lineAdd:20, lineRemove:10,
+  add:20, edit:[10, 40, 10], del:25, tab:8 };
 const fxIsIOS = /iPhone|iPad|iPod/.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 let fxTap = null;
 function fxIosTap(){
@@ -5147,7 +5158,9 @@ function fxVibe(kind){
 }
 
 // 鳴らす・ふるえる(設定に従う)
+let fxLastAt = 0;                 // 最後に鳴らした時刻(同じ操作で2回鳴らさないため)
 function playFx(kind){
+  fxLastAt = Date.now();
   if(fxOn(FX_SOUND_KEY)) fxSound(kind);
   if(fxOn(FX_VIBE_KEY)) fxVibe(kind);
 }
@@ -5174,6 +5187,37 @@ document.addEventListener("click", e => {
     playFx(typeof vehicleViewMode !== "undefined" && vehicleViewMode === "return" ? "return" : "depart");   // 出発・帰社
   }
 }, true);
+// 追加・修正・削除(v23)：できたときに出るお知らせ(「削除しました」など)の言葉で鳴らす。
+//   キャンセルしたときは、お知らせが出ないので鳴らない。直前(0.3秒以内)にほかの音を鳴らしたときは、重ねない
+function fxKindOfToast(m){
+  if(/削除しました|消しました/.test(m)) return "del";
+  if(/更新しました|変更しました/.test(m)) return "edit";
+  if(/追加しました/.test(m)) return "add";
+  return "";
+}
+window.ctFxKindOfToast = fxKindOfToast;
+(function(){
+  const prev = window.showToast;
+  if(typeof prev !== "function") return;
+  window.showToast = function(m){
+    prev.apply(this, arguments);
+    const k = fxKindOfToast(String(m));
+    if(k && Date.now() - fxLastAt > 300) playFx(k);
+  };
+})();
+document.addEventListener("click", e => {
+  const el = e.target && e.target.closest ? e.target.closest("#todoAddButton, #navHomeButton, #navVehicleButton, #navContainerButton, #navDataButton") : null;
+  if(!el || el.disabled) return;
+  if(el.id === "todoAddButton"){
+    const inp = $("todoManualInput");
+    if(inp && inp.value.trim()) playFx("add");                                 // ToDoの「追加」(ホームの追加も、このボタンを通る)
+  }else{
+    const scr = { navHomeButton:"reportScreen", navVehicleButton:"vehicleScreen", navContainerButton:"containerScreen", navDataButton:"dataScreen" }[el.id];
+    const now = $(scr);
+    if(!(now && now.classList.contains("active"))) playFx("tab");              // タブの切り替え(今のタブを押したときは鳴らさない。画面の端のなぞりも、このボタンを通る)
+  }
+}, true);
+
 // 車両の「やり直す」(v20)：確認で OK を押して、記録の時刻が消えたときだけ鳴らす
 (function(){
   const btn = $("vehicleResetButton");

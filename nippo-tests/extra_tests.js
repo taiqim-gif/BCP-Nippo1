@@ -2053,3 +2053,41 @@ ok(Math.max(...g62)>=0.24 && comp62===1 && toComp62===3,"帰社: louder and thro
 comp62=0; w.ctPlayFx("coin");
 ok(comp62===0,"other sounds are unchanged (no compressor)");
 }
+
+// ---- 63) v23:追加・修正・削除・タブ切り替えの音 ----
+{
+let osc63=0, vib63=[];
+const P63={setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}};
+w.AudioContext=class{ constructor(){ this.currentTime=0; this.destination={}; this.state="running"; } createOscillator(){ osc63++; return {frequency:P63,connect(){},start(){},stop(){}}; } createGain(){ return {gain:P63,connect(){}}; } createBiquadFilter(){ return {frequency:P63,connect(){}}; } };
+Object.defineProperty(w.navigator,"vibrate",{value:p=>{ vib63.push(JSON.stringify(p)); return true; },configurable:true});
+w.ctFxReset(); w.localStorage.removeItem("fxSound"); w.localStorage.removeItem("fxVibe");
+const r63=()=>{ osc63=0; vib63=[]; };
+const k63=w.ctFxKindOfToast;
+ok(k63("削除しました")==="del" && k63("完了したToDo 3件を消しました")==="del" && k63("容器を削除しました")==="del","delete messages → del");
+ok(k63("更新しました")==="edit" && k63("2件の客名・日付を更新しました")==="edit","update messages → edit");
+ok(k63("追加しました")==="add" && k63("コピーしました")==="" && k63("「A社」に追加します")==="" && k63("送信済みにしました")==="","add messages → add; others make no sound");
+await sleep(320);
+r63(); w.showToast("削除しました");
+ok(osc63===1 && vib63.join()==="25","a delete toast plays シュッ and a 25ms buzz");
+await sleep(320);
+r63(); w.showToast("更新しました");
+ok(osc63===2 && vib63.join()==="[10,40,10]","an update toast plays ピピッ");
+await sleep(320);
+r63(); w.ctPlayFx("record"); w.showToast("更新しました");
+ok(osc63===2 && vib63.length===1,"right after another sound, the toast does not play a second one");
+await sleep(320);
+// ToDoの「追加」
+r63(); $("todoManualInput").value=""; $("todoAddButton").click();
+ok(osc63===0,"ToDo 追加 with an empty box: no sound");
+r63(); $("todoManualInput").value="音の確認"; $("todoAddButton").click();
+ok(osc63===2 && vib63.join()==="20","ToDo 追加: ポンッ and a 20ms buzz");
+w.eval('todoItems=todoItems.filter(t=>t.content!=="音の確認")');
+// タブの切り替え
+$("navHomeButton").click(); await sleep(320);
+r63(); $("navHomeButton").click();
+ok(osc63===0,"pressing the tab you are on: no sound");
+r63(); $("navDataButton").click();
+ok(osc63===1 && vib63.join()==="8","switching tabs: a small コッ and an 8ms buzz");
+$("navHomeButton").click();
+delete w.navigator.vibrate;
+}
