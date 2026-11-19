@@ -2035,3 +2035,21 @@ pend61(); await sleep(10);
 ok(osc61===2,"after waking up, the sound plays");
 delete w.navigator.vibrate;
 }
+
+// ---- 62) v22:出発・帰社の音をさらに大きく(割れないよう抑える部品を通す) ----
+{
+let g62=[], comp62=0, toComp62=0;
+const mkP=()=>({value:0,setValueAtTime(){},linearRampToValueAtTime(v){ g62.push(v); },exponentialRampToValueAtTime(){}});
+w.AudioContext=class{ constructor(){ this.currentTime=0; this.destination={}; this.state="running"; }
+  createOscillator(){ return { frequency:mkP(), connect(){}, start(){}, stop(){} }; }
+  createGain(){ return { gain:mkP(), connect(d){ if(d && d.isComp) toComp62++; } }; }
+  createBiquadFilter(){ return { frequency:mkP(), connect(){} }; }
+  createDynamicsCompressor(){ comp62++; return { isComp:true, threshold:mkP(), knee:mkP(), ratio:mkP(), attack:mkP(), release:mkP(), connect(){} }; } };
+w.ctFxReset(); w.localStorage.removeItem("fxSound");
+w.ctPlayFx("depart");
+ok(Math.max(...g62)>=0.24 && comp62===1 && toComp62===4,"出発: peak "+Math.max(...g62)+", all 4 tones go through one compressor");
+g62=[]; comp62=0; toComp62=0; w.ctPlayFx("return");
+ok(Math.max(...g62)>=0.24 && comp62===1 && toComp62===3,"帰社: louder and through the compressor");
+comp62=0; w.ctPlayFx("coin");
+ok(comp62===0,"other sounds are unchanged (no compressor)");
+}
