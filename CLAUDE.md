@@ -29,7 +29,7 @@
 |---|---|
 | `index.html` | 元のアプリ本体(利用者のもの)。ホーム/訪問入力/車両の画面、客先リスト取り込み、日報メール |
 | `container.js` | 追加機能すべて(約20万文字)。`index.html` の最後で読み込む。容器・データ・顧客の管理・天気・各種の手直し |
-| `sw.js` | オフライン用(Service Worker)。保管の名前は `nippo-cache-v22`。大きく作り替えたら、版を上げる(container.js の `APP_VERSION`・`APP_DATE` も合わせる) |
+| `sw.js` | オフライン用(Service Worker)。保管の名前は `nippo-cache-v23`。大きく作り替えたら、版を上げる(container.js の `APP_VERSION`・`APP_DATE` も合わせる) |
 | `customer_list_tool.html` | 顧客リストの暗号化ツール(管理者がPCのブラウザで開く。アプリからは読み込まない。下の「顧客リストの暗号化ツール」)。暗号のコードは `index.html` と同じ文字にする。**消さない** |
 | `manifest.webmanifest`, `icon-180/192/512.png` | ホーム画面に追加するための部品 |
 | `docs/skill-backup/` | アカウントの skill の写し(`nippo-app-change` は、削除した元の1ファイル版 `sales_report.html` 用。今は使わない) |
@@ -70,7 +70,7 @@
   - 包んでいる関数: `renderTodoList`, `renderVehicleScreen`, `saveTodos`, `buildReportMail`, `getLatestPastReturnDistance`, `attachTodoDrag`(並べ替えを置き換え), `goToVisit`, `updateNav`, `updateDate`, `deleteData`, `renderMasterUI`, `setMasterMessage`, `showToast`, `confirm`。
   - 追加している画面: `containerScreen`(容器)、`dataScreen`(データ)、`custScreen`(顧客の管理)。ヘッダーに `navContainerButton`、`navDataButton` を足している。
 - 画面の色の統一は、`#tabColors` という `<style>`(`container.js` の中で作る)で上書きしている。
-- テスト用に、`window.ctXxx`(`ctMailAllCsv`, `ctRefreshWeather`, `ctWxStep`, `ctWxView`, `ctEnsureVisible`, `ctRenderBar`, `ctApplyTab`, `ctSetSlot`, `ctSlotNow`, `ctCompactVisits`, `ctMasterMerged`, `ctAccessHiddenPlan`, `ctSetListUse`, `ctDeleteMasterSource`, `ctHomeTypeSuggest`, `ctWxTempColor`, `ctStyleTodoDates`, `ctWxInterval`, `ctWxPageIndex`, `ctWxRestart`, `ctVehicleCardColor`, `ctMailMonthCsv`, `ctMonthData`, `ctRenderMonthly`, `ctOpenUserDialog`, `ctRemoveDoneTodos`, `ctAppVersion`, `ctTodoCode`, `ctTodoFullName`, `ctBundleCsv`, `ctDeleteMonth`, `ctLastWeekday`, `ctMonthlyTarget`, `ctSetLogs`, `ctCustSettingsPayload`, `ctCustSettingsPlan`, `ctApplyCustSettings`, `ctShowCustSettingsChoice`, `ctNumberTodos`, `ctPlayFx`, `ctFxReset`, `ctMailToLine`)を公開している。
+- テスト用に、`window.ctXxx`(`ctMailAllCsv`, `ctRefreshWeather`, `ctWxStep`, `ctWxView`, `ctEnsureVisible`, `ctRenderBar`, `ctApplyTab`, `ctSetSlot`, `ctSlotNow`, `ctCompactVisits`, `ctMasterMerged`, `ctAccessHiddenPlan`, `ctSetListUse`, `ctDeleteMasterSource`, `ctHomeTypeSuggest`, `ctWxTempColor`, `ctStyleTodoDates`, `ctWxInterval`, `ctWxPageIndex`, `ctWxRestart`, `ctVehicleCardColor`, `ctMailMonthCsv`, `ctMonthData`, `ctRenderMonthly`, `ctOpenUserDialog`, `ctRemoveDoneTodos`, `ctAppVersion`, `ctTodoCode`, `ctTodoFullName`, `ctBundleCsv`, `ctDeleteMonth`, `ctLastWeekday`, `ctMonthlyTarget`, `ctSetLogs`, `ctCustSettingsPayload`, `ctCustSettingsPlan`, `ctApplyCustSettings`, `ctShowCustSettingsChoice`, `ctNumberTodos`, `ctPlayFx`, `ctFxReset`, `ctFxKindOfToast`, `ctMailToLine`)を公開している。
   - `#mailButton`(日報メール、本文が文字)は、v12 から**出さない**(`style.display="none"`)。送るのは CSV だけ。本文を作る `buildReportMail` は残してある。
 
 ### 保存データ(localStorage のキー)— **名前を変えない・消さない**
@@ -125,6 +125,7 @@
   - v20 で追加: 容器の「記録する」(記録・更新できたときだけ)=はずむ「ポコン♪」/データの「まだ送っていない分を送る」「○月分を確定して…」(送るデータがあるときだけ)=上へ飛ぶ「シュワーン♪」/車両の「やり直す」(確認で OK を押して時刻が消えたときだけ)=巻き戻す「ピュルッ↓」。バイブ: ポコン 25ms・シュワーン 20-40-20・ピュルッ 15-30-15。
   - iPhoneは確認の画面(OK/キャンセル)のあと音が "interrupted" で止まるので、鳴らす前に running 以外なら起こし直す(v20。v19 は確認のあとの音が鳴らなかった)。v21 から、起こし直しが終わってから鳴らす(resume の Promise のあと)。
   - v21 で追加: 訪問履歴の内容の□で ToDo に追加=「ピコン↑」(バイブ 20ms)、□を外して ToDo から消す=「ポロン↓」(10ms)。
+  - v23 で追加: 追加・修正・削除は、できたときに出るお知らせの言葉で鳴らす(`showToast` を包む。「削除しました/消しました」=「シュッ↓」25ms、「更新しました/変更しました」=「ピピッ」10-40-10、「追加しました」=「ポンッ↑」20ms。キャンセルはお知らせが出ないので鳴らない。直前0.3秒以内にほかの音を鳴らしたときは重ねない)。ToDoの「追加」(お知らせなし)は `#todoAddButton` を押したとき(欄が空なら鳴らさない。ホームの追加もこのボタンを通る)=「ポンッ↑」。タブの切り替え(4つのタブのボタン。端のなぞりも同じ。今のタブを押したときは鳴らさない)=小さな「コッ」8ms。
   - バイブ: チャリン 30ms・ピロッ 15ms・出発 30-50-60・帰社 60-50-30。Android は `navigator.vibrate`。iPhone は使えないので、見えない所の `<input type="checkbox" switch>` の label を押して軽い振動(iOS 18 以降のしくみ。将来使えなくなることもある)。
   - データ画面の「使う人」の枠に [効果音 ON/OFF] [バイブ ON/OFF](別々。最初は ON。ON にすると試しに鳴る/ふるえる)。iPhoneはマナーモードだと音は出ない。
 
@@ -159,7 +160,7 @@
   - 車両の天気は、最初の言葉1つだけ。位置は「緯度,経度」を小数第5位まで。
   - **ToDoの顧客名は正式な名前**(v15。画面は短い名前のまま): `fullTarget`(短くする前の名前。長押しの編集で名前を変えたら、その名前)→ 元の訪問の訪問先(画面の名前がその短い形と同じときだけ)→ 画面の名前。
 - 「バックアップ保存/戻す」「消す」(送信済み/日報・車両/容器/ToDoリスト。普段は閉じている)。
-- **アプリの版**(v13から): データ画面のいちばん下(天気の表示の下)に、小さな灰色の文字(12px・中央)で「アプリの版 v22 (2026-11-19)」(`#dtVersion`)。数字と日付は `container.js` の `APP_VERSION`・`APP_DATE`。**`sw.js` の `CACHE` の版と同じ数字**にする(自動確認で、ずれていないか見る)。日付は、その版を作った日。iPhoneが新しい版になったかの目印に使う。
+- **アプリの版**(v13から): データ画面のいちばん下(天気の表示の下)に、小さな灰色の文字(12px・中央)で「アプリの版 v23 (2026-11-19)」(`#dtVersion`)。数字と日付は `container.js` の `APP_VERSION`・`APP_DATE`。**`sw.js` の `CACHE` の版と同じ数字**にする(自動確認で、ずれていないか見る)。日付は、その版を作った日。iPhoneが新しい版になったかの目印に使う。
 - 日報メール(ホームのボタン、本文が文字)は、**v12 でやめた**(誰も読んでいないため。ボタンを出さない)。
 - 毎日の「まだ送っていない分を送る」は**自由**(送らなくてよい)。月初の「10月分をまとめて送る」で、その月は全部そろう。
 - **使う人**(v11。データ画面の一番上の枠、ラベンダー): 名前と送り先のメールアドレスを登録(`#ctUserDlg`、`.ct-mchoice` の形)。未登録なら、アプリを開いたときに出す。「あとで」は、開き直すまで出さない(sessionStorage)。全角の英数字・空白は直す。スマホの中だけに保存。
@@ -202,6 +203,6 @@
 ## 7. 変更するときの注意(いつも守ること)
 
 - **保存データを消さない。キー名を変えない。** 変更の前に、データ画面の「バックアップ保存」を押すよう、利用者に伝える。
-- `container.js` を差し替えたら、`sw.js` の `CACHE` の版(今は v22)を上げる。`container.js` の `APP_VERSION`(同じ数字)と `APP_DATE`(作った日)も直す。
+- `container.js` を差し替えたら、`sw.js` の `CACHE` の版(今は v23)を上げる。`container.js` の `APP_VERSION`(同じ数字)と `APP_DATE`(作った日)も直す。
 - 顧客リスト(暗号化)や、顧客の実データを、GitHubに置かない。
 - 「テストで」と言われたら、テスト用のページ(作業用の枝)だけに入れる。**main に入れるのは「main に入れて」と言われたときだけ。**
