@@ -1962,3 +1962,47 @@ ok(w.ctMailToLine()==="","no address registered: nothing is added");
 if(mk59!==null) w.localStorage.setItem("nippoUserMail",mk59);
 delete w.navigator.vibrate;
 }
+
+// ---- 60) v20:容器の記録・メール送信・やり直すの音、出発/帰社を大きく、確認のあとも鳴る ----
+{
+let osc60=[], vib60=[], gains60=[], resumed60=0, state60="running";
+class FP60{ setValueAtTime(){} linearRampToValueAtTime(v){ gains60.push(v); } exponentialRampToValueAtTime(){} }
+class FN60{ constructor(){ this.frequency=new FP60(); this.gain=new FP60(); } connect(){} start(){} stop(){} }
+w.AudioContext=class{ constructor(){ this.currentTime=0; this.destination={}; } get state(){ return state60; } createOscillator(){ osc60.push(1); return new FN60(); } createGain(){ return new FN60(); } createBiquadFilter(){ return new FN60(); } resume(){ resumed60++; state60="running"; } };
+Object.defineProperty(w.navigator,"vibrate",{value:p=>{ vib60.push(JSON.stringify(p)); return true; },configurable:true});
+const r60=()=>{ osc60=[]; vib60=[]; gains60=[]; resumed60=0; };
+w.ctFxReset();
+w.localStorage.removeItem("fxSound"); w.localStorage.removeItem("fxVibe");
+r60(); w.ctPlayFx("record");
+ok(osc60.length===2 && vib60.join()==="25","record: its own 2-tone sound and a 25ms buzz");
+r60(); w.ctPlayFx("send");
+ok(osc60.length===3 && vib60.join()==="[20,40,20]","send: its own sound and buzz 20-40-20");
+r60(); w.ctPlayFx("redo");
+ok(osc60.length===2 && vib60.join()==="[15,30,15]","redo: its own sound and buzz 15-30-15");
+r60(); w.ctPlayFx("depart");
+ok(Math.max(...gains60)>=0.16,"出発 is louder (peak "+Math.max(...gains60)+")");
+r60(); w.ctPlayFx("return");
+ok(Math.max(...gains60)>=0.16,"帰社 is louder (peak "+Math.max(...gains60)+")");
+// iPhoneの確認の画面のあと(interrupted)でも、起こし直して鳴らす
+state60="interrupted"; r60(); w.ctPlayFx("coin");
+ok(resumed60===1 && osc60.length===3,"an interrupted audio is resumed and the sound plays");
+// 容器の「記録する」
+d.querySelector("#navContainerButton").click();
+r60();
+set("ctCustomer","音テスト商事"); d.querySelector('#ctStatusSeg button[data-status="2"]').click(); chip("O2").click(); set("ctSymbol","FX"); set("ctNumber","60"); $("ctSaveButton").click();
+ok(osc60.length===2 && vib60.join()==="25","容器「記録する」 plays the record sound");
+r60(); set("ctSymbol","1"); set("ctNumber",""); $("ctSaveButton").click();
+ok(osc60.length===0,"no sound when the record is refused (number missing)");
+w.ctSetLogs(JSON.parse(w.localStorage.getItem("containerLogs")).filter(l=>l.customer!=="音テスト商事"));
+// やり直す:OK のときだけ鳴る
+const cf60=w.confirm;
+w.eval('vehicleViewMode="departure"'); w.eval('getTodayVehicle().departure.time="2026-11-19T08:00"');
+w.confirm=()=>false; r60(); $("vehicleResetButton").click();
+ok(osc60.length===0 && w.eval('getTodayVehicle().departure.time')!=="","やり直す → キャンセル: no sound");
+w.confirm=()=>true; r60(); $("vehicleResetButton").click();
+ok(osc60.length===2 && vib60.join()==="[15,30,15]","やり直す → OK: redo sound");
+r60(); $("vehicleResetButton").click();
+ok(osc60.length===0,"やり直す with nothing recorded: no sound");
+w.confirm=cf60; w.eval('vehicleViewMode="x"');
+delete w.navigator.vibrate;
+}
