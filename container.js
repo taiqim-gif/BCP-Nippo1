@@ -2283,7 +2283,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v23";
+const APP_VERSION = "v24";
 const APP_DATE = "2026-11-19";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -5035,6 +5035,25 @@ function fxAudio(){
   if(fxCtx.state !== "running"){ try{ fxCtx.resume(); }catch(e){ /* 鳴らなくても続ける */ } }
   return fxCtx;
 }
+// 音の部品を捨てる(次に鳴らすとき、新しく作る)
+function fxDrop(){
+  const old = fxCtx;
+  fxCtx = null;
+  if(old && typeof old.close === "function"){ try{ const p = old.close(); if(p && p.catch) p.catch(() => {}); }catch(e){ /* 閉じられなくても続ける */ } }
+}
+// v24：iPhoneは、アプリを裏に回して戻ると、音の部品が「動いているのに音が出ない」ことがある。
+//   画面に戻ったら印を付け、次に指で触れたとき(音を出してよい時)に、部品を作り直しておく
+let fxStale = false;
+document.addEventListener("visibilitychange", () => { if(!document.hidden && fxCtx) fxStale = true; });
+window.addEventListener("pageshow", () => { if(fxCtx) fxStale = true; });
+function fxRenew(){
+  if(!fxStale) return;
+  fxStale = false;
+  fxDrop();
+  fxAudio();                        // 指で触れたその時に作る(iPhoneはこの時でないと鳴らせない)
+}
+["touchend", "click", "keydown"].forEach(t => document.addEventListener(t, fxRenew, true));
+window.ctFxMarkStale = function(){ fxStale = true; };   // テスト用
 // 1つの音：type=波の形、f0→f1(高さを滑らせる)、at=始まり(秒)、dur=長さ、vol=大きさ、lp=[こもり具合の始め,終わり]
 function fxTone(ctx, o, dest){
   const t = ctx.currentTime + (o.at || 0), end = t + o.dur;
@@ -5103,9 +5122,9 @@ const FX_SOUNDS = {
 function fxSound(kind){
   const list = FX_SOUNDS[kind];
   if(!list) return;
-  const ctx = fxAudio();
-  if(!ctx) return;
-  const play = () => {
+  const ctx0 = fxAudio();
+  if(!ctx0) return;
+  const play = (ctx) => {
     try{
       let dest = null;
       // 大きい音(出発・帰社)は、割れないように抑える部品を通す(v22)
@@ -5119,12 +5138,19 @@ function fxSound(kind){
     }catch(e){ /* 鳴らなくても続ける */ }
   };
   // 起こし直している途中(iPhone)は、起きてから鳴らす(v21。止まったままの時計に予定を入れると、鳴らないことがある)
-  if(ctx.state !== "running" && typeof ctx.resume === "function"){
+  // v24：起こしても動かないときは、部品を作り直して鳴らす
+  const retry = () => {
+    if(ctx0.state === "running"){ play(ctx0); return; }
+    if(fxCtx === ctx0) fxDrop();
+    const c2 = fxAudio();
+    if(c2) play(c2);
+  };
+  if(ctx0.state !== "running" && typeof ctx0.resume === "function"){
     let p = null;
-    try{ p = ctx.resume(); }catch(e){ p = null; }
-    if(p && typeof p.then === "function"){ p.then(play, play); return; }
+    try{ p = ctx0.resume(); }catch(e){ p = null; }
+    if(p && typeof p.then === "function"){ p.then(retry, retry); return; }
   }
-  play();
+  play(ctx0);
 }
 
 // バイブ
