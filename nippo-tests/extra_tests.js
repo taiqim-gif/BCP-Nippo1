@@ -1877,3 +1877,88 @@ ok(p58f.masterAdd.length===1 && p58f.masterAdd[0].o==="","broken list entries ar
 [["customerMaster",mBak58],["customerHidden",hBak58],["customerExtra",eBak58],["customerListUse",uBak58]].forEach(([k,v])=>{ if(v===null) w.localStorage.removeItem(k); else w.localStorage.setItem(k,v); });
 reload58();
 }
+// ---- 59) v19:ToDoの番号・効果音・バイブ・メール本文の送り先 ----
+{
+// ToDoの番号(右端・≡の左。並びが変わったら付け直す)
+const tl59=d.querySelector(".todo-list-target");
+const keep59=tl59.innerHTML;
+tl59.innerHTML=["a","b","c"].map(id=>`<div class="todo-item" data-id="${id}"><label><input type="checkbox" class="todo-complete" data-id="${id}"><span class="todo-line">${id}</span></label><span class="todo-handle">≡</span></div>`).join("");
+w.ctNumberTodos();
+const nos59=()=>[...tl59.querySelectorAll(".todo-item")].map(el=>el.getAttribute("data-id")+(el.querySelector(".todo-no")||{}).textContent).join();
+ok(nos59()==="a1,b2,c3","ToDo numbers 1,2,3 from the top: "+nos59());
+const it59=tl59.querySelector(".todo-item");
+ok(it59.querySelector(".todo-no").nextElementSibling===it59.querySelector(".todo-handle") && it59.querySelectorAll(".todo-no").length===1,"the number sits right before ≡ (once)");
+tl59.appendChild(it59); w.ctNumberTodos();
+ok(nos59()==="b1,c2,a3","after reordering the numbers follow the new order: "+nos59());
+ok(/\.todo-item \.todo-no\{[^}]*font-size:11px[^}]*color:#9A94D9/.test(d.getElementById("fxStyle").textContent),"the number is light purple #9A94D9, 11px");
+ok(!$("doneTodoBox").querySelector(".todo-no"),"the finished ToDo list has no numbers");
+// 音とバイブを数える(にせの AudioContext と vibrate)
+let osc59=0, vib59=[];
+class FakeParam{ setValueAtTime(){} linearRampToValueAtTime(){} exponentialRampToValueAtTime(){} }
+class FakeNode{ constructor(){ this.frequency=new FakeParam(); this.gain=new FakeParam(); } connect(){} start(){} stop(){} }
+w.AudioContext=class{ constructor(){ this.state="running"; this.currentTime=0; this.destination={}; } createOscillator(){ osc59++; return new FakeNode(); } createGain(){ return new FakeNode(); } createBiquadFilter(){ return new FakeNode(); } resume(){} };
+Object.defineProperty(w.navigator,"vibrate",{value:p=>{ vib59.push(JSON.stringify(p)); return true; },configurable:true});
+const reset59=()=>{ osc59=0; vib59=[]; };
+w.localStorage.removeItem("fxSound"); w.localStorage.removeItem("fxVibe");
+reset59(); w.ctPlayFx("coin");
+ok(osc59===3 && vib59.join()==="30","coin: 3 tones and a 30ms buzz by default (both ON)");
+// ToDoのチェック → コイン
+reset59();
+const cb59=tl59.querySelector('.todo-complete[data-id="b"]');
+const stopC59=e=>e.stopPropagation(); tl59.addEventListener("change",stopC59,true);   // 元のアプリの処理は動かさない
+cb59.checked=true; cb59.dispatchEvent(new w.Event("change",{bubbles:true}));
+ok(osc59===3 && vib59.join()==="30","checking a ToDo plays the coin sound");
+// 終了したToDoのチェックを外す → ピロッ
+reset59();
+const un59=d.createElement("input"); un59.type="checkbox"; un59.className="todo-undo"; tl59.appendChild(un59);
+un59.checked=false; un59.dispatchEvent(new w.Event("change",{bubbles:true}));
+ok(osc59===2 && vib59.join()==="15","unchecking a finished ToDo plays the short ピロッ");
+tl59.removeEventListener("change",stopC59,true);
+tl59.innerHTML=keep59;
+// 訪問の開始・記録終了・出発・帰社(ボタンを仮に作る。元の処理は止める)
+const box59=d.createElement("div"); d.body.appendChild(box59);
+box59.innerHTML='<button id="homeStartButton">開始</button><button id="vehicleSaveButton">出発</button>';
+box59.addEventListener("click",e=>e.stopPropagation(),true);
+const hv59=$("homeVisitTarget"), hvKeep59=hv59.value;
+reset59(); hv59.value=""; $("homeStartButton").click();
+ok(osc59===0 && vib59.length===0,"開始 with an empty 訪問先: no sound");
+reset59(); hv59.value="サンプル商店"; $("homeStartButton").click();
+ok(osc59===3,"開始: coin sound");
+hv59.value=hvKeep59;
+w.eval('vehicleViewMode="departure"'); reset59(); $("vehicleSaveButton").click();
+ok(osc59===4 && vib59.join()==="[30,50,60]","出発: rising sound (4 tones) and buzz 30-50-60");
+w.eval('vehicleViewMode="return"'); reset59(); $("vehicleSaveButton").click();
+ok(osc59===3 && vib59.join()==="[60,50,30]","帰社: falling sound (3 tones) and buzz 60-50-30");
+$("vehicleSaveButton").disabled=true; reset59(); $("vehicleSaveButton").click();
+ok(osc59===0,"a disabled 帰社 button makes no sound");
+w.eval('vehicleViewMode="x"');
+const end59=$("endButton"); const stopE59=e=>e.stopPropagation(); end59.parentNode.addEventListener("click",stopE59,true);
+w.eval('currentVisit={isEdit:false}'); reset59(); end59.click();
+ok(osc59===3,"記録終了: coin sound");
+w.eval('currentVisit={isEdit:true}'); reset59(); end59.click();
+ok(osc59===0,"saving an edited visit makes no sound");
+w.eval('currentVisit=null'); end59.parentNode.removeEventListener("click",stopE59,true);
+box59.remove();
+// データ画面の ON/OFF(別々)
+ok($("dtSoundBtn").textContent==="効果音 ON" && $("dtVibeBtn").textContent==="バイブ ON","data screen: 効果音 ON / バイブ ON at first");
+$("dtSoundBtn").click();
+ok($("dtSoundBtn").textContent==="効果音 OFF" && $("dtSoundBtn").classList.contains("off") && w.localStorage.getItem("fxSound")==="0","効果音 can be turned OFF (saved)");
+reset59(); w.ctPlayFx("coin");
+ok(osc59===0 && vib59.join()==="30","sound OFF: only the buzz");
+$("dtVibeBtn").click();
+ok($("dtVibeBtn").textContent==="バイブ OFF" && w.localStorage.getItem("fxVibe")==="0","バイブ can be turned OFF (saved)");
+reset59(); w.ctPlayFx("depart");
+ok(osc59===0 && vib59.length===0,"both OFF: nothing");
+reset59(); $("dtSoundBtn").click();
+ok($("dtSoundBtn").textContent==="効果音 ON" && osc59===3 && vib59.length===0,"turning 効果音 ON plays a sample (no buzz while バイブ is OFF)");
+reset59(); $("dtVibeBtn").click();
+ok(vib59.join()==="30" && osc59===0,"turning バイブ ON gives a sample buzz");
+// メール本文の先頭に送り先
+const mk59=w.localStorage.getItem("nippoUserMail");
+w.localStorage.setItem("nippoUserMail","sample@example.com");
+ok(w.ctMailToLine()==="送り先: sample@example.com\n\n","mail body starts with 送り先: (address)");
+w.localStorage.removeItem("nippoUserMail");
+ok(w.ctMailToLine()==="","no address registered: nothing is added");
+if(mk59!==null) w.localStorage.setItem("nippoUserMail",mk59);
+delete w.navigator.vibrate;
+}

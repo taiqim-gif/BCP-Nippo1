@@ -29,7 +29,7 @@
 |---|---|
 | `index.html` | 元のアプリ本体(利用者のもの)。ホーム/訪問入力/車両の画面、客先リスト取り込み、日報メール |
 | `container.js` | 追加機能すべて(約20万文字)。`index.html` の最後で読み込む。容器・データ・顧客の管理・天気・各種の手直し |
-| `sw.js` | オフライン用(Service Worker)。保管の名前は `nippo-cache-v18`。大きく作り替えたら、版を上げる(container.js の `APP_VERSION`・`APP_DATE` も合わせる) |
+| `sw.js` | オフライン用(Service Worker)。保管の名前は `nippo-cache-v19`。大きく作り替えたら、版を上げる(container.js の `APP_VERSION`・`APP_DATE` も合わせる) |
 | `customer_list_tool.html` | 顧客リストの暗号化ツール(管理者がPCのブラウザで開く。アプリからは読み込まない。下の「顧客リストの暗号化ツール」)。暗号のコードは `index.html` と同じ文字にする。**消さない** |
 | `manifest.webmanifest`, `icon-180/192/512.png` | ホーム画面に追加するための部品 |
 | `docs/skill-backup/` | アカウントの skill の写し(`nippo-app-change` は、削除した元の1ファイル版 `sales_report.html` 用。今は使わない) |
@@ -70,12 +70,12 @@
   - 包んでいる関数: `renderTodoList`, `renderVehicleScreen`, `saveTodos`, `buildReportMail`, `getLatestPastReturnDistance`, `attachTodoDrag`(並べ替えを置き換え), `goToVisit`, `updateNav`, `updateDate`, `deleteData`, `renderMasterUI`, `setMasterMessage`, `showToast`, `confirm`。
   - 追加している画面: `containerScreen`(容器)、`dataScreen`(データ)、`custScreen`(顧客の管理)。ヘッダーに `navContainerButton`、`navDataButton` を足している。
 - 画面の色の統一は、`#tabColors` という `<style>`(`container.js` の中で作る)で上書きしている。
-- テスト用に、`window.ctXxx`(`ctMailAllCsv`, `ctRefreshWeather`, `ctWxStep`, `ctWxView`, `ctEnsureVisible`, `ctRenderBar`, `ctApplyTab`, `ctSetSlot`, `ctSlotNow`, `ctCompactVisits`, `ctMasterMerged`, `ctAccessHiddenPlan`, `ctSetListUse`, `ctDeleteMasterSource`, `ctHomeTypeSuggest`, `ctWxTempColor`, `ctStyleTodoDates`, `ctWxInterval`, `ctWxPageIndex`, `ctWxRestart`, `ctVehicleCardColor`, `ctMailMonthCsv`, `ctMonthData`, `ctRenderMonthly`, `ctOpenUserDialog`, `ctRemoveDoneTodos`, `ctAppVersion`, `ctTodoCode`, `ctTodoFullName`, `ctBundleCsv`, `ctDeleteMonth`, `ctLastWeekday`, `ctMonthlyTarget`, `ctSetLogs`, `ctCustSettingsPayload`, `ctCustSettingsPlan`, `ctApplyCustSettings`, `ctShowCustSettingsChoice`)を公開している。
+- テスト用に、`window.ctXxx`(`ctMailAllCsv`, `ctRefreshWeather`, `ctWxStep`, `ctWxView`, `ctEnsureVisible`, `ctRenderBar`, `ctApplyTab`, `ctSetSlot`, `ctSlotNow`, `ctCompactVisits`, `ctMasterMerged`, `ctAccessHiddenPlan`, `ctSetListUse`, `ctDeleteMasterSource`, `ctHomeTypeSuggest`, `ctWxTempColor`, `ctStyleTodoDates`, `ctWxInterval`, `ctWxPageIndex`, `ctWxRestart`, `ctVehicleCardColor`, `ctMailMonthCsv`, `ctMonthData`, `ctRenderMonthly`, `ctOpenUserDialog`, `ctRemoveDoneTodos`, `ctAppVersion`, `ctTodoCode`, `ctTodoFullName`, `ctBundleCsv`, `ctDeleteMonth`, `ctLastWeekday`, `ctMonthlyTarget`, `ctSetLogs`, `ctCustSettingsPayload`, `ctCustSettingsPlan`, `ctApplyCustSettings`, `ctShowCustSettingsChoice`, `ctNumberTodos`, `ctPlayFx`, `ctMailToLine`)を公開している。
   - `#mailButton`(日報メール、本文が文字)は、v12 から**出さない**(`style.display="none"`)。送るのは CSV だけ。本文を作る `buildReportMail` は残してある。
 
 ### 保存データ(localStorage のキー)— **名前を変えない・消さない**
 - 元のアプリ: `meetingLogs`, `dailyVehicleInfo`, `todoItems`, `appLastOpenDate`, `customerMaster`
-- container.js: `containerLogs`(容器ログ), `customerHidden`(顧客の非表示の顧客コード), `customerExtra`(追加した顧客), `ctFontSize`, `lastCustomer`(直近に作業した顧客・その日だけ), `wxCache`(天気の保存), `wxSpeed`(天気をめくる速さ), `dailyWeather`(その日の天気1つ), `lastBackupAt`, `todoShortFrom`(ToDoの顧客名を短くする機能を入れた時刻), `customerListUse`(候補に出す顧客リスト。空=すべて), `nippoUserName`・`nippoUserMail`(使う人の名前・送り先。バックアップには入れない), `todoArchive`(送信済みにした完了ToDoの自動保存), `todoLastSentIds`(最後の「まだ送っていない分を送る」で送った完了ToDoのID), `monthlyReportSent`(月まとめを「送った」と答えた最後の月 `YYYY-MM`)
+- container.js: `containerLogs`(容器ログ), `customerHidden`(顧客の非表示の顧客コード), `customerExtra`(追加した顧客), `ctFontSize`, `lastCustomer`(直近に作業した顧客・その日だけ), `wxCache`(天気の保存), `wxSpeed`(天気をめくる速さ), `dailyWeather`(その日の天気1つ), `lastBackupAt`, `todoShortFrom`(ToDoの顧客名を短くする機能を入れた時刻), `customerListUse`(候補に出す顧客リスト。空=すべて), `nippoUserName`・`nippoUserMail`(使う人の名前・送り先。バックアップには入れない), `todoArchive`(送信済みにした完了ToDoの自動保存), `todoLastSentIds`(最後の「まだ送っていない分を送る」で送った完了ToDoのID), `monthlyReportSent`(月まとめを「送った」と答えた最後の月 `YYYY-MM`), `fxSound`・`fxVibe`(効果音・バイブの ON/OFF。"0"=OFF、無い=ON。バックアップには入れない)
 - バックアップの対象(`BACKUP_KEYS`): `meetingLogs`, `dailyVehicleInfo`, `todoItems`, `containerLogs`, `customerHidden`, `customerExtra`, `dailyWeather`, `todoArchive`
 
 ## 4. 仕様(決定事項)
@@ -117,6 +117,13 @@
 - ToDoの**実行済にするのは、□を押したときだけ**(行の文字を押しても反応しない)。□は約1.2倍。ToDoの文字は13pxで、**2行まで**折り返す(3行目からは…)。
 - ToDoの並べ替え: 「≡」を**0.2秒**押し続けるとつかめる。ToDoの文字の**長押し(0.5秒)で編集**(ホーム・車両。顧客名・内容・更新/やめる/削除)。
 - ToDoの行の日付は、アズールグレー(#6F8CA3)・11px・細身のフォント。ToDoに追加する顧客名は、会社の種類の語を除いた先頭3文字(北海道・道内の市町村名で始まるときは、地名の頭文字1文字 + 地名のあとの2文字。例: 北海道ガス → 北ガス)。この版より前に追加した分は、変えない。
+- **ToDoの番号**(v19): 実行中のToDoリスト(ホーム・車両)の右端(「≡」の左)に、上から 1, 2, 3…(`.todo-no`、11px、薄い紫 #9A94D9)。並べ替えている間も、付け直す。終了したToDoリストには付けない。
+- **効果音・バイブ**(v19。`playFx`): 音声ファイルは使わず、Web Audio でその場で作る。元のアプリの処理より先(document の capture)で鳴らす(iPhoneは指で押したその時でないと音が出ないため)。
+  - コイン風「チャリン♪」(A5→E6 の2音+キラッ。マリオの音そのものは使わない): ToDoのチェック・訪問の「開始」(訪問先が空なら鳴らさない)・「記録終了」(編集の「保存」は鳴らさない)・「送信済みにする」・月分の「送れましたか?」OK。
+  - 明るく短い「ピロッ♪」: 終了したToDoのチェックを外したとき(やる気を出すため、外したときも鳴らす)。
+  - 出発=未来風の上がる音(のこぎり波 180→1250Hz+最後に高い音)、帰社=未来風の下がる音(1250→160Hz+最後に低い音)。
+  - バイブ: チャリン 30ms・ピロッ 15ms・出発 30-50-60・帰社 60-50-30。Android は `navigator.vibrate`。iPhone は使えないので、見えない所の `<input type="checkbox" switch>` の label を押して軽い振動(iOS 18 以降のしくみ。将来使えなくなることもある)。
+  - データ画面の「使う人」の枠に [効果音 ON/OFF] [バイブ ON/OFF](別々。最初は ON。ON にすると試しに鳴る/ふるえる)。iPhoneはマナーモードだと音は出ない。
 
 ### ホーム/訪問入力
 - 訪問履歴の1件は3行(`compactVisitCards`): 1行目=番号・時刻(10:25–11:20)と、右上の小さな「編集」「削除」(約52×32px。削除は確認あり)、2行目=顧客名(太字)と面談者(小さな灰色)、3行目から=内容(□で ToDo へ)・特記事項。
@@ -149,11 +156,12 @@
   - 車両の天気は、最初の言葉1つだけ。位置は「緯度,経度」を小数第5位まで。
   - **ToDoの顧客名は正式な名前**(v15。画面は短い名前のまま): `fullTarget`(短くする前の名前。長押しの編集で名前を変えたら、その名前)→ 元の訪問の訪問先(画面の名前がその短い形と同じときだけ)→ 画面の名前。
 - 「バックアップ保存/戻す」「消す」(送信済み/日報・車両/容器/ToDoリスト。普段は閉じている)。
-- **アプリの版**(v13から): データ画面のいちばん下(天気の表示の下)に、小さな灰色の文字(12px・中央)で「アプリの版 v18 (2026-11-18)」(`#dtVersion`)。数字と日付は `container.js` の `APP_VERSION`・`APP_DATE`。**`sw.js` の `CACHE` の版と同じ数字**にする(自動確認で、ずれていないか見る)。日付は、その版を作った日。iPhoneが新しい版になったかの目印に使う。
+- **アプリの版**(v13から): データ画面のいちばん下(天気の表示の下)に、小さな灰色の文字(12px・中央)で「アプリの版 v19 (2026-11-19)」(`#dtVersion`)。数字と日付は `container.js` の `APP_VERSION`・`APP_DATE`。**`sw.js` の `CACHE` の版と同じ数字**にする(自動確認で、ずれていないか見る)。日付は、その版を作った日。iPhoneが新しい版になったかの目印に使う。
 - 日報メール(ホームのボタン、本文が文字)は、**v12 でやめた**(誰も読んでいないため。ボタンを出さない)。
 - 毎日の「まだ送っていない分を送る」は**自由**(送らなくてよい)。月初の「10月分をまとめて送る」で、その月は全部そろう。
 - **使う人**(v11。データ画面の一番上の枠、ラベンダー): 名前と送り先のメールアドレスを登録(`#ctUserDlg`、`.ct-mchoice` の形)。未登録なら、アプリを開いたときに出す。「あとで」は、開き直すまで出さない(sessionStorage)。全角の英数字・空白は直す。スマホの中だけに保存。
   - CSV添付の送信では、iPhoneの決まりで宛先を入れられないので、送る前にアドレスをコピーし、「宛先はコピー済み(貼り付け)」と出す。
+  - v19 から、毎日・月分のメールの本文の先頭に「送り先: (アドレス)」と空行を入れる(`mailToLine`。本文からコピーして宛先に貼れる)。未登録なら入れない。
   - CSVのファイル名に名前(`訪問_佐藤_20261117.csv`)。訪問の右端に「ID(`createdAt`)・担当者」、車両の右端に「担当者」、ToDoの右端に「ID・登録日・完了日(年まで)・担当者・顧客コード」(パソコンの取り込みツール用)。
   - **ToDoの顧客コード**(v14): 訪問の内容(□)から作ったToDoは、`saveTodos` を包んだ所で、元の訪問の `customerCode` を ToDo の `customerCode` に覚える(ToDoの顧客名は短くするので、パソコンで客先をつなぐ目印)。v14より前のToDoは、元の訪問が残っていれば CSV を作るときにそこから出す(`todoCode`)。手で書いたToDoは空。長押しの編集で顧客名を変えたら、`resolveCustomerCode`(リストに1つだけある名前ならそのコード、なければ空)にする。未登録なら、名前の部分は空(ファイル名は前と同じ)。
 - **送信済みの完了ToDo**(v11): 「まだ送っていない分を送る」で送った完了ToDoは、「送信済みにする」で、リストから外して `todoArchive` に自動保存(`sentAt` 付き)。送ったあとに完了したものは外さない。未完了は、いつまでもリストに残り、毎回送る。
@@ -191,6 +199,6 @@
 ## 7. 変更するときの注意(いつも守ること)
 
 - **保存データを消さない。キー名を変えない。** 変更の前に、データ画面の「バックアップ保存」を押すよう、利用者に伝える。
-- `container.js` を差し替えたら、`sw.js` の `CACHE` の版(今は v18)を上げる。`container.js` の `APP_VERSION`(同じ数字)と `APP_DATE`(作った日)も直す。
+- `container.js` を差し替えたら、`sw.js` の `CACHE` の版(今は v19)を上げる。`container.js` の `APP_VERSION`(同じ数字)と `APP_DATE`(作った日)も直す。
 - 顧客リスト(暗号化)や、顧客の実データを、GitHubに置かない。
 - 「テストで」と言われたら、テスト用のページ(作業用の枝)だけに入れる。**main に入れるのは「main に入れて」と言われたときだけ。**

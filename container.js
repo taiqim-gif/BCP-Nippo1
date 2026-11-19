@@ -1941,6 +1941,9 @@ function copyMailAddr(){
   if(!m || typeof copyToClipboard !== "function") return false;
   try{ copyToClipboard(m); return true; }catch(e){ return false; }
 }
+// メールの本文の先頭に、送り先のアドレスを書く(v19。宛先に入らなかったとき、本文からコピーして貼り付けられる)
+function mailToLine(){ const m = userMail(); return m ? `送り先: ${m}\n\n` : ""; }
+window.ctMailToLine = mailToLine;
 
 /* ---------- CSVの中身(毎日の送信と、月まとめの送信で同じ形) ---------- */
 function localYmd(iso){                       // 日時(ISO)を、スマホの時刻の「年-月-日」にする
@@ -2044,7 +2047,7 @@ async function mailAllCsv(){
   try{ localStorage.setItem(TODO_SENT_IDS_KEY, JSON.stringify(todos.filter(t => t.done).map(t => t.id))); }catch(e){ /* 保存できなくても送れる */ }
   const nm = userName();
   const title = `営業日報 ${today}${nm ? " " + nm : ""}`;
-  const text = `営業日報 ${today}${nm ? " " + nm : ""}\n訪問${visits.length}件・車両${vdays.length}日・ToDo${todos.length}件・容器${cts.length}本(CSVとバックアップを添付)`;
+  const text = mailToLine() + `営業日報 ${today}${nm ? " " + nm : ""}\n訪問${visits.length}件・車両${vdays.length}日・ToDo${todos.length}件・容器${cts.length}本(CSVとバックアップを添付)`;
   const copied = copyMailAddr();
   const r = await saveFiles(files, title, text);
   if(r) noteBackup();
@@ -2118,7 +2121,7 @@ async function mailMonthCsv(ym){
     backupPart()];
   const nm = userName();
   const title = `運転日報 ${ym.slice(0, 4)}年${monthLabel(ym)}分${nm ? " " + nm : ""}`;
-  const text = `${title}\n訪問${md.visits.length}件・車両${md.vdays.length}日・ToDo${md.todos.length}件・容器${md.cts.length}本(CSVとバックアップを添付)`;
+  const text = mailToLine() + `${title}\n訪問${md.visits.length}件・車両${md.vdays.length}日・ToDo${md.todos.length}件・容器${md.cts.length}本(CSVとバックアップを添付)`;
   const copied = copyMailAddr();
   const r = await saveFiles(files, title, text);
   if(!r) return;                                  // 共有の画面を閉じただけ
@@ -2132,6 +2135,7 @@ async function mailMonthCsv(ym){
     if(!window.confirm(`${monthLabel(ym)}分の運転日報を、送れましたか?\n\n「OK」で、お知らせを消します。`)) return;
     try{ if((localStorage.getItem(MONTHLY_SENT_KEY) || "") < ym) localStorage.setItem(MONTHLY_SENT_KEY, ym); }catch(e){ /* 保存できなくても動く */ }
     renderMonthly();
+    playFx("coin");
     // 送れたら、その月の分をスマホから消す(キャンセルなら何も消さない)
     const d = monthData(ym);
     if(d.visits.length + d.vdays.length + d.cts.length + d.doneTodos.length === 0) return;
@@ -2276,8 +2280,8 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v18";
-const APP_DATE = "2026-11-18";
+const APP_VERSION = "v19";
+const APP_DATE = "2026-11-19";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
 /* =========================================================
@@ -2303,6 +2307,13 @@ dataSection.innerHTML = `
       <div class="dt-item">
         <button class="btn btn-outline-mint" id="dtUserEdit">登録・変更</button>
         <div class="dt-desc">名前と、日報の送り先</div>
+      </div>
+      <div class="dt-item">
+        <div class="ct-fxrow">
+          <button type="button" class="ct-fxbtn" id="dtSoundBtn">効果音 ON</button>
+          <button type="button" class="ct-fxbtn" id="dtVibeBtn">バイブ ON</button>
+        </div>
+        <div class="dt-desc">ToDo・訪問・出発/帰社・送信のときに鳴らす/ふるえる(押すと切り替え。iPhoneはマナーモードだと音は出ません)</div>
       </div>
     </div>
   </section>
@@ -3279,6 +3290,7 @@ window.attachTodoDrag = function(handle, container){
     }
     if(before){ if(item.nextElementSibling !== before) container.insertBefore(item, before); }
     else if(container.lastElementChild !== item){ container.appendChild(item); }
+    numberTodos();                                 // 動かしている間も、右の番号を付け直す
   }
   function stopListening(){
     window.removeEventListener("pointermove", onMove);
@@ -4063,6 +4075,7 @@ function markAllSent(){
   renderList();
   renderData();
   showToast("送信済みにしました");
+  playFx("coin");
 }
 
 function afterDelete(msg){
@@ -4956,5 +4969,188 @@ document.addEventListener("visibilitychange", () => { if(!document.hidden) rende
   const btn = $("mailButton");
   if(btn) btn.style.display = "none";
 })();
+
+/* =========================================================
+   v19：ToDoの番号・効果音・バイブ
+   ・ToDoリスト(実行中)の右端(≡の左)に、上から 1, 2, 3… の番号(薄い紫)。並べ替えると付け直す
+   ・効果音(音声ファイルは使わず、その場で作る音)
+       coin   = コイン風「チャリン♪」(ToDoのチェック・訪問の開始/記録終了・送信済みにした)
+       undo   = 明るく短い「ピロッ♪」(終了したToDoのチェックを外した)
+       depart = 未来風の上がる音(出発)　return = 未来風の下がる音(帰社)
+   ・バイブ：Android は navigator.vibrate。iPhone は使えないので、
+     「スイッチ型のチェック欄」を見えない所で押して、軽い振動を出す(iOS 18 以降。将来使えなくなることもある)
+   ・効果音・バイブは、データ画面の「使う人」で別々に ON/OFF(保存 fxSound・fxVibe、"0"=OFF。最初は ON)
+========================================================= */
+
+// ToDoの番号(ホーム・車両の ToDoリスト。終了したToDoリストには付けない)
+function numberTodos(){
+  document.querySelectorAll(".todo-list-target").forEach(list => {
+    let n = 0;
+    list.querySelectorAll(".todo-item").forEach(item => {
+      n++;
+      let no = item.querySelector(".todo-no");
+      if(!no){
+        no = document.createElement("span");
+        no.className = "todo-no";
+        no.setAttribute("aria-hidden", "true");
+        const handle = item.querySelector(".todo-handle");
+        if(handle) item.insertBefore(no, handle); else item.appendChild(no);
+      }
+      if(no.textContent !== String(n)) no.textContent = String(n);
+    });
+  });
+}
+window.ctNumberTodos = numberTodos;
+(function(){
+  const prev = window.renderTodoList;
+  if(typeof prev === "function") window.renderTodoList = function(){ prev.apply(this, arguments); numberTodos(); };
+  const st = document.createElement("style");
+  st.id = "fxStyle";
+  st.textContent = `
+  .todo-item .todo-no{ flex:0 0 auto; min-width:18px; text-align:right; font-size:11px; color:#9A94D9; font-family:"Helvetica Neue",Arial,sans-serif; font-weight:400; -webkit-user-select:none; user-select:none; }
+  .ct-fxrow{ display:flex; gap:8px; }
+  .ct-fxbtn{ flex:1 1 0; min-height:40px; border-radius:10px; font-size:14px; font-weight:700; border:2px solid var(--lavender-dark, #9C8FD0); background:var(--lavender, #E6E0F8); color:var(--lavender-ink, #4A3F7A); }
+  .ct-fxbtn.off{ background:#fff; border-color:#C9C4D6; color:#8A8698; font-weight:400; }
+  `;
+  document.head.appendChild(st);
+  numberTodos();
+})();
+
+// 設定(効果音・バイブ)
+const FX_SOUND_KEY = "fxSound", FX_VIBE_KEY = "fxVibe";
+function fxOn(key){ try{ return localStorage.getItem(key) !== "0"; }catch(e){ return true; } }
+function fxSet(key, on){ try{ localStorage.setItem(key, on ? "1" : "0"); }catch(e){ /* 保存できなくても動く */ }  }
+
+// 音(Web Audio。最初に指で押したときに使えるようになる)
+let fxCtx = null;
+function fxAudio(){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC) return null;
+  if(!fxCtx){ try{ fxCtx = new AC(); }catch(e){ return null; } }
+  if(fxCtx.state === "suspended"){ try{ fxCtx.resume(); }catch(e){ /* 鳴らなくても続ける */ } }
+  return fxCtx;
+}
+// 1つの音：type=波の形、f0→f1(高さを滑らせる)、at=始まり(秒)、dur=長さ、vol=大きさ、lp=[こもり具合の始め,終わり]
+function fxTone(ctx, o){
+  const t = ctx.currentTime + (o.at || 0), end = t + o.dur;
+  const osc = ctx.createOscillator(), g = ctx.createGain();
+  osc.type = o.type || "sine";
+  osc.frequency.setValueAtTime(o.f0, t);
+  if(o.f1 && o.f1 !== o.f0) osc.frequency.exponentialRampToValueAtTime(o.f1, t + (o.glide || o.dur));
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(o.vol, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, end);
+  let last = osc;
+  if(o.lp){
+    const f = ctx.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.setValueAtTime(o.lp[0], t);
+    f.frequency.exponentialRampToValueAtTime(o.lp[1], end);
+    osc.connect(f); last = f;
+  }
+  last.connect(g); g.connect(ctx.destination);
+  osc.start(t); osc.stop(end + 0.02);
+}
+const FX_SOUNDS = {
+  coin: [   // コイン風「チャリン♪」(2音で上がる + キラッ)
+    { type:"square", f0:880, at:0, dur:0.08, vol:0.10 },
+    { type:"square", f0:1319, at:0.075, dur:0.42, vol:0.10 },
+    { type:"sine", f0:2637, at:0.075, dur:0.30, vol:0.03 }],
+  undo: [   // 明るく短い「ピロッ♪」
+    { type:"sine", f0:1047, f1:1397, at:0, dur:0.08, vol:0.16 },
+    { type:"sine", f0:1568, at:0.085, dur:0.14, vol:0.14 }],
+  depart: [ // 未来風の上がる音(起動していく感じ)
+    { type:"sawtooth", f0:180, f1:1250, at:0, dur:0.62, glide:0.55, vol:0.08, lp:[500, 4500] },
+    { type:"sine", f0:362, f1:2500, at:0, dur:0.62, glide:0.55, vol:0.05 },
+    { type:"triangle", f0:1568, at:0.55, dur:0.32, vol:0.08 },
+    { type:"sine", f0:2349, at:0.55, dur:0.36, vol:0.04 }],
+  return: [ // 未来風の下がる音(着陸・停止する感じ)
+    { type:"sawtooth", f0:1250, f1:160, at:0, dur:0.75, glide:0.70, vol:0.08, lp:[4500, 450] },
+    { type:"sine", f0:2500, f1:322, at:0, dur:0.75, glide:0.70, vol:0.05 },
+    { type:"sine", f0:196, at:0.66, dur:0.40, vol:0.10 }]
+};
+function fxSound(kind){
+  const list = FX_SOUNDS[kind];
+  if(!list) return;
+  const ctx = fxAudio();
+  if(!ctx) return;
+  try{ list.forEach(o => fxTone(ctx, o)); }catch(e){ /* 鳴らなくても続ける */ }
+}
+
+// バイブ
+const FX_VIBES = { coin:30, undo:15, depart:[30, 50, 60], return:[60, 50, 30] };
+const fxIsIOS = /iPhone|iPad|iPod/.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let fxTap = null;
+function fxIosTap(){
+  if(!fxIsIOS || !document.body) return;
+  try{
+    if(!fxTap){
+      fxTap = document.createElement("label");
+      fxTap.setAttribute("aria-hidden", "true");
+      fxTap.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;overflow:hidden;";
+      fxTap.innerHTML = '<input type="checkbox" switch tabindex="-1">';
+      fxTap.addEventListener("click", e => e.stopPropagation());   // ほかの「押した」の処理に届けない
+      document.body.appendChild(fxTap);
+    }
+    fxTap.click();
+    const inp = fxTap.querySelector("input");
+    if(inp && document.activeElement === inp) inp.blur();
+  }catch(e){ /* 振動できなくても続ける */ }
+}
+function fxVibe(kind){
+  const p = FX_VIBES[kind];
+  if(p === undefined) return;
+  if(typeof navigator.vibrate === "function"){
+    try{ if(navigator.vibrate(p)) return; }catch(e){ /* 下へ */ }
+  }
+  fxIosTap();
+}
+
+// 鳴らす・ふるえる(設定に従う)
+function playFx(kind){
+  if(fxOn(FX_SOUND_KEY)) fxSound(kind);
+  if(fxOn(FX_VIBE_KEY)) fxVibe(kind);
+}
+window.ctPlayFx = playFx;
+
+// いつ鳴らすか(元のアプリの処理より先に聞く＝指で押したその時に鳴らす)
+document.addEventListener("change", e => {
+  const t = e.target;
+  if(!t || !t.classList) return;
+  if(t.classList.contains("todo-complete") && t.checked) playFx("coin");       // ToDoを実行済に
+  else if(t.classList.contains("todo-undo") && !t.checked) playFx("undo");     // 終了したToDoを戻す
+}, true);
+document.addEventListener("click", e => {
+  const el = e.target && e.target.closest ? e.target.closest("#homeStartButton, #endButton, #vehicleSaveButton") : null;
+  if(!el || el.disabled) return;
+  if(el.id === "homeStartButton"){
+    const inp = $("homeVisitTarget");
+    if(inp && inp.value.trim()) playFx("coin");                                // 訪問の開始
+  }else if(el.id === "endButton"){
+    if(typeof currentVisit !== "undefined" && currentVisit && !currentVisit.isEdit) playFx("coin");   // 訪問の記録終了(編集の「保存」は鳴らさない)
+  }else{
+    playFx(typeof vehicleViewMode !== "undefined" && vehicleViewMode === "return" ? "return" : "depart");   // 出発・帰社
+  }
+}, true);
+
+// データ画面の切り替えボタン
+function renderFxButtons(){
+  const s = $("dtSoundBtn"), v = $("dtVibeBtn");
+  if(s){ const on = fxOn(FX_SOUND_KEY); s.textContent = `効果音 ${on ? "ON" : "OFF"}`; s.classList.toggle("off", !on); s.setAttribute("aria-pressed", on ? "true" : "false"); }
+  if(v){ const on = fxOn(FX_VIBE_KEY); v.textContent = `バイブ ${on ? "ON" : "OFF"}`; v.classList.toggle("off", !on); v.setAttribute("aria-pressed", on ? "true" : "false"); }
+}
+if($("dtSoundBtn")) $("dtSoundBtn").addEventListener("click", () => {
+  const on = !fxOn(FX_SOUND_KEY);
+  fxSet(FX_SOUND_KEY, on);
+  renderFxButtons();
+  if(on) fxSound("coin");                 // ON にしたら、試しに鳴らす
+});
+if($("dtVibeBtn")) $("dtVibeBtn").addEventListener("click", () => {
+  const on = !fxOn(FX_VIBE_KEY);
+  fxSet(FX_VIBE_KEY, on);
+  renderFxButtons();
+  if(on) fxVibe("coin");                  // ON にしたら、試しにふるえる
+});
+renderFxButtons();
 
 })();
