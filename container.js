@@ -632,15 +632,15 @@ style.textContent = `
   /* 顧客の管理 */
   .cm-top{ display:flex; align-items:center; gap:10px; margin:6px 0 10px; }
   .cm-top h2{ margin:0; }
-  .cm-row{ display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line); font-size:15px; }
+  .cm-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; padding:10px 4px; border-bottom:1px solid var(--line); font-size:15px; }   /* v27:2段(上=名前、下=コード・ボタン・非表示) */
   .cm-row input[type=checkbox]{ width:20px; height:20px; flex:none; }
-  .cm-name{ flex:1; min-width:0; overflow-wrap:anywhere; }
+  .cm-name{ flex:1 1 100%; min-width:0; overflow-wrap:anywhere; }
   .cm-code{ font-size:12px; color:var(--ink-soft); white-space:nowrap; }
   .cm-tag{ font-size:11px; border:1px solid var(--lavender-dark); color:var(--lavender-ink); border-radius:4px; padding:0 4px; white-space:nowrap; }
   .cm-mini{ border:1.5px solid var(--line); background:#fff; border-radius:8px; padding:4px 9px; font-size:12px; font-weight:700; font-family:inherit; color:var(--ink); cursor:pointer; }
   .cm-note{ font-size:14px; font-weight:700; color:var(--lavender-ink); margin:0 2px 8px; }
   .cm-head{ display:flex; justify-content:space-between; font-size:12px; color:var(--ink-soft); padding:6px 4px 2px; border-bottom:1px solid var(--line); }
-  .cm-chk{ display:flex; align-items:center; gap:4px; font-size:12px; color:var(--ink-soft); padding:6px 4px; flex:none; white-space:nowrap; cursor:pointer; }
+  .cm-chk{ display:flex; align-items:center; gap:4px; font-size:12px; color:var(--ink-soft); padding:6px 4px; flex:none; white-space:nowrap; cursor:pointer; margin-left:auto; }
   .cm-row.is-hidden .cm-name{ color:var(--ink-soft); text-decoration:line-through; }
   .cm-tools{ display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; align-items:center; }
   .cm-share-note{ font-size:12px; color:var(--ink-soft); line-height:1.6; margin-bottom:8px; }
@@ -2319,7 +2319,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v26";
+const APP_VERSION = "v27";
 const APP_DATE = "2026-11-20";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -3591,6 +3591,7 @@ custSection.innerHTML = `
 document.querySelector("main").appendChild(custSection);
 
 let cmTab = "all", cmKana = null, cmLimit = 100, cmEditId = null;
+let cmKanaStep = 0;         // v27:「あ〜わ」を押した段階(ホーム・容器と同じしくみ。外すのは「全件」)
 let cmEditKey = null;       // v26:直している「取り込んだ顧客」の目印(custEdit のキー)
 $("cmLists").addEventListener("change", e => { if(e.target.name === "cmListUse") setListUse(e.target.value); });
 $("cmLists").addEventListener("click", e => { const b = e.target.closest(".cm-ldel"); if(!b) return; e.preventDefault(); deleteMasterSource(b.getAttribute("data-office")); });
@@ -3604,7 +3605,7 @@ function cmItems(){
     const nq = normQ(q), hq = hira(q);
     items = items.filter(i => normQ(i.n).includes(nq) || (i.k && hira(i.k).includes(hq)) || (i.c && normQ(i.c).includes(nq)));
   }
-  if(cmKana) items = items.filter(i => kanaRowOf(i.k) === cmKana);
+  if(cmKana) items = items.filter(i => kanaStepMatch(i.k, cmKana, cmKanaStep));
   items.sort((a, b) => hira(a.k || a.n).localeCompare(hira(b.k || b.n), "ja") || a.n.localeCompare(b.n, "ja"));
   return items;
 }
@@ -3628,10 +3629,17 @@ function renderCust(){
     const b = document.createElement("button");
     b.type = "button";
     b.className = "kana-btn" + (row === cmKana ? " active" : "");
-    b.textContent = row;
-    b.addEventListener("click", () => { cmKana = (cmKana === row) ? null : row; cmLimit = 100; renderCust(); });
+    b.textContent = kanaLabel(row, cmKana, cmKanaStep);
+    b.addEventListener("click", () => { const nx = kanaNext(cmKana, cmKanaStep, row); cmKana = nx.row; cmKanaStep = nx.step; cmLimit = 100; renderCust(); });
     grid.appendChild(b);
   });
+  const all = document.createElement("button");                                  // v27:絞り込みを外して全件に戻す
+  all.type = "button";
+  all.className = "kana-btn" + (cmKana ? "" : " active");
+  all.id = "cmKanaAll";
+  all.textContent = "全件";
+  all.addEventListener("click", () => { cmKana = null; cmKanaStep = 0; cmLimit = 100; renderCust(); });
+  grid.appendChild(all);
 
   const items = cmItems();
   $("cmCount").textContent = `${items.length}件`;
