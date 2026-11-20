@@ -101,7 +101,41 @@ let ctFilter = "all";
 let ctEditId = null;
 let ctAdding = false;       // 「この顧客に追加」「新しい記録として追加」で、続けて追加入力している状態
 let ctKana = null;
+let ctKanaStep = 0;         // v25:「あ〜わ」を押した回数-1(0=行全部、1=2文字目から下…)
 let ctPicked = null;        // 一覧から選んだ客先 { code, name }
+
+/* ---------- v25:「あ」を押すたびに絞り込む(1回目=あ行全部、2回目=い〜お、3回目=う〜お…、最後の次は行全部に戻る) ---------- */
+const KANA_STEPS = { "あ":"あいうえお", "か":"かきくけこ", "さ":"さしすせそ", "た":"たちつてと", "な":"なにぬねの",
+  "は":"はひふへほ", "ま":"まみむめも", "や":"やゆよ", "ら":"らりるれろ", "わ":"わをん" };
+const KANA_SMALL = { "ぁ":"あ","ぃ":"い","ぅ":"う","ぇ":"え","ぉ":"お","っ":"つ","ゃ":"や","ゅ":"ゆ","ょ":"よ","ゎ":"わ" };
+// 読みの1文字目を、濁点・半濁点・小さい字を外した字にする(が→か、ぱ→は、ゔ→う、ぁ→あ)
+function kanaHead(reading){
+  const s = toHiragana(reading).trim();
+  if(!s) return "";
+  const ch = s[0].normalize("NFD")[0];
+  return KANA_SMALL[ch] || ch;
+}
+// 行(row)と押した回数(step)に合う読みか。step=0 は行全部、step=n は n+1 文字目から下
+function kanaStepMatch(reading, row, step){
+  if(kanaRowOf(reading) !== row) return false;
+  const chars = KANA_STEPS[row];
+  if(!chars || !step) return true;
+  return chars.indexOf(kanaHead(reading)) >= step;
+}
+// 押したときの次の状態。同じ行なら次の段階(最後の次は行全部)、別の行なら行全部から。「他」は押し直しで外す
+function kanaNext(curRow, curStep, row){
+  if(curRow !== row) return { row, step:0 };
+  const chars = KANA_STEPS[row];
+  if(!chars) return { row:null, step:0 };
+  return { row, step:(curStep + 1) % chars.length };
+}
+// ボタンの表示(押している行は、今の段階の字。2回目以降は「い〜」のように)
+function kanaLabel(row, curRow, curStep){
+  if(row !== curRow || !curStep || !KANA_STEPS[row]) return row;
+  return KANA_STEPS[row][curStep] + "〜";
+}
+window.ctKanaStepMatch = kanaStepMatch;
+window.ctKanaNext = kanaNext;
 const FS = {   // 顧客カードの文字サイズ(小・標準・大)。単位は画面上の文字の大きさ
   s:{ name:18, sum:12, line:14, badge:12, btn:12, row:15, hint:11, swipe:13 },
   m:{ name:20, sum:14, line:16, badge:14, btn:14, row:17, hint:13, swipe:15 },
@@ -1286,13 +1320,14 @@ function renderKana(){
     const b = document.createElement("button");
     b.type = "button";
     b.className = "kana-btn" + (row === ctKana ? " active" : "");
-    b.textContent = row;
+    b.textContent = kanaLabel(row, ctKana, ctKanaStep);
     b.addEventListener("click", () => {
-      ctKana = (ctKana === row) ? null : row;
+      const nx = kanaNext(ctKana, ctKanaStep, row);
+      ctKana = nx.row; ctKanaStep = nx.step;
       renderKana();
       if(!ctKana){ showCustomerList(null); return; }
       const items = customerMaster.items
-        .filter(i => kanaRowOf(i.k) === ctKana)
+        .filter(i => kanaStepMatch(i.k, ctKana, ctKanaStep))
         .sort((a, b2) => toHiragana(a.k).localeCompare(toHiragana(b2.k), "ja"));
       showCustomerList(items);
     });
@@ -2283,8 +2318,8 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v24";
-const APP_DATE = "2026-11-19";
+const APP_VERSION = "v25";
+const APP_DATE = "2026-11-20";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
 /* =========================================================
@@ -2512,6 +2547,57 @@ function homeTypeSuggest(){
   box.scrollTop = 0;
 }
 window.ctHomeTypeSuggest = homeTypeSuggest;
+
+/* ---------- v25:ホームの「あ〜わ他」も、押すたびに絞り込む(容器タブと同じしくみ)。元の renderKanaGrid・renderCustomerList を置き換える ---------- */
+let homeKanaStep = 0;
+window.renderKanaGrid = function(){
+  const grid = $("kanaGrid");
+  if(!grid) return;
+  grid.innerHTML = "";
+  [...KANA_ROWS.map(r => r[0]), "他"].forEach(row => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "kana-btn" + (row === activeKana ? " active" : "");
+    btn.textContent = kanaLabel(row, activeKana, homeKanaStep);
+    btn.addEventListener("click", () => {
+      const nx = kanaNext(activeKana, homeKanaStep, row);
+      activeKana = nx.row; homeKanaStep = nx.step;
+      window.renderKanaGrid();
+      window.renderCustomerList();
+    });
+    grid.appendChild(btn);
+  });
+};
+window.renderCustomerList = function(){
+  const box = $("customerList");
+  if(!box) return;
+  box.innerHTML = "";
+  if(!activeKana || !customerMaster){ box.style.display = "none"; return; }
+  const items = customerMaster.items
+    .filter(i => kanaStepMatch(i.k, activeKana, homeKanaStep))
+    .sort((a, b) => toHiragana(a.k).localeCompare(toHiragana(b.k), "ja"));
+  if(items.length === 0){
+    const empty = document.createElement("div");
+    empty.className = "customer-empty";
+    empty.textContent = "該当する客先はありません";
+    box.appendChild(empty);
+  }else{
+    items.forEach(item => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "customer-item";
+      btn.textContent = item.n;
+      btn.addEventListener("click", () => {
+        $("homeVisitTarget").value = item.n;
+        selectedCustomer = { code: item.c || "", name: item.n };
+        box.style.display = "none";
+      });
+      box.appendChild(btn);
+    });
+  }
+  box.style.display = "block";
+  box.scrollTop = 0;
+};
 
 /* ---------- 訪問履歴：1件を3行にまとめる(番号・時刻・面談者 / 顧客名 / 内容)。編集・削除は、右上の小さなボタン ---------- */
 function compactVisitCards(){

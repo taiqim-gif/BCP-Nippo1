@@ -53,6 +53,11 @@ imp = subprocess.run(["node", "master_import_test.js"], capture_output=True, tex
 text += (imp.stdout or "") + (imp.stderr or "")
 if imp.returncode != 0 and out.returncode == 0:
     out = imp
+# v25:「あ〜わ」を押すたびに絞り込む確認(本物の index.html + container.js)
+kt = subprocess.run(["node", "kana_tap_test.js"], capture_output=True, text=True, encoding="utf-8", errors="replace", shell=(os.name == "nt"))
+text += (kt.stdout or "") + (kt.stderr or "")
+if kt.returncode != 0 and out.returncode == 0:
+    out = kt
 open(os.path.join(HERE, "smoke8.out"), "w", encoding="utf-8").write(text)
 lines = text.splitlines()
 print("合格の項目数:", sum(1 for l in lines if l.startswith("PASS ")))
