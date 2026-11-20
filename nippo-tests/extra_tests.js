@@ -197,13 +197,49 @@ d.querySelector('#cmTabs button[data-tab="all"]').click();
 $("cmSearch").value="やまだ"; ev($("cmSearch"),"input");
 ok(rowsOf().join()==="山田ガス店","search by reading in 管理");
 $("cmSearch").value=""; ev($("cmSearch"),"input");
-// まとめて
-$("cmSearch").value="工業"; ev($("cmSearch"),"input");
-confirms.length=0; confirmAnswer=true; $("cmHideAll").click();
-ok(/^絞り込んだ 1件を非表示にします。/.test(confirms[0]||"") && JSON.parse(w.localStorage.getItem("customerHidden")).join()==="c:2002","bulk hide of the filtered customers (confirm shows the count)");
-confirms.length=0; $("cmShowAll").click();
-ok(/^絞り込んだ 1件を表示に戻します。/.test(confirms[0]||"") && JSON.parse(w.localStorage.getItem("customerHidden")).length===0,"bulk restore of the filtered customers");
+// v26:「絞り込んだ分を全て非表示/表示に戻す」はなくした
+ok(!$("cmHideAll") && !$("cmShowAll"),"v26: the bulk hide / restore buttons are gone");
+// v26:取り込んだ顧客の名前・読み仮名を直す
+{
+const mbtn=n=>rowOf(n).querySelector('button[data-act="medit"]');
+ok(!!mbtn("〇〇商店") && !rowOf("〇〇商店").querySelector('button[data-act="del"]'),"v26: an imported customer has 直す (and no 消す)");
+mbtn("〇〇商店").click();
+ok($("cmAddName").value==="〇〇商店" && $("cmAddCode").value==="1001" && $("cmAddCode").disabled && $("cmAddBtn").textContent==="更新" && $("cmAddRevert").hidden,"v26: 直す fills the form, code is locked, no revert yet");
+$("cmAddName").value="〇〇商店(本店)"; $("cmAddKana").value="まるまるしょうてん"; $("cmAddBtn").click();
+const ed26=JSON.parse(w.localStorage.getItem("customerEdit")||"{}");
+ok(ed26["c:1001"] && ed26["c:1001"].n==="〇〇商店(本店)" && ed26["c:1001"].k==="まるまるしょうてん","v26: saved in customerEdit by code");
+ok(!!rowOf("〇〇商店(本店)") && /直した/.test(rowOf("〇〇商店(本店)").textContent) && !rowOf("〇〇商店"),"v26: the list shows the new name with a 直した tag");
+ok(w.eval("customerMaster.items").some(i=>i.n==="〇〇商店(本店)" && i.k==="まるまるしょうてん" && i.c==="1001"),"v26: pickers get the new name and reading");
+ok(JSON.parse(w.localStorage.getItem("customerMaster")).items.some(i=>i.n==="〇〇商店"),"v26: the imported list itself is not changed");
+$("cmSearch").value="まるまる"; ev($("cmSearch"),"input");
+ok(rowsOf().join()==="〇〇商店(本店)","v26: search uses the new reading");
 $("cmSearch").value=""; ev($("cmSearch"),"input");
+ok(w.ctBackupKeys().includes("customerEdit"),"v26: customerEdit is in the backup");
+ok(JSON.stringify(w.ctCustSettingsPayload().edit)===JSON.stringify(ed26),"v26: the copy file carries the edits");
+// 取り込み直しても残る(同じ顧客コード)
+const mOld=w.localStorage.getItem("customerMaster");
+w.localStorage.setItem("customerMaster",mOld); w.renderMasterUI();
+ok(w.eval("customerMaster.items").some(i=>i.n==="〇〇商店(本店)"),"v26: the edit stays after the list is stored again");
+// 元に戻す
+mbtn("〇〇商店(本店)").click();
+ok(!$("cmAddRevert").hidden,"v26: an edited customer shows 取り込んだときの名前に戻す");
+$("cmAddRevert").click();
+ok(!!rowOf("〇〇商店") && !JSON.parse(w.localStorage.getItem("customerEdit")||"{}")["c:1001"] && !$("cmAddCode").disabled,"v26: revert brings back the imported name and clears the edit");
+// 同じ名前に戻したときも、直した印は外れる
+mbtn("〇〇商店").click(); $("cmAddBtn").click();
+ok(Object.keys(JSON.parse(w.localStorage.getItem("customerEdit")||"{}")).length===0,"v26: saving the imported name unchanged leaves no edit");
+// 取り込みのとき:足すだけ=まだ直していない顧客だけ、同じにする=上書き
+const pl26=w.ctCustSettingsPlan({kind:"customerSettings",ver:2,hidden:[],extra:[],edit:{"c:1001":{n:"送った名前",k:"おくった"},"x:bad":{n:"x"}}});
+ok(pl26.editTotal===1 && pl26.editAdd===1,"v26: the plan counts valid edits only");
+w.ctApplyCustSettings(pl26,"add");
+ok(w.eval("customerMaster.items").some(i=>i.n==="送った名前"),"v26: add mode takes an edit this phone did not have");
+w.ctApplyCustSettings(w.ctCustSettingsPlan({kind:"customerSettings",ver:2,hidden:[],extra:[],edit:{"c:1001":{n:"もう一つ",k:""}}}),"add");
+ok(w.eval("customerMaster.items").some(i=>i.n==="送った名前"),"v26: add mode keeps this phone's own edit");
+w.ctApplyCustSettings(w.ctCustSettingsPlan({kind:"customerSettings",ver:2,hidden:[],extra:[],edit:{"c:1001":{n:"もう一つ",k:""}}}),"replace");
+ok(w.eval("customerMaster.items").some(i=>i.n==="もう一つ"),"v26: replace mode overwrites with the sender's edit");
+mbtn("もう一つ").click(); $("cmAddRevert").click();
+ok(!!rowOf("〇〇商店") && w.localStorage.getItem("customerEdit")==="{}","v26: cleaned up");
+}
 // 容器タブの候補から消える
 cbOf("〇〇商店").checked=true; ev(cbOf("〇〇商店"),"change");
 d.querySelector("#navContainerButton").click();

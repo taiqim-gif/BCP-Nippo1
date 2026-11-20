@@ -58,7 +58,8 @@ const CAP_PRESETS = {
 
 const CT_KEY = "containerLogs";
 const TODO_ARCHIVE_KEY = "todoArchive";   // 送信済みにした「完了したToDo」の自動保存(リストからは外す。月まとめの送信とバックアップに使う)
-const BACKUP_KEYS = ["meetingLogs","dailyVehicleInfo","todoItems","containerLogs","customerHidden","customerExtra","dailyWeather",TODO_ARCHIVE_KEY];
+const BACKUP_KEYS = ["meetingLogs","dailyVehicleInfo","todoItems","containerLogs","customerHidden","customerExtra","customerEdit","dailyWeather",TODO_ARCHIVE_KEY];
+window.ctBackupKeys = () => BACKUP_KEYS.slice();   // 確認用
 const MAILTO_LIMIT = 50000;
 
 /* ---------- データ ---------- */
@@ -2318,7 +2319,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v25";
+const APP_VERSION = "v26";
 const APP_DATE = "2026-11-20";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -2457,9 +2458,15 @@ let custHidden = new Set(loadJson(CH_KEY, []));
 let custExtra = loadJson(CE_KEY, []);
 if(!Array.isArray(custExtra)) custExtra = [];
 function custKey(i){ return i.c ? "c:" + i.c : "n:" + i.n; }
+// v26:取り込んだ顧客の名前・読み仮名をスマホで直した分。{ "c:顧客コード"(コードが無ければ "n:取り込んだ名前"): { n, k } }
+// 顧客リストとは別に保存するので、リストを取り込み直しても残る(スマホで直したほうを使う)
+const CEDIT_KEY = "customerEdit";
+let custEdit = loadJson(CEDIT_KEY, {});
+if(!custEdit || typeof custEdit !== "object" || Array.isArray(custEdit)) custEdit = {};
 function saveCust(){
   localStorage.setItem(CH_KEY, JSON.stringify([...custHidden]));
   localStorage.setItem(CE_KEY, JSON.stringify(custExtra));
+  localStorage.setItem(CEDIT_KEY, JSON.stringify(custEdit));
 }
 function rawMaster(){ try{ return JSON.parse(localStorage.getItem("customerMaster") || "null"); }catch(e){ return null; } }
 
@@ -2470,7 +2477,16 @@ function allCustomers(){
   const first = (raw && Array.isArray(raw.sources) && raw.sources[0]) ? raw.sources[0].office : (raw ? (raw.office || "") : "");
   const codes = new Set(base.map(i => i.c).filter(Boolean));
   const extras = custExtra.filter(e => !(e.c && codes.has(e.c))).map(e => ({ n:e.n, k:e.k || "", c:e.c || "", x:true, id:e.id }));
-  return base.map(i => ({ n:i.n, k:i.k || "", c:i.c || "", x:false, o: i.o != null ? i.o : first })).concat(extras);
+  return base.map(i => {
+    const it = { n:i.n, k:i.k || "", c:i.c || "", x:false, o: i.o != null ? i.o : first };
+    const ek = custKey(it), ed = custEdit[ek];                                    // スマホで直した名前・読み仮名があれば、そちらを使う
+    if(ed && typeof ed === "object"){
+      it.ek = ek; it.on = it.n; it.okana = it.k;                                   // 取り込んだときの名前・読み仮名(元に戻すため)
+      if(ed.n) it.n = String(ed.n);
+      if(typeof ed.k === "string") it.k = ed.k;
+    }
+    return it;
+  }).concat(extras);
 }
 // 使うリスト(顧客の候補に出すリスト)。空なら「すべて」。そのリストがなくなったら「すべて」に戻す
 const LIST_USE_KEY = "customerListUse";
@@ -3545,8 +3561,6 @@ custSection.innerHTML = `
     <input type="text" id="cmSearch" placeholder="顧客名・読み仮名・コードで検索" autocomplete="off">
     <div class="kana-grid" id="cmKana" style="margin-top:8px;"></div>
     <div class="cm-tools">
-      <button type="button" class="cm-mini" id="cmHideAll">絞り込んだ分を全て非表示</button>
-      <button type="button" class="cm-mini" id="cmShowAll">絞り込んだ分を全て表示に戻す</button>
       <span class="cm-count" id="cmCount"></span>
     </div>
     <div class="cm-head"><span>顧客</span><span>非表示にする</span></div>
@@ -3561,6 +3575,7 @@ custSection.innerHTML = `
       <input type="text" id="cmAddCode" placeholder="顧客コード(省略可)" autocomplete="off" style="margin-bottom:8px;">
     </div>
     <button type="button" class="btn btn-mint" id="cmAddBtn">追加</button>
+    <button type="button" class="btn btn-outline-mint" id="cmAddRevert" style="margin-top:8px;" hidden>取り込んだときの名前に戻す</button>
     <button type="button" class="btn btn-outline-mint" id="cmAddCancel" style="margin-top:8px;" hidden>やめる</button>
   </div>
   <div class="card" id="cmShareCard">
@@ -3576,6 +3591,7 @@ custSection.innerHTML = `
 document.querySelector("main").appendChild(custSection);
 
 let cmTab = "all", cmKana = null, cmLimit = 100, cmEditId = null;
+let cmEditKey = null;       // v26:直している「取り込んだ顧客」の目印(custEdit のキー)
 $("cmLists").addEventListener("change", e => { if(e.target.name === "cmListUse") setListUse(e.target.value); });
 $("cmLists").addEventListener("click", e => { const b = e.target.closest(".cm-ldel"); if(!b) return; e.preventDefault(); deleteMasterSource(b.getAttribute("data-office")); });
 
@@ -3634,8 +3650,10 @@ function renderCust(){
     row.className = "cm-row" + (hidden ? " is-hidden" : "");
     row.innerHTML = `<span class="cm-name">${escapeHtml(i.n)}</span>` +
       (i.x ? '<span class="cm-tag">追加</span>' : "") +
+      (i.ek ? '<span class="cm-tag">直した</span>' : "") +
       (i.c ? `<span class="cm-code">${escapeHtml(i.c)}</span>` : "") +
-      (i.x ? `<button type="button" class="cm-mini" data-act="edit" data-id="${escapeHtml(i.id)}">直す</button><button type="button" class="cm-mini" data-act="del" data-id="${escapeHtml(i.id)}">消す</button>` : "") +
+      (i.x ? `<button type="button" class="cm-mini" data-act="edit" data-id="${escapeHtml(i.id)}">直す</button><button type="button" class="cm-mini" data-act="del" data-id="${escapeHtml(i.id)}">消す</button>`
+           : `<button type="button" class="cm-mini" data-act="medit" data-key="${encodeURIComponent(i.ek || key)}">直す</button>`) +
       `<label class="cm-chk"><input type="checkbox" data-key="${encodeURIComponent(key)}"${hidden ? " checked" : ""}><span>非表示</span></label>`;
     list.appendChild(row);
   });
@@ -3644,11 +3662,21 @@ function renderCust(){
 }
 
 function cmResetAddForm(){
-  cmEditId = null;
+  cmEditId = null; cmEditKey = null;
   $("cmAddName").value = ""; $("cmAddKana").value = ""; $("cmAddCode").value = "";
+  $("cmAddCode").disabled = false;
   $("cmAddTitle").textContent = "顧客を追加";
   $("cmAddBtn").textContent = "追加";
   $("cmAddCancel").hidden = true;
+  $("cmAddRevert").hidden = true;
+}
+// v26:取り込んだ顧客を、custEdit のキーで探す(直したあとも、取り込んだときの目印で見つける)
+function cmMasterByKey(ek){
+  return allCustomers().find(i => !i.x && (i.ek || custKey(i)) === ek) || null;
+}
+// 直したあと、コードの無い顧客は名前が目印なので、非表示の印を新しい名前に付け替える
+function cmMoveHidden(oldKey, newKey){
+  if(oldKey !== newKey && custHidden.has(oldKey)){ custHidden.delete(oldKey); custHidden.add(newKey); }
 }
 
 // 保存して、ホーム・容器の顧客選択に反映する(一覧の作り直しはしない)
@@ -3690,26 +3718,31 @@ $("cmList").addEventListener("change", e => {
   }
 });
 
-// 絞り込んだ分を、まとめて非表示／表示に戻す
-function cmBulk(hide){
-  const target = cmItems().filter(i => custHidden.has(custKey(i)) !== hide);
-  if(target.length === 0){ showToast(hide ? "非表示にする顧客はありません" : "表示に戻す顧客はありません"); return; }
-  if(!window.confirm(`絞り込んだ ${target.length}件を${hide ? "非表示にします" : "表示に戻します"}。\n\nよろしいですか?`)) return;
-  target.forEach(i => { if(hide) custHidden.add(custKey(i)); else custHidden.delete(custKey(i)); });
-  refreshCustomers();
-  showToast(`${target.length}件を${hide ? "非表示にしました" : "表示に戻しました"}`);
-}
-$("cmHideAll").addEventListener("click", () => cmBulk(true));
-$("cmShowAll").addEventListener("click", () => cmBulk(false));
 
 $("cmList").addEventListener("click", e => {
   const btn = e.target.closest("button[data-act]");
   if(!btn) return;
+  if(btn.getAttribute("data-act") === "medit"){                                   // v26:取り込んだ顧客の名前・読み仮名を直す
+    const ek = decodeURIComponent(btn.getAttribute("data-key"));
+    const it = cmMasterByKey(ek);
+    if(!it) return;
+    cmEditId = null; cmEditKey = ek;
+    $("cmAddName").value = it.n; $("cmAddKana").value = it.k || ""; $("cmAddCode").value = it.c || "";
+    $("cmAddCode").disabled = true;                                                 // 顧客コードは Access とつなぐ番号なので直さない
+    $("cmAddTitle").textContent = "顧客を直す(名前・読み仮名)";
+    $("cmAddBtn").textContent = "更新";
+    $("cmAddCancel").hidden = false;
+    $("cmAddRevert").hidden = !it.ek;
+    const card = $("cmAddCard");
+    if(card.scrollIntoView) card.scrollIntoView({ block:"center" });
+    return;
+  }
   const id = btn.getAttribute("data-id");
   const ex = custExtra.find(x => x.id === id);
   if(!ex) return;
   if(btn.getAttribute("data-act") === "edit"){
-    cmEditId = id;
+    cmEditId = id; cmEditKey = null;
+    $("cmAddCode").disabled = false; $("cmAddRevert").hidden = true;
     $("cmAddName").value = ex.n; $("cmAddKana").value = ex.k || ""; $("cmAddCode").value = ex.c || "";
     $("cmAddTitle").textContent = "追加した顧客を直す";
     $("cmAddBtn").textContent = "更新";
@@ -3730,6 +3763,19 @@ $("cmAddBtn").addEventListener("click", () => {
   const k = $("cmAddKana").value.trim();
   const c = nfkc($("cmAddCode").value).trim();
   if(!n){ showToast("顧客名を入力してください"); $("cmAddName").focus(); return; }
+  if(cmEditKey){                                                                  // v26:取り込んだ顧客を直す
+    const it = cmMasterByKey(cmEditKey);
+    if(it){
+      const oldKey = custKey(it), on = it.ek ? it.on : it.n, okana = it.ek ? it.okana : it.k;
+      if(n === on && k === okana) delete custEdit[cmEditKey];                     // 取り込んだときと同じなら、直した印を外す
+      else custEdit[cmEditKey] = { n, k };
+      cmMoveHidden(oldKey, custKey({ c: it.c, n }));
+      showToast("更新しました");
+    }
+    cmResetAddForm();
+    refreshCustomers();
+    return;
+  }
   if(c && allCustomers().some(i => i.c === c && !(cmEditId && i.id === cmEditId))){ showToast("この顧客コードは登録済みです"); $("cmAddCode").focus(); return; }
   if(cmEditId){
     const ex = custExtra.find(x => x.id === cmEditId);
@@ -3747,6 +3793,17 @@ $("cmAddBtn").addEventListener("click", () => {
   refreshCustomers();
 });
 $("cmAddCancel").addEventListener("click", cmResetAddForm);
+$("cmAddRevert").addEventListener("click", () => {                               // v26:取り込んだときの名前・読み仮名に戻す
+  const it = cmEditKey && cmMasterByKey(cmEditKey);
+  if(it && it.ek){
+    const oldKey = custKey(it);
+    delete custEdit[cmEditKey];
+    cmMoveHidden(oldKey, custKey({ c: it.c, n: it.on }));
+    showToast("取り込んだときの名前に戻しました");
+  }
+  cmResetAddForm();
+  refreshCustomers();
+});
 
 /* ---------- 顧客の設定(顧客リスト・非表示の印・追加した顧客)を、他の人にコピーする(v17、v18で顧客リストも) ----------
    ・書き出す: 顧客リスト(customerMaster)・非表示の印(customerHidden)・追加した顧客(customerExtra)を、担当キーで鍵をかけたファイルにして共有する
@@ -3773,7 +3830,8 @@ function custSettingsPayload(){
     from: (localStorage.getItem("nippoUserName") || "").trim(),
     at: new Date().toISOString(),
     hidden: [...custHidden],
-    extra: custExtra.map(e => ({ n: e.n, k: e.k || "", c: e.c || "" }))
+    extra: custExtra.map(e => ({ n: e.n, k: e.k || "", c: e.c || "" })),
+    edit: custEdit                                                                // v26:取り込んだ顧客の、直した名前・読み仮名
   };
   if(raw && Array.isArray(raw.items) && raw.items.length) data.master = raw;     // 顧客リスト(全部の顧客。リストごとの印も)
   return data;
@@ -3822,7 +3880,20 @@ function custSettingsPlan(data){
     if(c) codes.add(c);
     names.add(normQ(n));
   });
-  return { hidden: inHidden, addHide, removeHide, newExtra, extraTotal: extras.length, masterAdd, masterSrcs, masterTotal, from: String(data.from || ""), at: String(data.at || "") };
+  // v26:直した名前・読み仮名。「足すだけ」はこのスマホで直していない顧客だけ、「同じにする」は送った人のほうで上書き
+  custEdit = loadJson(CEDIT_KEY, {}); if(!custEdit || typeof custEdit !== "object" || Array.isArray(custEdit)) custEdit = {};
+  const edit = {};
+  const inEdit = (data.edit && typeof data.edit === "object" && !Array.isArray(data.edit)) ? data.edit : {};
+  Object.keys(inEdit).forEach(key => {
+    const v = inEdit[key];
+    if(!/^[cn]:./.test(key) || !v || typeof v !== "object") return;
+    const n = String(v.n || "").trim();
+    if(!n) return;
+    edit[key] = { n, k: String(v.k || "").trim() };
+  });
+  const editKeys = Object.keys(edit);
+  const editAdd = editKeys.filter(key => !custEdit[key]).length;
+  return { edit, editTotal: editKeys.length, editAdd, hidden: inHidden, addHide, removeHide, newExtra, extraTotal: extras.length, masterAdd, masterSrcs, masterTotal, from: String(data.from || ""), at: String(data.at || "") };
 }
 window.ctCustSettingsPlan = custSettingsPlan;
 // mode: "replace" = 送った人と同じにする / "add" = 非表示を足すだけ(顧客リストは、どちらでも足すだけ)
@@ -3838,6 +3909,7 @@ function applyCustSettings(plan, mode){
   if(mode === "replace") custHidden = new Set(plan.hidden);
   else plan.hidden.forEach(k => custHidden.add(k));
   plan.newExtra.forEach(e => custExtra.push({ id: newId(), n: e.n, k: e.k, c: e.c }));
+  Object.keys(plan.edit || {}).forEach(key => { if(mode === "replace" || !custEdit[key]) custEdit[key] = plan.edit[key]; });
   refreshCustomers();
 }
 window.ctApplyCustSettings = applyCustSettings;
@@ -3846,7 +3918,7 @@ $("cmShareOut").addEventListener("click", async () => {
   const key = cmShareKeyOk();
   if(!key) return;
   const data = custSettingsPayload();
-  if(!data.master && data.hidden.length === 0 && data.extra.length === 0){ showToast("コピーする顧客リスト・非表示・追加した顧客がありません"); return; }
+  if(!data.master && data.hidden.length === 0 && data.extra.length === 0 && Object.keys(data.edit).length === 0){ showToast("コピーする顧客リスト・非表示・追加した顧客がありません"); return; }
   const btn = $("cmShareOut");
   btn.disabled = true;
   try{
@@ -3904,6 +3976,7 @@ function showCustSettingsChoice(plan){
     (plan.masterTotal > 0 ? `・顧客リスト ${plan.masterTotal.toLocaleString()}件(このスマホに足す ${plan.masterAdd.length.toLocaleString()}件。同じ顧客があるものは足しません)\n` : "") +
     `・非表示 ${plan.hidden.length.toLocaleString()}件(このスマホで新しく非表示になる ${plan.addHide.toLocaleString()}件)\n` +
     `・追加した顧客 ${plan.extraTotal.toLocaleString()}件(このスマホに足す ${plan.newExtra.length.toLocaleString()}件。同じ顧客があるものは足しません)\n` +
+    (plan.editTotal > 0 ? `・名前を直した顧客 ${plan.editTotal.toLocaleString()}件(このスマホでまだ直していない ${plan.editAdd.toLocaleString()}件に入れます。「送った人と同じにする」は全部を送った人の名前にします)\n` : "") +
     (plan.removeHide > 0 ? `「送った人と同じにする」を選ぶと、このスマホだけで非表示にしていた ${plan.removeHide.toLocaleString()}件は、表示に戻ります。` : "非表示をどうしますか?");
   $("ctCsText").style.whiteSpace = "pre-line";
   const done = mode => {
