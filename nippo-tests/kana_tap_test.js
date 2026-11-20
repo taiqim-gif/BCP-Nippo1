@@ -102,5 +102,27 @@ const master = { office:"架空営業所", updated:"2026-11-20", items:[
   cA().click();
   check("容器 6回目: あ行全部に戻る", cnames().length === 6 && cA().textContent === "あ");
 
+  // v27:顧客の管理も同じしくみ。外すのは「全件」
+  doc.getElementById("navDataButton").click(); await sleep(100);
+  doc.getElementById("dtCustManage").click(); await sleep(100);
+  const mg = () => doc.getElementById("cmKana");
+  const mA = () => [...mg().querySelectorAll(".kana-btn")][0];
+  const mAll = () => doc.getElementById("cmKanaAll");
+  const mnames = () => [...doc.querySelectorAll("#cmList .cm-row .cm-name")].map(x => x.textContent);
+  check("管理: 「全件」ボタンがあり、最初は全件(押されている)", !!mAll() && mAll().classList.contains("active") && mnames().length === 12, mnames().length);
+  mA().click();
+  check("管理 1回目: あ行全部", mnames().length === 6 && !mAll().classList.contains("active"));
+  mA().click();
+  check("管理 2回目: い〜お", mnames().length === 5 && !mnames().includes("あおば商店") && mA().textContent === "い〜");
+  mA().click(); mA().click(); mA().click();
+  check("管理 5回目: お だけ", mnames().join() === "おかガス");
+  mA().click();
+  check("管理 6回目: あ行全部に戻る", mnames().length === 6 && mA().textContent === "あ");
+  mAll().click();
+  check("管理: 「全件」で絞り込みを外す", mnames().length === 12 && mAll().classList.contains("active") && !mA().classList.contains("active"));
+  // 1件を2段に(名前は上の段に横いっぱい)
+  const css = [...doc.querySelectorAll("style")].map(x => x.textContent).join(" ");
+  check("管理: 行は折り返し、名前は上の段いっぱい", /\.cm-row\{[^}]*flex-wrap:wrap/.test(css) && /\.cm-name\{[^}]*flex:1 1 100%/.test(css));
+
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.log("FAIL かな: エラー " + (e && e.stack || e)); process.exit(1); });
