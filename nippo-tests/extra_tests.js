@@ -1670,7 +1670,8 @@ ok(w.localStorage.getItem("monthlyReportSent")===pm50 && bnH.hidden && bnV.hidde
 $("navDataButton").click();
 ok(/訪問 1・車両 1/.test($("dtMailMonthDesc").textContent),"データ → 先月分をメール送信 shows the counts: "+$("dtMailMonthDesc").textContent);
 // 先月のデータがないときは、お知らせを出さない
-w.localStorage.removeItem("monthlyReportSent"); w.eval("meetingLogs=[]; dailyVehicleInfo={}"); w.ctRenderMonthly();
+ok(JSON.parse(w.localStorage.getItem("monthlySentDates")||"{}")[pm50]===td50,"v2.0: 'OK' also records the day it was sent: "+w.localStorage.getItem("monthlySentDates"));
+w.localStorage.removeItem("monthlyReportSent"); w.localStorage.removeItem("monthlySentDates"); w.eval("meetingLogs=[]; dailyVehicleInfo={}"); w.ctRenderMonthly();
 ok(bnH.hidden,"no data last month: no notice");
 // バックアップに自動保存のToDoも入る
 shared50=null; $("dtBackup").click(); await sleep(300);
@@ -1725,9 +1726,9 @@ ok(typeof w.buildReportMail==="function","the mail body builder is still there (
 {
 const v53=$("dtVersion"), av53=w.ctAppVersion();
 ok(!!v53 && v53.parentElement===$("dataScreen") && v53===$("dataScreen").lastElementChild,"the version line is at the bottom of the data screen");
-ok(/^v\d+$/.test(av53.version) && /^\d{4}-\d{2}-\d{2}$/.test(av53.date),"version and date have the right form");
+ok(/^v\d+(\.\d+)?$/.test(av53.version) && /^\d{4}-\d{2}-\d{2}$/.test(av53.date),"version and date have the right form");
 ok(v53.textContent==="アプリの版 "+av53.version+" ("+av53.date+")","it shows 'アプリの版 v○○ (日付)' (half-width brackets)");
-const sw53=require("fs").readFileSync(require("path").join("..","sw.js"),"utf8").match(/nippo-cache-(v\d+)/);
+const sw53=require("fs").readFileSync(require("path").join("..","sw.js"),"utf8").match(/nippo-cache-(v\d+(?:\.\d+)?)/);   // v2.0 から「v2.0」の形も
 ok(!!sw53 && sw53[1]===av53.version,"the number is the same as the sw.js CACHE ("+(sw53&&sw53[1])+")");
 }
 // ---- 54) ToDoの顧客コード(v14):訪問の内容から作ったToDoは、その訪問の顧客コードを覚え、ToDo.csv の右端に出す ----
@@ -1791,7 +1792,7 @@ ok(!bn56.hidden && sb56.textContent==="10月分を確定して、スマホから
 $("navDataButton").click();
 ok($("dtMailMonth").innerHTML==="10月分を確定して、スマホから消す<br>(CSV・バックアップ添付)" && $("dtMailMonth").classList.contains("ct-attn"),"the 送る tab button: same name, blinking: "+$("dtMailMonth").innerHTML);
 today56="2026-10-29"; w.ctRenderMonthly();
-ok(w.ctMonthlyTarget()===null && !$("dtMailMonth").classList.contains("ct-attn") && $("dtMailMonth").innerHTML.startsWith("9月分を確定して"),"a day before: no blink (the button is for last month)");
+ok(w.ctMonthlyTarget()===null && !$("dtMailMonth").classList.contains("ct-attn") && $("dtMailMonth").innerHTML.startsWith("9月分は送信済み"),"a day before: no blink (the button is for last month, already sent → v2.0 送信済み)");
 today56="2026-10-31"; w.eval('dailyVehicleInfo["2026-10-30"].return={}');
 ok(!!w.ctMonthlyTarget() && w.ctMonthlyTarget().ym==="2026-10","the day after the last weekday: blinking even without 帰社");
 // 月初:先月が残っていれば、出発を入れたあとも、送るまで点滅
@@ -2150,4 +2151,31 @@ nextState64="interrupted"; w.ctPlayFx("coin"); nextState64="running";
 ok(osc64===0,"nothing is scheduled on a part that is not running");
 await sleep(10);
 ok(made64===2 && closed64===1 && osc64===3,"a part that will not wake up is replaced and the sound still plays");
+}
+
+// ---- 65) v2.0:月分を送ったか分かるようにする(灰色の「送信済み(送った日)」、押すと「もう一度送りますか?」) ----
+{
+const gt65=w.getToday, cf65=w.confirm; w.getToday=()=>"2026-11-05";
+w.localStorage.setItem("monthlyReportSent","2026-09"); w.localStorage.removeItem("monthlySentDates");
+w.eval('meetingLogs=[{createdAt:"t65",date:"2026-10-20",number:1,target:"架空商店"}]; dailyVehicleInfo={}');
+$("navDataButton").click(); w.ctRenderMonthly();
+const mb65=$("dtMailMonth");
+ok(mb65.innerHTML.startsWith("10月分を確定して") && !mb65.classList.contains("ct-sent") && mb65.classList.contains("ct-attn"),"not sent yet: the normal name, blinking: "+mb65.innerHTML);
+// 送ったと答えた月:灰色で送った日を出す
+w.localStorage.setItem("monthlyReportSent","2026-10"); w.localStorage.setItem("monthlySentDates",JSON.stringify({"2026-10":"2026-11-02"}));
+w.ctRenderMonthly();
+ok(mb65.innerHTML==="10月分は送信済み(11/2)<br>(もう一度送るときは押す)" && mb65.classList.contains("ct-sent") && !mb65.classList.contains("ct-attn"),"sent: grey 送信済み with the day: "+mb65.innerHTML);
+ok(w.ctMonthlySentInfo("2026-10")==="2026-11-02" && w.ctMonthlySentInfo("2026-11")===null,"sent info per month");
+// 押すと、もう一度送るか聞く(キャンセルなら送らない)
+let q65=[];
+w.confirm=m=>{ q65.push(m); return false; };
+mb65.click(); await sleep(100);
+ok(q65.length===1 && q65[0]==="10月分は11/2に送っています。\nもう一度送りますか?","pressing a sent month asks again: "+q65.join("|"));
+// 前の版で送った(日が分からない)ときは「送信済み」だけ
+w.localStorage.removeItem("monthlySentDates"); w.ctRenderMonthly();
+ok(mb65.innerHTML.startsWith("10月分は送信済み<br>") && mb65.classList.contains("ct-sent"),"sent by the old version: 送信済み without a day: "+mb65.innerHTML);
+q65=[]; mb65.click(); await sleep(100);
+ok(q65[0]==="10月分は送っています。\nもう一度送りますか?","old version: asks without a day: "+q65.join("|"));
+w.confirm=cf65; w.getToday=gt65;
+w.eval("meetingLogs=[]; dailyVehicleInfo={}"); w.localStorage.removeItem("monthlyReportSent"); w.ctRenderMonthly();
 }
