@@ -570,7 +570,9 @@ style.textContent = `
   @keyframes ctBlink{ 0%,100%{ opacity:1; } 50%{ opacity:.15; } }
   /* 月分を確定して消すボタン：月末の帰社のあと・月初に点滅させる */
   .ct-attn{ animation:ctAttn 1.2s ease-in-out infinite; }
-  #dtMailMonth.ct-sent{ background:#eee; color:#888; border-color:#bbb; }   /* v2.0：送信済みの月分ボタン */
+  /* v2.0：送信済みの月分ボタン(灰色+赤い斜線) */
+  #dtMailMonth.ct-sent{ color:#888; border-color:#bbb;
+    background:linear-gradient(to top right, #eee calc(50% - 1.5px), #e53935 calc(50% - 1.5px), #e53935 calc(50% + 1.5px), #eee calc(50% + 1.5px)); }
   @keyframes ctAttn{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
 
   .ct-hint{ display:inline-flex; align-items:center; gap:26px; }

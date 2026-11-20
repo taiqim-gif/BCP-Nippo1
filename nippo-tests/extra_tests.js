@@ -2165,6 +2165,7 @@ ok(mb65.innerHTML.startsWith("10月分を確定して") && !mb65.classList.conta
 w.localStorage.setItem("monthlyReportSent","2026-10"); w.localStorage.setItem("monthlySentDates",JSON.stringify({"2026-10":"2026-11-02"}));
 w.ctRenderMonthly();
 ok(mb65.innerHTML==="10月分は送信済み(11/2)<br>(もう一度送るときは押す)" && mb65.classList.contains("ct-sent") && !mb65.classList.contains("ct-attn"),"sent: grey 送信済み with the day: "+mb65.innerHTML);
+ok(/#dtMailMonth\.ct-sent\{[^}]*linear-gradient\(to top right[^}]*#e53935/.test([...d.querySelectorAll("style")].map(x=>x.textContent).join(" ")),"sent: the grey button has a red diagonal line");
 ok(w.ctMonthlySentInfo("2026-10")==="2026-11-02" && w.ctMonthlySentInfo("2026-11")===null,"sent info per month");
 // 押すと、もう一度送るか聞く(キャンセルなら送らない)
 let q65=[];
