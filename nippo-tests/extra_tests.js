@@ -2180,3 +2180,47 @@ ok(q65[0]==="10月分は送っています。\nもう一度送りますか?","ol
 w.confirm=cf65; w.getToday=gt65;
 w.eval("meetingLogs=[]; dailyVehicleInfo={}"); w.localStorage.removeItem("monthlyReportSent"); w.ctRenderMonthly();
 }
+
+// ---- 66) v2.1:最後に送った分をもう一度送る(いちばん新しい sentAt の分。送信済みのまま) ----
+{
+const gt66=w.getToday, cf66=w.confirm; w.getToday=()=>"2026-11-25";
+const A66="2026-11-20T03:00:00.000Z", B66="2026-11-24T03:00:00.000Z";
+w.eval(`meetingLogs=[{createdAt:"r1",date:"2026-11-20",number:1,target:"古い送信商店",sentAt:"${A66}"},{createdAt:"r2",date:"2026-11-24",number:1,target:"最後の送信商店",sentAt:"${B66}"},{createdAt:"r3",date:"2026-11-25",number:1,target:"未送信商店"}]`);
+w.eval(`dailyVehicleInfo={"2026-11-20":{departure:{time:"2026-11-20T08:00",distance:"100"},sentAt:"${A66}"},"2026-11-24":{departure:{time:"2026-11-24T08:00",distance:"200"},return:{time:"2026-11-24T17:00",distance:"250"},sentAt:"${B66}"}}`);
+w.ctSetLogs([{id:"rk1",date:"2026-11-24",time:"10:00",status:"2",symbol:"A",number:"1",customer:"最後の送信商店",gas:"酸素",gasCode:"O2",capacity:"7",unit:"㎥",sentAt:B66},{id:"rk2",date:"2026-11-25",time:"10:00",status:"2",symbol:"A",number:"2",customer:"未送信商店",gas:"酸素",gasCode:"O2",capacity:"7",unit:"㎥"}]);
+w.eval('todoItems=[{id:"rt1",date:"2026-11-24",target:"残る用事",content:"見積",done:false,order:1}]');
+w.localStorage.setItem("todoArchive",JSON.stringify([{id:"ra1",date:"2026-11-24",target:"外した用事",content:"配達",done:true,completedAt:"2026-11-24T05:00:00.000Z",sentAt:B66},{id:"ra2",date:"2026-11-19",target:"古い用事",content:"電話",done:true,completedAt:"2026-11-19T05:00:00.000Z",sentAt:A66}]));
+w.localStorage.setItem("todoLastSentIds",'["x66"]');
+const ls66=w.ctLastSentData();
+ok(ls66 && ls66.at===B66 && ls66.visits.length===1 && ls66.visits[0].createdAt==="r2" && ls66.vdays.join()==="2026-11-24" && ls66.cts.length===1 && ls66.cts[0].id==="rk1","last sent = the newest sentAt only (visit r2, vehicle 11/24, container rk1)");
+ok(ls66.todos.map(t=>t.id).sort().join()==="ra1,rt1","ToDo = the list now + the done ToDo taken out that time");
+$("navDataButton").click();
+const rb66=$("dtResend");
+ok(rb66.textContent==="最後に送った分をもう一度送る" && !rb66.disabled && rb66.closest(".dt-item")===$("dtMarkSent").closest(".dt-item") && $("dtMarkSent").compareDocumentPosition(rb66)===4,"the resend button is under 「送信済みにする」 in the same box");
+ok($("dtResendDesc").textContent==="11/24に送信済みにした分(訪問 1・車両 1・容器 1)","the line under the button: "+$("dtResendDesc").textContent);
+// キャンセルなら送らない
+let q66=[], sh66=null;
+Object.defineProperty(w.navigator,"canShare",{configurable:true,value:()=>true});
+Object.defineProperty(w.navigator,"share",{configurable:true,value:async d0=>{ sh66=d0; }});
+w.confirm=m=>{ q66.push(m); return false; };
+rb66.click(); await sleep(100);
+ok(q66.length===1 && q66[0]==="11/24に送信済みにした分\n(訪問 1・車両 1・容器 1・ToDo 2)\nを、もう一度送りますか?" && sh66===null,"asks first; cancel sends nothing: "+q66.join("|"));
+// OK なら、毎日と同じ形で送る
+w.confirm=m=>{ q66.push(m); return true; };
+rb66.click(); await sleep(200);
+ok(!!sh66 && sh66.files.length===2 && /^日報_.*20261125\.csv$/.test(sh66.files[0].name) && /^営業日報バックアップ_20261125\.json$/.test(sh66.files[1].name),"sends the same CSV name as every day + the backup: "+(sh66?sh66.files.map(f=>f.name).join(" "):"(not shared)"));
+const csv66=await new Promise(r=>{ const fr=new w.FileReader(); fr.onload=()=>r(fr.result); fr.readAsText(sh66.files[0]); });
+ok(csv66.includes("[訪問]") && csv66.includes("最後の送信商店") && !csv66.includes("古い送信商店") && !csv66.includes("未送信商店") && csv66.includes("[車両]") && csv66.includes("2026-11-24,08:00,200") && !csv66.includes("2026-11-20,08:00") && csv66.includes("外した用事") && csv66.includes("残る用事") && !csv66.includes("古い用事"),"the CSV has only the last-sent records");
+ok(/送り直し\(11\/24送信済みの分\)$/.test(sh66.title) && /訪問1件・車両1日・ToDo2件・容器1本/.test(sh66.text),"the mail title says 送り直し: "+sh66.title);
+// 送ったあとも送信済みのまま・未送信は未送信のまま・todoLastSentIds は変えない
+ok(w.eval('meetingLogs.find(l=>l.createdAt==="r2").sentAt')===B66 && !w.eval('meetingLogs.find(l=>l.createdAt==="r3").sentAt') && w.localStorage.getItem("todoLastSentIds")==='["x66"]' && w.eval('todoItems.length')===1,"nothing is changed: still sent, unsent stays unsent, todoLastSentIds kept");
+// 送り直す分が無いとき(月分で消したあと等)
+w.eval("meetingLogs=[]; dailyVehicleInfo={}"); w.ctSetLogs([]); w.localStorage.setItem("todoArchive","[]");
+$("navHomeButton").click(); $("navDataButton").click();
+ok(rb66.disabled && $("dtResendDesc").textContent==="送り直す分はありません","no last-sent data: the button cannot be pressed");
+const t66=w.eval("toasts.length"); sh66=null;
+await w.ctResendLast();
+ok(sh66===null && w.eval("toasts").slice(t66).includes("送り直す分はありません"),"no last-sent data: 「送り直す分はありません」");
+w.confirm=cf66; w.getToday=gt66;
+w.eval("todoItems=[]"); w.localStorage.setItem("todoItems","[]"); w.localStorage.removeItem("todoLastSentIds");
+}

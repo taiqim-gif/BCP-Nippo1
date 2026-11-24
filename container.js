@@ -2100,6 +2100,60 @@ async function mailAllCsv(){
 }
 window.ctMailAllCsv = mailAllCsv;
 
+/* v2.1：最後に「送信済みにする」を押した分を、もう一度送る。
+   「送信済みにする」は、その回の分に同じ時刻(sentAt)を付けるので、いちばん新しい時刻の分＝最後に送った分 */
+function lastSentData(){
+  const arc = todoArchive().filter(t => t && t.sentAt);
+  let at = "";
+  const see = s => { if(s && s > at) at = s; };
+  meetingLogs.forEach(l => see(l.sentAt));
+  Object.keys(dailyVehicleInfo).forEach(k => { const v = dailyVehicleInfo[k]; if(v) see(v.sentAt); });
+  ctLogs.forEach(l => see(l.sentAt));
+  arc.forEach(t => see(t.sentAt));
+  if(!at) return null;
+  const visits = sortVisits(meetingLogs.filter(l => l.sentAt === at));
+  const vdays = Object.keys(dailyVehicleInfo).filter(k => { const v = dailyVehicleInfo[k]; return v && v.sentAt === at && vehicleHasData(v); }).sort();
+  const cts = ctLogs.filter(l => l.sentAt === at);
+  const arcTodos = arc.filter(t => t.sentAt === at);         // その回にリストから外した完了ToDo
+  if(visits.length + vdays.length + cts.length + arcTodos.length === 0) return null;
+  const seen = new Set();
+  const todos = sortTodosForCsv([...todoItems, ...arcTodos].filter(t => {   // 今のリスト＋その回に外した分(最初に送ったときと同じ形)
+    if(!t || seen.has(t.id)) return false;
+    seen.add(t.id);
+    return true;
+  }));
+  return { at, visits, vdays, todos, cts };
+}
+window.ctLastSentData = lastSentData;
+function sentDayLabel(iso){ return iso ? shortDate(localYmd(iso)) : ""; }
+async function resendLast(){
+  const d = lastSentData();
+  if(!d){ showToast("送り直す分はありません"); return; }
+  const day = sentDayLabel(d.at);
+  if(!window.confirm(`${day}に送信済みにした分\n(訪問 ${d.visits.length}・車両 ${d.vdays.length}・容器 ${d.cts.length}・ToDo ${d.todos.length})\nを、もう一度送りますか?`)) return;
+  playFx("send");
+  const today = getToday(), ymd = today.replace(/-/g, ""), tag = fileTag();
+  const files = [
+    { name:`日報_${tag}${ymd}.csv`, content:bundleCsv([       // ファイル名は毎日の送信と同じ(パソコンの取り込みツールが名前で探すため)
+      { label:"訪問", n:d.visits.length, text:d.visits.length ? visitCsv(d.visits) : "" },
+      { label:"車両", n:d.vdays.length, text:d.vdays.length ? vehicleCsv(d.vdays) : "" },
+      { label:"ToDo", n:d.todos.length, text:d.todos.length ? todoCsv(d.todos) : "" },
+      { label:"容器", n:d.cts.length, text:d.cts.length ? csvText(d.cts) : "" }]) },
+    backupPart()];
+  const nm = userName();
+  const title = `営業日報 ${today}${nm ? " " + nm : ""} 送り直し(${day}送信済みの分)`;
+  const text = mailToLine() + `${title}\n訪問${d.visits.length}件・車両${d.vdays.length}日・ToDo${d.todos.length}件・容器${d.cts.length}本(CSVとバックアップを添付)`;
+  const copied = copyMailAddr();
+  const r = await saveFiles(files, title, text);
+  if(r) noteBackup();
+  if(r === "shared"){
+    showToast(copied ? "宛先はコピー済み(貼り付け)。送信済みのままです" : "送り直しました(送信済みのままです)");
+  }else if(r === "downloaded"){
+    window.location.href = `${mailtoHead()}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + "\n(CSVとバックアップはダウンロードに保存しました。添付してください)")}`;
+  }
+}
+window.ctResendLast = resendLast;
+
 /* ---------- 月まとめの送信(運転管理表用)：その月の訪問・車両・ToDo・容器を、送信済みも含めて全部送る。
    送れたら、その月の分をスマホから消す(まだ済んでいないToDoは残す) ---------- */
 const MONTHLY_SENT_KEY = "monthlyReportSent";   // 送ったと答えた最後の月("2026-10")
@@ -2344,8 +2398,8 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v2.0";
-const APP_DATE = "2026-11-20";
+const APP_VERSION = "v2.1";
+const APP_DATE = "2026-11-25";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
 /* =========================================================
@@ -2391,6 +2445,8 @@ dataSection.innerHTML = `
         <div class="dt-desc" id="dtMailReportDesc"></div>
         <button class="btn btn-mint dt-next" id="dtMarkSent">送れたら押す：送信済みにする</button>
         <div class="dt-desc">次から送りません(スマホには残ります)</div>
+        <button class="btn btn-outline-mint dt-next" id="dtResend">最後に送った分をもう一度送る</button>
+        <div class="dt-desc" id="dtResendDesc"></div>
       </div>
       <div class="dt-sub">月に1回(月初)</div>
       <div class="dt-item">
@@ -4216,6 +4272,9 @@ function renderData(){
   $("dtChipD").textContent = `車両 ${c.vehUnsent}`;
   $("dtChipC").textContent = `容器 ${c.ctUnsent}`;
   $("dtMailReportDesc").textContent = `訪問 ${c.visitsUnsent}件・車両 ${c.vehUnsent}日・容器 ${c.ctUnsent}本・ToDo ${c.todoPending + c.todoDone}件`;
+  const ls = lastSentData();                  // v2.1：最後に送信済みにした分
+  $("dtResend").disabled = !ls;
+  $("dtResendDesc").textContent = ls ? `${sentDayLabel(ls.at)}に送信済みにした分(訪問 ${ls.visits.length}・車両 ${ls.vdays.length}・容器 ${ls.cts.length})` : "送り直す分はありません";
   const last = localStorage.getItem("lastBackupAt");
   const el = $("dtLastBackup");
   if(last){
@@ -4327,6 +4386,7 @@ $("dtMailReport").addEventListener("click", mailAllCsv);
 $("dtMailMonth").addEventListener("click", pressMonthly);   // v2.0：送った月は、もう一度送るか聞く
 $("dtUserEdit").addEventListener("click", () => openUserDialog());
 $("dtMarkSent").addEventListener("click", markAllSent);
+$("dtResend").addEventListener("click", resendLast);         // v2.1：最後に送った分をもう一度
 $("dtBackup").addEventListener("click", backupExport);
 $("dtRestore").addEventListener("click", () => backupFile.click());
 $("dtDelSent").addEventListener("click", delSentOnly);
