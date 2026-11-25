@@ -2126,11 +2126,13 @@ function lastSentData(){
 }
 window.ctLastSentData = lastSentData;
 function sentDayLabel(iso){ return iso ? shortDate(localYmd(iso)) : ""; }
-async function resendLast(){
+function resendLast(){
   const d = lastSentData();
   if(!d){ showToast("送り直す分はありません"); return; }
+  askAgain(`${sentDayLabel(d.at)}に送信済みにした分\n(訪問 ${d.visits.length}・車両 ${d.vdays.length}・容器 ${d.cts.length}・ToDo ${d.todos.length})\nを、もう一度送りますか?`, () => sendLastData(d));
+}
+async function sendLastData(d){
   const day = sentDayLabel(d.at);
-  if(!window.confirm(`${day}に送信済みにした分\n(訪問 ${d.visits.length}・車両 ${d.vdays.length}・容器 ${d.cts.length}・ToDo ${d.todos.length})\nを、もう一度送りますか?`)) return;
   playFx("send");
   const today = getToday(), ymd = today.replace(/-/g, ""), tag = fileTag();
   const files = [
@@ -2171,12 +2173,31 @@ function monthlySentInfo(ym){
 }
 window.ctMonthlySentInfo = monthlySentInfo;
 function shortDate(ymd){ return ymd ? `${Number(ymd.slice(5, 7))}/${Number(ymd.slice(8, 10))}` : ""; }
+/* v2.1：「もう一度送りますか?」はアプリの中の枠で聞く。
+   iPhone は window.confirm のあとだと添付つきの共有画面を開けない(添付なしのメールになる)ため、
+   枠の[もう一度送る]を押したその時に送る */
+function askAgain(msg, onOk){
+  let dl = $("ctAgainDlg");
+  if(!dl){
+    dl = document.createElement("div");
+    dl.id = "ctAgainDlg";
+    dl.className = "ct-mchoice";
+    dl.innerHTML = '<div class="ct-mchoice-box"><h3>もう一度送る</h3><p id="ctAgainText" style="white-space:pre-line"></p>' +
+      '<button type="button" class="btn btn-mint" id="ctAgainOk">もう一度送る</button>' +
+      '<button type="button" class="btn-mini" id="ctAgainCancel">やめる</button></div>';
+    document.body.appendChild(dl);
+  }
+  $("ctAgainText").textContent = msg;
+  $("ctAgainOk").onclick = () => { dl.hidden = true; onOk(); };
+  $("ctAgainCancel").onclick = () => { dl.hidden = true; };
+  dl.hidden = false;
+}
 // 月分のボタンを押したとき：送ったことのある月なら、もう一度送るか聞く
 function pressMonthly(){
   const t = monthlyTarget(), ym = t ? t.ym : prevMonth(getToday());
   const s = monthlySentInfo(ym);
-  if(s !== null && !window.confirm(`${monthLabel(ym)}分は${s ? shortDate(s) + "に" : ""}送っています。\nもう一度送りますか?`)) return;
-  mailMonthCsv(ym);
+  if(s === null){ mailMonthCsv(ym); return; }
+  askAgain(`${monthLabel(ym)}分は${s ? shortDate(s) + "に" : ""}送っています。\nもう一度送りますか?`, () => mailMonthCsv(ym));
 }
 function prevMonth(ymdStr){
   const y = Number(ymdStr.slice(0, 4)), m = Number(ymdStr.slice(5, 7));
@@ -2398,7 +2419,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v2.1";
+const APP_VERSION = "v2.2";
 const APP_DATE = "2026-11-25";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 

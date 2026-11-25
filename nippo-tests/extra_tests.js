@@ -2171,12 +2171,21 @@ ok(w.ctMonthlySentInfo("2026-10")==="2026-11-02" && w.ctMonthlySentInfo("2026-11
 let q65=[];
 w.confirm=m=>{ q65.push(m); return false; };
 mb65.click(); await sleep(100);
-ok(q65.length===1 && q65[0]==="10月分は11/2に送っています。\nもう一度送りますか?","pressing a sent month asks again: "+q65.join("|"));
+ok(q65.length===0 && !$("ctAgainDlg").hidden && $("ctAgainText").textContent==="10月分は11/2に送っています。\nもう一度送りますか?","pressing a sent month asks again in the app's own box (not window.confirm): "+$("ctAgainText").textContent);
+// v2.2:[もう一度送る]を押したその時に、確認の画面を挟まずに共有する(iPhone は confirm のあとだと添付できない)
+let sh65=null;
+Object.defineProperty(w.navigator,"canShare",{configurable:true,value:()=>true});
+Object.defineProperty(w.navigator,"share",{configurable:true,value:async d0=>{ sh65=d0; }});
+$("ctAgainOk").click(); await sleep(500);
+ok($("ctAgainDlg").hidden && !!sh65 && sh65.files.length===2 && q65.length===1 && q65[0].startsWith("10月分の運転日報を、送れましたか"),"[もう一度送る] shares the files right away (confirm only after the share): "+q65.join("|"));
+q65=[]; sh65=null; mb65.click(); await sleep(100); $("ctAgainCancel").click(); await sleep(100);
+ok($("ctAgainDlg").hidden && sh65===null && q65.length===0,"[やめる] sends nothing");
 // 前の版で送った(日が分からない)ときは「送信済み」だけ
 w.localStorage.removeItem("monthlySentDates"); w.ctRenderMonthly();
 ok(mb65.innerHTML.startsWith("10月分は送信済み<br>") && mb65.classList.contains("ct-sent"),"sent by the old version: 送信済み without a day: "+mb65.innerHTML);
 q65=[]; mb65.click(); await sleep(100);
-ok(q65[0]==="10月分は送っています。\nもう一度送りますか?","old version: asks without a day: "+q65.join("|"));
+ok($("ctAgainText").textContent==="10月分は送っています。\nもう一度送りますか?","old version: asks without a day: "+$("ctAgainText").textContent);
+$("ctAgainCancel").click();
 w.confirm=cf65; w.getToday=gt65;
 w.eval("meetingLogs=[]; dailyVehicleInfo={}"); w.localStorage.removeItem("monthlyReportSent"); w.ctRenderMonthly();
 }
@@ -2204,10 +2213,12 @@ Object.defineProperty(w.navigator,"canShare",{configurable:true,value:()=>true})
 Object.defineProperty(w.navigator,"share",{configurable:true,value:async d0=>{ sh66=d0; }});
 w.confirm=m=>{ q66.push(m); return false; };
 rb66.click(); await sleep(100);
-ok(q66.length===1 && q66[0]==="11/24に送信済みにした分\n(訪問 1・車両 1・容器 1・ToDo 2)\nを、もう一度送りますか?" && sh66===null,"asks first; cancel sends nothing: "+q66.join("|"));
-// OK なら、毎日と同じ形で送る
-w.confirm=m=>{ q66.push(m); return true; };
-rb66.click(); await sleep(200);
+ok(q66.length===0 && !$("ctAgainDlg").hidden && $("ctAgainText").textContent==="11/24に送信済みにした分\n(訪問 1・車両 1・容器 1・ToDo 2)\nを、もう一度送りますか?" && sh66===null,"asks first in the app's own box (not window.confirm): "+$("ctAgainText").textContent);
+$("ctAgainCancel").click(); await sleep(100);
+ok($("ctAgainDlg").hidden && sh66===null,"[やめる] sends nothing");
+// [もう一度送る]なら、毎日と同じ形で送る(確認の画面を挟まない)
+rb66.click(); await sleep(100); $("ctAgainOk").click(); await sleep(200);
+ok($("ctAgainDlg").hidden && q66.length===0,"no window.confirm before the share (iPhone would drop the files)");
 ok(!!sh66 && sh66.files.length===2 && /^日報_.*20261125\.csv$/.test(sh66.files[0].name) && /^営業日報バックアップ_20261125\.json$/.test(sh66.files[1].name),"sends the same CSV name as every day + the backup: "+(sh66?sh66.files.map(f=>f.name).join(" "):"(not shared)"));
 const csv66=await new Promise(r=>{ const fr=new w.FileReader(); fr.onload=()=>r(fr.result); fr.readAsText(sh66.files[0]); });
 ok(csv66.includes("[訪問]") && csv66.includes("最後の送信商店") && !csv66.includes("古い送信商店") && !csv66.includes("未送信商店") && csv66.includes("[車両]") && csv66.includes("2026-11-24,08:00,200") && !csv66.includes("2026-11-20,08:00") && csv66.includes("外した用事") && csv66.includes("残る用事") && !csv66.includes("古い用事"),"the CSV has only the last-sent records");
