@@ -22,7 +22,6 @@ Public Function BuildAll() As String
     MakeViewForm "F_ToDo日数", "Q_ToDo日数", "ToDo 済ませるまでの日数(月別)", "", False
     MakeViewForm "F_ToDo客先別", "Q_ToDo客先別", "ToDo 客先別の件数", "件数 DESC", False
     MakeViewForm "F_容器ログ", "Q_容器ログ", "容器ログの一覧", "", False
-    MakeViewForm "F_会社休日", "Q_会社休日", "会社の休み(年末年始・お盆など)", "", True
     MakeViewForm "F_担当者", "Q_担当者", "担当者の設定(車両ナンバー。運転管理表に出ます)", "", True
     MakeViewForm "F_上長", "Q_上長", "上長の登録(名字は確認印欄に出ます。空なら名前の空白の前)", "", True
     MakeViewForm "F_承認の一覧", "Q_承認の一覧", "承認済みの日の一覧", "", False
@@ -80,7 +79,8 @@ Private Sub MakeTables()
     End If
     If Not HasField("T_ToDo", "顧客コード") Then db.Execute "ALTER TABLE T_ToDo ADD COLUMN 顧客コード TEXT(50)"
     If Not HasTable("T_取込履歴") Then db.Execute "CREATE TABLE T_取込履歴 (番号 COUNTER CONSTRAINT pk_log PRIMARY KEY, 日時 DATETIME, ファイル TEXT(255), 担当者 TEXT(50), 件数 LONG)"
-    If Not HasTable("T_会社休日") Then db.Execute "CREATE TABLE T_会社休日 (日付 DATETIME CONSTRAINT pk_off PRIMARY KEY, メモ TEXT(100))"
+    ' 会社の休みは使わないことにした(2026-11-25)。前の版で作った表があれば消す
+    If HasTable("T_会社休日") Then db.Execute "DROP TABLE T_会社休日"
     ' 容器ログ(アプリ v15 から)。IDが無いので、キー = 日付|時刻|区分コード|記号|番号 で同じ記録を見分ける
     If Not HasTable("T_容器ログ") Then
         db.Execute "CREATE TABLE T_容器ログ (担当者 TEXT(50) NOT NULL, キー TEXT(200) NOT NULL, 日付 DATETIME, 時刻 TEXT(10), " & _
@@ -155,7 +155,6 @@ Private Sub MakeQueries()
     AddQuery "Q_容器ログ", _
         "SELECT 担当者, 日付, 時刻, 区分, 記号, 番号, T_容器ログ.顧客コード, NowName(T_容器ログ.顧客コード,T_容器ログ.顧客名) AS 顧客名, ガス種, 容量, 単位 FROM T_容器ログ " & _
         "WHERE WhoOk([担当者]) AND Year(DateAdd('m',-3,[日付]))=SelYear() ORDER BY 日付 DESC, 時刻 DESC, 担当者"
-    AddQuery "Q_会社休日", "SELECT 日付, メモ FROM T_会社休日 ORDER BY 日付"
     AddQuery "Q_担当者", "SELECT 名前, 車両ナンバー FROM T_担当者 ORDER BY 名前"
     ' 上長の承認(2026-11-18)
     AddQuery "Q_上長", "SELECT 名前, 名字 FROM T_上長 ORDER BY 名前"
@@ -256,8 +255,7 @@ Private Sub MakeMenu()
     c.ColumnWidths = "0;3cm": c.LimitToList = True: c.FontSize = 11
     Btn tmp, "営業日誌を作る", "=BtnMake()", 5.6, 5.45, 4.6, 0.8
     Btn tmp, "日誌フォルダを開く", "=BtnOpenOut()", 10.4, 5.45, 4.6, 0.8
-    Btn tmp, "会社の休みを入れる(年末年始など)", "=BtnHolidays()", 5.6, 6.4, 9.4, 0.7
-    Lbl tmp, "土日・祝日・会社の休みのシートは、データがある日だけ出します", 0.8, 7.15, 15, 0.5, 9, False
+    Lbl tmp, "土日・祝日のシートは、データがある日だけ出します", 0.8, 6.45, 15, 0.5, 9, False
 
     Lbl tmp, "3. 分析(上の担当者で分かれます)", 0.5, 7.9, 9, 0.6, 11, True
     Lbl tmp, "年度", 9.2, 7.9, 1.2, 0.6, 11, False

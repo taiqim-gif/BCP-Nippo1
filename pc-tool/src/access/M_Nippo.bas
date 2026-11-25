@@ -225,11 +225,6 @@ Public Function BtnWhoSettings()
     DoCmd.OpenForm "F_担当者", acFormDS
 End Function
 
-' 会社の休み(年末年始・お盆など)を入れる画面
-Public Function BtnHolidays()
-    DoCmd.OpenForm "F_会社休日", acFormDS
-End Function
-
 Public Function BtnOpenCsv()
     If Not FolderExists(CsvDir()) Then MkDir CsvDir()
     OpenPath CsvDir()
@@ -651,7 +646,7 @@ Public Function MakeNisshi(ByVal who As String, ByVal ym As String, Optional ByR
     WriteTodoSheet wb, todos
     WriteCtSheet wb, ctList                                ' 容器ログ(v15)
 
-    ' 土日・祝日・会社の休みは、データか手書きがある日だけ見せる。月に無い日(11月31日など)は隠す
+    ' 土日・祝日は、データか手書きがある日だけ見せる。月に無い日(11月31日など)は隠す
     ShowDaySheets wb, ym, visits, cars
 
     ' 運転管理表:日付のシートから、出発・帰着・行先・給油を集めて書く
@@ -831,7 +826,7 @@ End Sub
 
 ' 日々のシートの表示・非表示
 '  平日 … いつも見せる
-'  土日・祝日・会社の休み … 訪問か車両のデータがある日、または手で書いてある日だけ見せる
+'  土日・祝日 … 訪問か車両のデータがある日、または手で書いてある日だけ見せる
 '  その月に無い日(11月31日など) … 隠す
 Private Sub ShowDaySheets(wb As Object, ByVal ym As String, visits As Object, cars As Collection)
     Dim y As Long, m As Long, nDays As Long, has As Object, k As Variant, ws As Object, d As Long, dt As Date, vis As Boolean
@@ -901,7 +896,7 @@ Private Sub CleanTemplate(t As Object)
     t.Range(CELL_DATE).MergeArea.ClearContents
 End Sub
 
-' その月の日付のシートを作る:平日は全部。土日・祝日・会社の休みは、データがある日だけ
+' その月の日付のシートを作る:平日は全部。土日・祝日は、データがある日だけ
 Private Sub MakeDaySheets(wb As Object, ByVal ym As String, dataDays As Object)
     Dim y As Long, m As Long, d As Long, dt As Date
     If SheetOf(wb, TPL_SHEET) Is Nothing Then Exit Sub    ' 前の形(1～31のシートがある)のときは作らない
@@ -1078,28 +1073,18 @@ Private Sub WriteCarSheet(wb As Object, cars As Collection)
 End Sub
 
 ' =====================================================================
-'  休みの日(土日・祝日・会社の休み)
+'  休みの日(土日・祝日)
 ' =====================================================================
 Public Function IsOffDay(ByVal d As Date) As Boolean
     If Weekday(d) = vbSaturday Or Weekday(d) = vbSunday Then IsOffDay = True: Exit Function
-    If HolidayName(d) <> "" Then IsOffDay = True: Exit Function
-    IsOffDay = IsCompanyOff(d)
+    IsOffDay = (HolidayName(d) <> "")
 End Function
 
-' 会社の休み(T_会社休日 に入れた日)
-Public Function IsCompanyOff(ByVal d As Date) As Boolean
-    IsCompanyOff = (DCount("*", "T_会社休日", "日付=#" & Format(d, "yyyy/mm/dd") & "#") > 0)
-End Function
-
-' 曜日(「月」。祝日なら「月(祝)」、会社の休みなら「月(休)」)
+' 曜日(「月」。祝日なら「月(祝)」)
 Public Function WeekLabel(ByVal d As Variant) As String
     If IsNull(d) Or IsEmpty(d) Then Exit Function
     WeekLabel = Mid$("日月火水木金土", Weekday(d), 1)
-    If HolidayName(d) <> "" Then
-        WeekLabel = WeekLabel & "(祝)"
-    ElseIf IsCompanyOff(d) Then
-        WeekLabel = WeekLabel & "(休)"
-    End If
+    If HolidayName(d) <> "" Then WeekLabel = WeekLabel & "(祝)"
 End Function
 
 ' 祝日の名前(祝日でなければ "")。振替休日・国民の休日も含む
