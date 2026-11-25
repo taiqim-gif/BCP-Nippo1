@@ -172,7 +172,10 @@ End Function
 
 Public Function BtnAddWho()
     Dim nm As String
-    nm = Trim$(InputBox("担当者の名前を入れてください。" & vbLf & "(スマホのアプリに登録した名前と同じ字)", "担当者を追加"))
+    ' 取り込みは、CSVの「担当者」の列(無ければファイル名の _ と _ の間)の名前で分ける。空白は無視する
+    nm = Trim$(InputBox("担当者の名前を入れてください。" & vbLf & vbLf & _
+        "※スマホのアプリの「使う人」に登録した名前と、同じ字にしてください。" & vbLf & _
+        "(送られてくるCSVの名前「日報_〇〇_日付.csv」の〇〇と同じ。空白はあってもなくてもよい)", "担当者を追加"))
     If nm = "" Then Exit Function
     AddWho nm
     FillWhoList

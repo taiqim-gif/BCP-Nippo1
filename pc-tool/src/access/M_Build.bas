@@ -241,7 +241,8 @@ Private Sub MakeMenu()
     c.AfterUpdate = "=AfterSel()"
     Btn tmp, "担当者を追加", "=BtnAddWho()", 7.9, 1.4, 3, 0.6
     Btn tmp, "担当者の設定(車両No.)", "=BtnWhoSettings()", 11.1, 1.4, 4.4, 0.6
-    Lbl tmp, "(全員)を選ぶと全員分。名前を選ぶと、その人の分だけになります", 0.5, 2.05, 15, 0.5, 9, False
+    Lbl tmp, "(全員)を選ぶと全員分。名前を選ぶと、その人の分だけになります", 0.5, 2.05, 15, 0.45, 9, False
+    Lbl tmp, "担当者の名前は、スマホのアプリの「使う人」に登録した名前と同じ字にする", 0.5, 2.45, 15, 0.45, 9, False
 
     Lbl tmp, "1. 取り込み(CSVフォルダのCSVを入れる)", 0.5, 2.9, 15, 0.6, 11, True
     Btn tmp, "自分の分を取り込む", "=BtnImportMine()", 0.8, 3.6, 4.6, 0.8
