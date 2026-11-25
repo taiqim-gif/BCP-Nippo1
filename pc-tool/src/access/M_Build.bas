@@ -119,41 +119,42 @@ End Function
 ' ---------------------------------------------------------------------
 Private Sub MakeQueries()
     Dim m As String, i As Long
-    For i = 1 To 12
-        m = m & IIf(i > 1, ",", "") & """" & i & "月"""
+    ' 月の列は年度の順(4月～12月、1月～3月)。年度で絞る(4月～翌年3月。2026-11-25 から)
+    For i = 0 To 11
+        m = m & IIf(i > 0, ",", "") & """" & (((i + 3) Mod 12) + 1) & "月"""
     Next i
     ' 客先の名前は、顧客コードから今の名前(いちばん新しい訪問の名前)を引く(NowName)。
     '  別名と同じ列名を式の中で使うと循環参照(3103)になるので、列は「表名.列名」で書く
     AddQuery "Q_訪問回数", _
         "TRANSFORM Count(*) AS 回数 SELECT T_訪問.顧客コード, NowName(T_訪問.顧客コード,T_訪問.訪問先) AS 訪問先, Count(*) AS 合計 FROM T_訪問 " & _
-        "WHERE WhoOk([担当者]) AND Year([日付])=SelYear() GROUP BY T_訪問.顧客コード, NowName(T_訪問.顧客コード,T_訪問.訪問先) " & _
+        "WHERE WhoOk([担当者]) AND Year(DateAdd('m',-3,[日付]))=SelYear() GROUP BY T_訪問.顧客コード, NowName(T_訪問.顧客コード,T_訪問.訪問先) " & _
         "PIVOT Month([日付]) & ""月"" IN (" & m & ")"
     AddQuery "Q_訪問の一覧", _
         "SELECT 担当者, 日付, 開始, 終了, T_訪問.顧客コード, NowName(T_訪問.顧客コード,T_訪問.訪問先) AS 訪問先, 面談者, 内容, 特記事項 FROM T_訪問 " & _
-        "WHERE WhoOk([担当者]) AND Year([日付])=SelYear() ORDER BY 日付 DESC, 開始, 担当者"
+        "WHERE WhoOk([担当者]) AND Year(DateAdd('m',-3,[日付]))=SelYear() ORDER BY 日付 DESC, 開始, 担当者"
     AddQuery "Q_走行距離", _
         "SELECT 担当者, Format([日付],'yyyy/mm') AS 月, Count(*) AS 走った日数, Sum([帰社距離]-[出発距離]) AS 走行距離km, " & _
         "HM(Sum(RunMin([出発時刻],[帰社時刻]))) AS 走った時間, HM(Round(Avg(RunMin([出発時刻],[帰社時刻])),0)) AS 一日の平均時間, " & _
-        "Sum(給油量) AS 給油L FROM T_車両 WHERE WhoOk([担当者]) AND Year([日付])=SelYear() " & _
+        "Sum(給油量) AS 給油L FROM T_車両 WHERE WhoOk([担当者]) AND Year(DateAdd('m',-3,[日付]))=SelYear() " & _
         "GROUP BY 担当者, Format([日付],'yyyy/mm') ORDER BY 担当者, Format([日付],'yyyy/mm')"
     AddQuery "Q_車両の一覧", _
         "SELECT 担当者, 日付, WeekLabel([日付]) AS 曜日, 天気, 出発時刻, 帰社時刻, HM(RunMin([出発時刻],[帰社時刻])) AS 走った時間, " & _
         "出発距離, 帰社距離, [帰社距離]-[出発距離] AS 走行距離, 給油量 FROM T_車両 " & _
-        "WHERE WhoOk([担当者]) AND Year([日付])=SelYear() ORDER BY 日付 DESC, 担当者"
+        "WHERE WhoOk([担当者]) AND Year(DateAdd('m',-3,[日付]))=SelYear() ORDER BY 日付 DESC, 担当者"
     AddQuery "Q_ToDo未対応", _
         "SELECT 担当者, 登録日, T_ToDo.顧客コード, NowName(T_ToDo.顧客コード,T_ToDo.顧客名) AS 顧客名, 内容, Date()-[登録日] AS 経過日数 FROM T_ToDo " & _
         "WHERE Nz([状態],'')<>'済' AND WhoOk([担当者]) ORDER BY 登録日, 担当者"
     AddQuery "Q_ToDo日数", _
         "SELECT 担当者, Format([完了日],'yyyy/mm') AS 完了月, Count(*) AS 済ませた件数, " & _
         "Round(Avg([完了日]-[登録日]),1) AS 平均日数, Max([完了日]-[登録日]) AS 一番長い日数 FROM T_ToDo " & _
-        "WHERE 状態='済' AND 完了日 Is Not Null AND 登録日 Is Not Null AND WhoOk([担当者]) AND Year([完了日])=SelYear() " & _
+        "WHERE 状態='済' AND 完了日 Is Not Null AND 登録日 Is Not Null AND WhoOk([担当者]) AND Year(DateAdd('m',-3,[完了日]))=SelYear() " & _
         "GROUP BY 担当者, Format([完了日],'yyyy/mm') ORDER BY 担当者, Format([完了日],'yyyy/mm')"
     AddQuery "Q_ToDo客先別", _
         "SELECT IIf(Nz(NowName(T_ToDo.顧客コード,T_ToDo.顧客名),'')='','(客先なし)',NowName(T_ToDo.顧客コード,T_ToDo.顧客名)) AS 客先, Max(T_ToDo.顧客コード) AS 顧客コード, Count(*) AS 件数, Sum(IIf(Nz([状態],'')<>'済',1,0)) AS 未対応, Sum(IIf([状態]='済',1,0)) AS 済 " & _
-        "FROM T_ToDo WHERE WhoOk([担当者]) AND Year([登録日])=SelYear() GROUP BY IIf(Nz(NowName(T_ToDo.顧客コード,T_ToDo.顧客名),'')='','(客先なし)',NowName(T_ToDo.顧客コード,T_ToDo.顧客名))"
+        "FROM T_ToDo WHERE WhoOk([担当者]) AND Year(DateAdd('m',-3,[登録日]))=SelYear() GROUP BY IIf(Nz(NowName(T_ToDo.顧客コード,T_ToDo.顧客名),'')='','(客先なし)',NowName(T_ToDo.顧客コード,T_ToDo.顧客名))"
     AddQuery "Q_容器ログ", _
         "SELECT 担当者, 日付, 時刻, 区分, 記号, 番号, T_容器ログ.顧客コード, NowName(T_容器ログ.顧客コード,T_容器ログ.顧客名) AS 顧客名, ガス種, 容量, 単位 FROM T_容器ログ " & _
-        "WHERE WhoOk([担当者]) AND Year([日付])=SelYear() ORDER BY 日付 DESC, 時刻 DESC, 担当者"
+        "WHERE WhoOk([担当者]) AND Year(DateAdd('m',-3,[日付]))=SelYear() ORDER BY 日付 DESC, 時刻 DESC, 担当者"
     AddQuery "Q_会社休日", "SELECT 日付, メモ FROM T_会社休日 ORDER BY 日付"
     AddQuery "Q_担当者", "SELECT 名前, 車両ナンバー FROM T_担当者 ORDER BY 名前"
     ' 上長の承認(2026-11-18)
@@ -169,7 +170,7 @@ Private Sub MakeQueries()
         "WHERE a.担当者 Is Null AND u.日付 Is Not Null AND WhoOk(u.担当者) ORDER BY u.日付, u.担当者"
     AddQuery "Q_承認の一覧", _
         "SELECT 担当者, 日付, WeekLabel([日付]) AS 曜日, 承認者, 承認日時 FROM T_承認 " & _
-        "WHERE WhoOk([担当者]) AND Year([日付])=SelYear() ORDER BY 日付 DESC, 担当者"
+        "WHERE WhoOk([担当者]) AND Year(DateAdd('m',-3,[日付]))=SelYear() ORDER BY 日付 DESC, 担当者"
 End Sub
 
 Private Sub AddQuery(ByVal nm As String, ByVal sql As String)
@@ -259,9 +260,10 @@ Private Sub MakeMenu()
     Lbl tmp, "土日・祝日・会社の休みのシートは、データがある日だけ出します", 0.8, 7.15, 15, 0.5, 9, False
 
     Lbl tmp, "3. 分析(上の担当者で分かれます)", 0.5, 7.9, 9, 0.6, 11, True
-    Lbl tmp, "年", 9.6, 7.9, 0.8, 0.6, 11, False
-    Set c = CreateControl(tmp, acComboBox, acDetail, , , 10.4 * CM, 7.9 * CM, 2.2 * CM, 0.6 * CM)
-    c.Name = "cbo年": c.RowSourceType = "Value List": c.LimitToList = True: c.FontSize = 11
+    Lbl tmp, "年度", 9.2, 7.9, 1.2, 0.6, 11, False
+    Set c = CreateControl(tmp, acComboBox, acDetail, , , 10.4 * CM, 7.9 * CM, 3 * CM, 0.6 * CM)
+    c.Name = "cbo年": c.RowSourceType = "Value List": c.ColumnCount = 2: c.BoundColumn = 1   ' 値=2026、表示=2026年度
+    c.ColumnWidths = "0;2.6cm": c.LimitToList = True: c.FontSize = 11
     c.AfterUpdate = "=AfterSel()"
     Btn tmp, "訪問回数(客先×月)", "=BtnView(""F_訪問回数"")", 0.8, 8.7, 4.6, 0.8
     Btn tmp, "訪問の一覧", "=BtnView(""F_訪問の一覧"")", 5.6, 8.7, 4.6, 0.8

@@ -84,10 +84,24 @@ Public Function SelWho() As String
     SelWho = CStr(v)
 End Function
 
-' 分析で選んでいる年(未選択なら今年)
+' 年度(4月～翌年3月)。2027年3月 → 2026、2027年4月 → 2027(2026-11-25)
+Public Function FiscalYear(ByVal d As Date) As Long
+    FiscalYear = Year(DateAdd("m", -3, d))
+End Function
+
+' 年月("2026-11")の年度のフォルダ(営業日誌\2026年度)。無ければ作る(新しい年度の4月分を初めて作ったときに、できる)
+Public Function FyDir(ByVal ym As String) As String
+    Dim p As String
+    p = AddSep(OutDir()) & FiscalYear(DateSerial(CLng(Left$(ym, 4)), CLng(Mid$(ym, 6, 2)), 1)) & "年度"
+    If Not FolderExists(OutDir()) Then MkDir OutDir()
+    If Not FolderExists(p) Then MkDir p
+    FyDir = p
+End Function
+
+' 分析で選んでいる年度(未選択なら今の年度)
 Public Function SelYear() As Long
     Dim v As Variant
-    SelYear = Year(Date)
+    SelYear = FiscalYear(Date)
     On Error Resume Next
     If CurrentProject.AllForms(MENU).IsLoaded Then v = Forms(MENU)!cbo年
     On Error GoTo 0
@@ -108,21 +122,21 @@ Public Function MenuLoad()
     Dim f As Form, y As Long, d As Date, i As Long, s As String
     Set f = Forms(MENU)
     FillWhoList
-    ' 年月(印刷用):今月から13か月前まで。最初は先月(月初に先月分を出すため)
+    ' 年月(印刷用):今月から13か月前まで。最初は、月の1～5日は先月(月初に先月分を出すため)、6日からは今月
     s = ""
     For i = 0 To 12
         d = DateAdd("m", -i, DateSerial(Year(Date), Month(Date), 1))
         s = s & Format(d, "yyyy-mm") & ";" & Format(d, "yyyy年m月") & ";"
     Next i
     f!cbo年月.RowSource = s
-    f!cbo年月 = Format(DateAdd("m", -1, Date), "yyyy-mm")
-    ' 年(分析用)
+    If Day(Date) <= 5 Then f!cbo年月 = Format(DateAdd("m", -1, Date), "yyyy-mm") Else f!cbo年月 = Format(Date, "yyyy-mm")
+    ' 年度(分析用。4月～翌年3月):今の年度から5年度前まで。値=2026、表示=2026年度
     s = ""
-    For y = Year(Date) To Year(Date) - 5 Step -1
-        s = s & y & ";"
+    For y = FiscalYear(Date) To FiscalYear(Date) - 5 Step -1
+        s = s & y & ";" & y & "年度;"
     Next y
     f!cbo年.RowSource = s
-    f!cbo年 = Year(Date)
+    f!cbo年 = FiscalYear(Date)
 End Function
 
 ' 担当者の一覧を作り直す(選んでいた人は、そのまま)
@@ -528,8 +542,8 @@ Public Function MakeNisshi(ByVal who As String, ByVal ym As String, Optional ByR
     ResetNames                                            ' 客先の今の名前を、読み直す
     tpl = TemplatePath()
     If Not FileExists(tpl) Then MakeNisshi = "日誌原紙が見つかりません。「初期設定用紙入れ」フォルダに「日誌原紙.xlsx」を入れてください。" & vbLf & tpl: Exit Function
-    If Not FolderExists(OutDir()) Then MkDir OutDir()
-    path = AddSep(OutDir()) & "営業日誌_" & Left$(ym, 4) & "年" & Mid$(ym, 6, 2) & "月_" & SafeName(who) & Mid$(tpl, InStrRev(tpl, "."))
+    ' 年度のフォルダ(営業日誌\2026年度)に入れる(2026-11-25 から)
+    path = AddSep(FyDir(ym)) & "営業日誌_" & Left$(ym, 4) & "年" & Mid$(ym, 6, 2) & "月_" & SafeName(who) & Mid$(tpl, InStrRev(tpl, "."))
 
     ' データを読む
     Set visits = CreateObject("Scripting.Dictionary")      ' 日付 → その日の訪問(時間の順)
