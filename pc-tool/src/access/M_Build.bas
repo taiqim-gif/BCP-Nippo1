@@ -95,6 +95,8 @@ Private Sub MakeTables()
         db.Execute "CREATE TABLE T_承認 (担当者 TEXT(50) NOT NULL, 日付 DATETIME NOT NULL, 承認者 TEXT(50), 承認日時 DATETIME, " & _
                    "CONSTRAINT pk_ok PRIMARY KEY (担当者, 日付))"
     End If
+    ' 承認したPCのユーザー番号(2026-11-25)。前に承認した分は空のまま
+    If Not HasField("T_承認", "ユーザー番号") Then db.Execute "ALTER TABLE T_承認 ADD COLUMN ユーザー番号 TEXT(50)"
     db.TableDefs.Refresh
 End Sub
 
@@ -168,7 +170,7 @@ Private Sub MakeQueries()
         "LEFT JOIN T_承認 AS a ON (u.担当者=a.担当者 AND u.日付=a.日付) " & _
         "WHERE a.担当者 Is Null AND u.日付 Is Not Null AND WhoOk(u.担当者) ORDER BY u.日付, u.担当者"
     AddQuery "Q_承認の一覧", _
-        "SELECT 担当者, 日付, WeekLabel([日付]) AS 曜日, 承認者, 承認日時 FROM T_承認 " & _
+        "SELECT 担当者, 日付, WeekLabel([日付]) AS 曜日, 承認者, 承認日時, ユーザー番号 FROM T_承認 " & _
         "WHERE WhoOk([担当者]) AND Year(DateAdd('m',-3,[日付]))=SelYear() ORDER BY 日付 DESC, 担当者"
 End Sub
 
@@ -198,7 +200,7 @@ Private Sub MakeViewForm(ByVal nm As String, ByVal qry As String, ByVal cap As S
         Select Case fld.Name
         Case "内容", "特記事項": w = 5000
         Case "訪問先", "顧客名", "面談者", "客先", "メモ": w = 2600
-        Case "日付", "登録日", "担当者", "名前", "車両ナンバー", "顧客コード", "承認者", "名字": w = 1800
+        Case "日付", "登録日", "担当者", "名前", "車両ナンバー", "顧客コード", "承認者", "名字", "ユーザー番号": w = 1800
         Case "承認日時": w = 2400
         Case Else: w = 1100
         End Select

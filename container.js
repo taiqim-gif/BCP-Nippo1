@@ -1999,7 +1999,7 @@ function visitCsv(visits){
   const nm = userName();
   return csvRows(
     ["日付","番号","顧客コード","訪問先","開始時刻","終了時刻","面談者","敬称","内容","特記事項","開始位置","終了位置","ID","担当者"],
-    visits.map(l => [l.date, l.number, l.customerCode, l.target, formatTimeOnly(l.startTime), formatTimeOnly(l.endTime), l.attendee, l.attendeeTitle, l.content, l.notes,
+    visits.map(l => [l.date, l.number, l.customerCode, l.target, formatTimeOnly(l.startTime), formatTimeOnly(l.endTime), l.attendee, (l.attendee ? l.attendeeTitle : ""), l.content, l.notes,
       posText(l.startLat, l.startLng, l.startLocation), posText(l.endLat, l.endLng, l.endLocation), l.createdAt, nm]));   // ID=訪問ごとの目印(パソコンで二重に入れない)
 }
 function vehicleCsv(vdays){
@@ -2125,6 +2125,7 @@ function lastSentData(){
   return { at, visits, vdays, todos, cts };
 }
 window.ctLastSentData = lastSentData;
+window.ctVisitCsv = visitCsv;              // テスト用(v2.3)
 function sentDayLabel(iso){ return iso ? shortDate(localYmd(iso)) : ""; }
 function resendLast(){
   const d = lastSentData();
@@ -2419,7 +2420,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v2.2";
+const APP_VERSION = "v2.3";
 const APP_DATE = "2026-11-25";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -2727,7 +2728,7 @@ function compactVisitCards(){
     if(!log) return;
     card.setAttribute("data-compact", "1");
     const t1 = typeof formatTimeOnly === "function" ? formatTimeOnly(log.startTime) : "", t2 = typeof formatTimeOnly === "function" ? formatTimeOnly(log.endTime) : "";
-    const person = [log.attendee, log.attendeeTitle].filter(Boolean).join("");
+    const person = log.attendee ? log.attendee + (log.attendeeTitle || "") : "";   // v2.3：名前が空なら敬称も出さない
     const l1 = document.createElement("div");
     l1.className = "vc-l1";
     l1.innerHTML = `<span class="vc-no">No.${escapeHtml(String(log.number || "-"))}</span><span class="vc-time">${escapeHtml(t1)}${t2 ? "–" + escapeHtml(t2) : ""}</span><span class="vc-sp"></span><span class="vc-btns"></span>`;

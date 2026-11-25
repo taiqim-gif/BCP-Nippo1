@@ -959,7 +959,7 @@ function renderReportScreen(){
     card.className = "visit-card";
 
     const timeRange = `${formatTimeOnly(log.startTime)} ～ ${formatTimeOnly(log.endTime)}`;
-    const person = [log.attendee, log.attendeeTitle].filter(Boolean).join("");
+    const person = log.attendee ? log.attendee + (log.attendeeTitle || "") : "";   // 名前が空なら敬称も出さない
 
     card.innerHTML = `
       <div class="top">
@@ -1240,7 +1240,7 @@ document.getElementById("endButton").addEventListener("click", async () => {
       }
       log.target = newTarget;
       log.attendee = document.getElementById("meetingPerson").value.trim();
-      log.attendeeTitle = document.getElementById("meetingPersonTitle").value.trim();
+      log.attendeeTitle = log.attendee ? document.getElementById("meetingPersonTitle").value.trim() : "";   // 名前が空なら敬称も空
       log.content = document.getElementById("meetingContent").value;
       log.notes = document.getElementById("meetingNotes").value;
 
@@ -1260,7 +1260,7 @@ document.getElementById("endButton").addEventListener("click", async () => {
   }
 
   currentVisit.person = document.getElementById("meetingPerson").value.trim();
-  currentVisit.personTitle = document.getElementById("meetingPersonTitle").value.trim();
+  currentVisit.personTitle = currentVisit.person ? document.getElementById("meetingPersonTitle").value.trim() : "";   // 名前が空なら敬称も空
   currentVisit.content = document.getElementById("meetingContent").value;
   currentVisit.notes = document.getElementById("meetingNotes").value;
   currentVisit.endTime = getNowDateTimeLocal();
@@ -1954,7 +1954,7 @@ function buildReportMail(){
         body += `訪問先：${log.target || ""}\n`;
         body += `顧客コード：${log.customerCode || ""}\n`;
         body += `時間：${formatTimeOnly(log.startTime)} ～ ${formatTimeOnly(log.endTime)}\n`;
-        body += `面談者：${log.attendee || ""}${log.attendeeTitle || ""}\n`;
+        body += `面談者：${log.attendee ? log.attendee + (log.attendeeTitle || "") : ""}\n`;
         body += `内容：${log.content || ""}\n`;
         body += `特記事項：${log.notes || ""}\n\n`;
       });

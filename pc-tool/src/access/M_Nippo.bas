@@ -429,7 +429,8 @@ Private Function ImportTable(db As DAO.Database, ByVal kind As String, rows As C
                 rs!担当者 = who: rs!訪問ID = id: rs!日付 = d
                 rs!開始 = Cell(r, cS): rs!終了 = Cell(r, cE)
                 rs!顧客コード = Cell(r, cCode): rs!訪問先 = Cell(r, cT)
-                rs!面談者 = Cell(r, cA) & Cell(r, cAt)
+                ' 面談者の名前が空なら、敬称(さん)も付けない
+                If Cell(r, cA) = "" Then rs!面談者 = "" Else rs!面談者 = Cell(r, cA) & Cell(r, cAt)
                 rs!内容 = Cell(r, cC): rs!特記事項 = Cell(r, cN)
                 rs!取込日時 = Now
                 rs.Update
@@ -1284,7 +1285,8 @@ Public Function BtnApprove()
             d = DateSerial(CLng(Mid$(key, pos + 1, 4)), CLng(Mid$(key, pos + 6, 2)), CLng(Mid$(key, pos + 9, 2)))
             ' 同じ担当者・日付は1件だけ(あれば置き換える)
             db.Execute "DELETE FROM T_承認 WHERE 担当者=" & Q(who) & " AND 日付=" & SqlDate(d), dbFailOnError
-            db.Execute "INSERT INTO T_承認 (担当者, 日付, 承認者, 承認日時) VALUES (" & Q(who) & ", " & SqlDate(d) & ", " & Q(CStr(boss)) & ", Now())", dbFailOnError
+            ' ユーザー番号 = 承認したPCにログインしている番号(どのPCで承認したかが分かる)
+            db.Execute "INSERT INTO T_承認 (担当者, 日付, 承認者, 承認日時, ユーザー番号) VALUES (" & Q(who) & ", " & SqlDate(d) & ", " & Q(CStr(boss)) & ", Now(), " & Q(Environ$("USERNAME")) & ")", dbFailOnError
             months(who & "|" & Format(d, "yyyy-mm")) = True
             n = n + 1
         End If

@@ -2235,3 +2235,10 @@ ok(sh66===null && w.eval("toasts").slice(t66).includes("送り直す分はあり
 w.confirm=cf66; w.getToday=gt66;
 w.eval("todoItems=[]"); w.localStorage.setItem("todoItems","[]"); w.localStorage.removeItem("todoLastSentIds");
 }
+// ---- 67) v2.3:面談者の名前が空なら、敬称(さん)も付けない ----
+{
+const c67=w.ctVisitCsv([{date:"2026-11-25",number:1,target:"架空商店",attendee:"",attendeeTitle:"さん",createdAt:"e1"},{date:"2026-11-25",number:2,target:"架空工業",attendee:"山田",attendeeTitle:"さん",createdAt:"e2"}]);
+const r67=c67.split(/\r?\n/);
+ok(r67[1].includes("架空商店") && !r67[1].includes("さん"),"no name: no さん in the CSV: "+r67[1]);
+ok(r67[2].includes("山田,さん"),"with a name: さん stays: "+r67[2]);
+}
