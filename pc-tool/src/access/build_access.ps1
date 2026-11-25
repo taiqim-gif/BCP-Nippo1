@@ -32,7 +32,7 @@ try {
     $a.DoCmd.RunCommand(126)                          # 126 = コンパイルして保存(書き間違いがあればここで止まる)
     $r = $a.Run("BuildAll")
     if ($r -ne "OK") { throw "組み立てが止まりました: $r" }
-    # 組み立て用のモジュールは、もう使わないので外す(元は src にある)
+    # 組み立て用のモジュールは、もう使わないので外す(元は プログラム_直すとき用 にある)
     $vbp.VBComponents.Remove($vbp.VBComponents.Item("M_Build"))
     $a.DoCmd.RunCommand(126)
     if ($isNew) { "作成: $Db ($r)" } else { "新しい版にしました: $Db ($r)" }

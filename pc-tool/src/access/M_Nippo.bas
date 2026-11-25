@@ -6,12 +6,12 @@ Option Explicit
 '  ・担当者と月を選んで、今と同じ書式の営業日誌(Excel、日誌原紙のコピー)を作る
 '  ・訪問回数・ToDo・走行距離を、担当者ごとに分けて見る
 '  場所はすべて、このファイルが今あるフォルダを元に決める(フォルダごと持ち歩ける)
-'    日誌原紙.xlsx / CSV フォルダ / 営業日誌 フォルダ
+'    初期設定用紙入れ\日誌原紙.xlsx / CSV フォルダ / 営業日誌 フォルダ
 ' =====================================================================
 
 Private Const ROW_FIRST As Long = 7          ' 日々のシートの表の最初の行
 Private Const ROW_LAST As Long = 24          ' 日々のシートの表の最後の行(18行)
-' 日々のシートの列(2026-11-18 の新しい原紙。1項目=1列。作り方は src\make_template.ps1)
+' 日々のシートの列(2026-11-18 の新しい原紙。1項目=1列。作り方は プログラム_直すとき用\make_template.ps1)
 Private Const C_CODE As String = "B"         ' 顧客コード
 Private Const C_START As String = "C"        ' 開始
 Private Const C_END As String = "E"          ' 終了(D列は「～」)
@@ -47,8 +47,19 @@ End Function
 ' =====================================================================
 '  場所
 ' =====================================================================
+' 日誌原紙の置き場所(2026-11-25 から「初期設定用紙入れ」フォルダ。ほかの人が消したり直したりしにくいよう、読み取り専用にしてある)
+Public Function TemplateDir() As String
+    TemplateDir = AddSep(CurrentProject.Path) & "初期設定用紙入れ"
+End Function
+
+' 日誌原紙の場所。新しい置き場所に無いときは、前の場所(このファイルと同じフォルダ)を使う
 Public Function TemplatePath() As String
-    TemplatePath = AddSep(CurrentProject.Path) & "日誌原紙.xlsx"
+    Dim p As String
+    p = AddSep(TemplateDir()) & "日誌原紙.xlsx"
+    If Not FileExists(p) Then
+        If FileExists(AddSep(CurrentProject.Path) & "日誌原紙.xlsx") Then p = AddSep(CurrentProject.Path) & "日誌原紙.xlsx"
+    End If
+    TemplatePath = p
 End Function
 
 Public Function CsvDir() As String
@@ -516,7 +527,7 @@ Public Function MakeNisshi(ByVal who As String, ByVal ym As String, Optional ByR
     outPath = ""
     ResetNames                                            ' 客先の今の名前を、読み直す
     tpl = TemplatePath()
-    If Not FileExists(tpl) Then MakeNisshi = "日誌原紙が見つかりません。このファイルと同じフォルダに「日誌原紙.xlsx」を入れてください。" & vbLf & tpl: Exit Function
+    If Not FileExists(tpl) Then MakeNisshi = "日誌原紙が見つかりません。「初期設定用紙入れ」フォルダに「日誌原紙.xlsx」を入れてください。" & vbLf & tpl: Exit Function
     If Not FolderExists(OutDir()) Then MkDir OutDir()
     path = AddSep(OutDir()) & "営業日誌_" & Left$(ym, 4) & "年" & Mid$(ym, 6, 2) & "月_" & SafeName(who) & Mid$(tpl, InStrRev(tpl, "."))
 
@@ -566,6 +577,7 @@ Public Function MakeNisshi(ByVal who As String, ByVal ym As String, Optional ByR
     xl.ScreenUpdating = False
     If Not FileExists(path) Then
         FileCopy tpl, path
+        SetAttr path, vbNormal                            ' 原紙の「読み取り専用」の印が写るので外す(営業日誌は書けるようにする)
         isNew = True
     End If
     Set wb = xl.Workbooks.Open(path, 0)

@@ -8,8 +8,11 @@
 #   6行目 = 見出し      7～24行目 = 訪問(18行)
 #   A=No B=顧客コード C=開始 D=～ E=終了 F=行先 G=面談者 H=用件 I=ToDo J=備考 K=確認印
 #   25行目: G25 = 出発メーター  I25 = 帰着メーター  K25 = 給油
-param([string]$Path = (Join-Path (Split-Path $PSScriptRoot -Parent) "日誌原紙.xlsx"))
+param([string]$Path = (Join-Path (Split-Path $PSScriptRoot -Parent) "初期設定用紙入れ\日誌原紙.xlsx"))
 $ErrorActionPreference = "Stop"
+# 原紙は「読み取り専用」にしてあるので、作り直す間だけ外す(終わったら、また付ける)
+$f = Get-Item $Path
+$f.IsReadOnly = $false
 $FONT = "UD デジタル 教科書体 N"
 
 $xl = New-Object -ComObject Excel.Application
@@ -126,4 +129,5 @@ try {
 } finally {
     $xl.Quit()
     [void][Runtime.InteropServices.Marshal]::ReleaseComObject($xl)
+    (Get-Item $Path).IsReadOnly = $true                  # 読み取り専用に戻す
 }
