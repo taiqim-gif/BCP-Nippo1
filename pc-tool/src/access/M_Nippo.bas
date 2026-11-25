@@ -91,11 +91,16 @@ End Function
 
 ' 年月("2026-11")の年度のフォルダ(営業日誌\2026年度)。無ければ作る(新しい年度の4月分を初めて作ったときに、できる)
 Public Function FyDir(ByVal ym As String) As String
+    FyDir = YearDir(FiscalYear(DateSerial(CLng(Left$(ym, 4)), CLng(Mid$(ym, 6, 2)), 1)))
+End Function
+
+' 年度(2026)のフォルダ(営業日誌\2026年度)。無ければ作る
+Public Function YearDir(ByVal fy As Long) As String
     Dim p As String
-    p = AddSep(OutDir()) & FiscalYear(DateSerial(CLng(Left$(ym, 4)), CLng(Mid$(ym, 6, 2)), 1)) & "年度"
+    p = AddSep(OutDir()) & fy & "年度"
     If Not FolderExists(OutDir()) Then MkDir OutDir()
     If Not FolderExists(p) Then MkDir p
-    FyDir = p
+    YearDir = p
 End Function
 
 ' 分析で選んでいる年度(未選択なら今の年度)
@@ -253,8 +258,8 @@ Public Function BtnExport()
     fname = gLastView
     If fname <> "" Then If Not CurrentProject.AllForms(fname).IsLoaded Then fname = ""
     If fname = "" Then MsgBox "先に、分析のボタンで画面を開いてください。", vbExclamation, "営業日報": Exit Function
-    If Not FolderExists(OutDir()) Then MkDir OutDir()
-    p = AddSep(OutDir()) & "分析_" & Mid$(fname, 3) & "_" & IIf(SelWho() = "", "全員", SafeName(SelWho())) & "_" & Format(Now, "yyyymmdd_hhnn") & ".xlsx"
+    ' 分析で選んでいる年度のフォルダ(営業日誌\2026年度)に入れる(2026-11-25 から)
+    p = AddSep(YearDir(SelYear())) & "分析_" & Mid$(fname, 3) & "_" & IIf(SelWho() = "", "全員", SafeName(SelWho())) & "_" & Format(Now, "yyyymmdd_hhnn") & ".xlsx"
     DoCmd.OutputTo acOutputForm, fname, acFormatXLSX, p, True
 End Function
 
