@@ -247,9 +247,12 @@ Private Sub MakeMenu()
     Lbl tmp, "担当者の名前は、スマホのアプリの「使う人」に登録した名前と同じ字にする", 0.5, 2.45, 15, 0.45, 9, False
 
     Lbl tmp, "1. 取り込み(CSVフォルダのCSVを入れる)", 0.5, 2.9, 15, 0.6, 11, True
-    Btn tmp, "自分の分を取り込む", "=BtnImportMine()", 0.8, 3.6, 4.6, 0.8
-    Btn tmp, "まとめて取り込む(全員)", "=BtnImportAll()", 5.6, 3.6, 4.6, 0.8
-    Btn tmp, "CSVフォルダを開く", "=BtnOpenCsv()", 10.4, 3.6, 4.6, 0.8
+    ' 押す順番に、左から ①→②→③ と並べる
+    Btn tmp, "① CSVフォルダを開く", "=BtnOpenCsv()", 0.8, 3.6, 4.4, 0.8
+    Lbl tmp, "→", 5.3, 3.7, 0.5, 0.6, 14, True
+    Btn tmp, "② 自分の分を取り込む", "=BtnImportMine()", 5.8, 3.6, 4.4, 0.8
+    Lbl tmp, "→", 10.3, 3.7, 0.5, 0.6, 14, True
+    Btn tmp, "③ まとめて取り込む(全員)", "=BtnImportAll()", 10.8, 3.6, 4.4, 0.8
 
     Lbl tmp, "2. 営業日誌(今までと同じ書式のExcel。印刷はExcelで)", 0.5, 4.8, 15, 0.6, 11, True
     Lbl tmp, "年月", 0.8, 5.55, 1.2, 0.6, 11, False

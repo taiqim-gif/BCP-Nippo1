@@ -186,7 +186,7 @@ End Function
 Public Function BtnImportMine()
     Dim who As String
     who = SelWho()
-    If who = "" Then MsgBox "上の「担当者」で、自分の名前を選んでください。" & vbLf & "(全員分を入れるときは「まとめて取り込む」)", vbExclamation, "営業日報": Exit Function
+    If who = "" Then MsgBox "上の「担当者」で、自分の名前を選んでください。" & vbLf & "(全員分を入れるときは「③ まとめて取り込む」)", vbExclamation, "営業日報": Exit Function
     ShowResult ImportCsv(who, CsvDir())
 End Function
 
