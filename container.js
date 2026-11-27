@@ -652,6 +652,10 @@ style.textContent = `
   .ct-more-row[hidden]{ display:none; }
   .ct-more-row .btn{ margin-top:0; flex:1 1 auto; width:auto; }
   .ct-more-row .ct-close-btn{ flex:0 0 auto; padding-left:18px; padding-right:18px; }
+  /* v2.5:長いリストの上にも「閉じる」(右寄せの小さいボタン) */
+  .ct-top-close{ display:flex; justify-content:flex-end; margin:6px 0 4px; }
+  .ct-top-close[hidden]{ display:none; }
+  .ct-head-right{ display:flex; align-items:center; gap:8px; flex:none; }
   .cm-share-note{ font-size:12px; color:var(--ink-soft); line-height:1.6; margin-bottom:8px; }
   .cm-share-label{ display:block; font-size:12px; color:var(--ink-soft); margin-bottom:6px; }
   .cm-count{ font-size:12px; color:var(--ink-soft); margin-left:auto; }
@@ -2426,7 +2430,7 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v2.4";
+const APP_VERSION = "v2.5";
 const APP_DATE = "2026-11-27";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
@@ -3349,7 +3353,9 @@ function renderDoneTodos(){
   if(done.length === 0) return;
   const head = document.createElement("div");
   head.className = "dt-head";
-  head.innerHTML = '<span>終了したToDoリスト</span><span class="h2-note">チェックを外すと戻る</span>';
+  const long = !doneClosed && done.length > 20;          // v2.5:長いときは、見出しの右端にも「閉じる」
+  head.innerHTML = '<span>終了したToDoリスト</span><span class="ct-head-right"><span class="h2-note">チェックを外すと戻る</span>' +
+    (long ? '<button type="button" class="cm-mini" id="doneCloseTop">閉じる</button>' : '') + '</span>';
   const body = document.createElement("div");
   body.className = "dt-body";
   box.appendChild(head);
@@ -3498,7 +3504,7 @@ doneBox.addEventListener("change", e => {
 });
 doneBox.addEventListener("click", e => {
   if(e.target.closest("#doneMore")){ doneLimit += 20; renderDoneTodos(); }
-  if(e.target.closest("#doneClose")){                                              // v2.4:リスト全体をたたむ
+  if(e.target.closest("#doneClose, #doneCloseTop")){                                              // v2.4:リスト全体をたたむ
     doneClosed = true; doneLimit = 20; renderDoneTodos();
     if(doneBox.scrollIntoView) doneBox.scrollIntoView({ block:"start" });
   }
@@ -3718,6 +3724,7 @@ custSection.innerHTML = `
     <div class="cm-tools">
       <span class="cm-count" id="cmCount"></span>
     </div>
+    <div class="ct-top-close" id="cmTopCloseRow" hidden><button type="button" class="cm-mini" id="cmCloseTop">閉じる</button></div>
     <div class="cm-head"><span>顧客</span><span>非表示にする</span></div>
     <div id="cmList"></div>
     <div class="ct-more-row" id="cmMoreRow" hidden>
@@ -3813,6 +3820,7 @@ function renderCust(){
   $("cmMore").hidden = items.length <= cmLimit;
   $("cmMore").textContent = `さらに表示(残り ${Math.max(0, items.length - cmLimit)}件)`;
   $("cmMoreRow").hidden = cmClosed || items.length <= CM_STEP;          // v2.4:30件より多いときだけ「閉じる」を出す
+  $("cmTopCloseRow").hidden = $("cmMoreRow").hidden;                       // v2.5:上の「閉じる」も同じとき
 }
 
 function cmResetAddForm(){
@@ -3865,12 +3873,14 @@ $("cmTabs").addEventListener("click", e => {
 });
 $("cmSearch").addEventListener("input", () => { cmLimit = CM_STEP; cmClosed = false; renderCust(); });
 $("cmMore").addEventListener("click", () => { cmLimit += CM_STEP; renderCust(); });
-$("cmClose").addEventListener("click", () => {                                    // v2.4:リスト全体をたたむ
+function cmCloseList(){                                                           // v2.4:リスト全体をたたむ(v2.5:上と下の「閉じる」)
   cmClosed = true; cmLimit = CM_STEP;
   renderCust();
   const card = $("cmList").closest(".card");
   if(card && card.scrollIntoView) card.scrollIntoView({ block:"start" });
-});
+}
+$("cmClose").addEventListener("click", cmCloseList);
+$("cmCloseTop").addEventListener("click", cmCloseList);
 $("cmOpen").addEventListener("click", () => { cmClosed = false; cmLimit = CM_STEP; renderCust(); });
 
 // 「非表示」のチェック：付けるとすぐ非表示、外すとすぐ表示に戻る

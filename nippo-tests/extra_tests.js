@@ -2257,6 +2257,10 @@ const n68=()=>d.querySelectorAll("#cmList .cm-row").length;
 const N68=parseInt($("cmCount").textContent,10);   // 架空の70件+前の確認で足した顧客
 ok(N68>=70 && N68<90 && n68()===30 && !$("cmMore").hidden && $("cmMore").textContent===`さらに表示(残り ${N68-30}件)`,"v2.4: 30 shown first, then さらに表示(残り): "+n68()+" "+$("cmMore").textContent);
 ok(!$("cmMoreRow").hidden && !$("cmClose").hidden && $("cmMoreRow").lastElementChild===$("cmClose"),"v2.4: 閉じる sits on the right of さらに表示");
+ok(!$("cmTopCloseRow").hidden && $("cmTopCloseRow").nextElementSibling.classList.contains("cm-head"),"v2.5: 閉じる also above the list");
+$("cmCloseTop").click();
+ok(n68()===0 && $("cmTopCloseRow").hidden && !$("cmOpen").hidden,"v2.5: the top 閉じる folds the list too");
+$("cmOpen").click();
 $("cmMore").click();
 ok(n68()===60 && $("cmMore").textContent===`さらに表示(残り ${N68-60}件)`,"v2.4: さらに表示 adds 30: "+n68());
 $("cmMore").click();
@@ -2266,7 +2270,7 @@ ok(n68()===0 && $("cmList").hidden && $("cmMoreRow").hidden && !$("cmOpen").hidd
 $("cmOpen").click();
 ok(n68()===30 && !$("cmList").hidden && $("cmOpen").hidden,"v2.4: 開く shows the first 30 again");
 $("cmClose").click(); $("cmSearch").value="架空商店0"; ev($("cmSearch"),"input");
-ok(n68()===10 && $("cmMoreRow").hidden,"v2.4: searching opens the list; 10 rows → no 閉じる: "+n68());
+ok(n68()===10 && $("cmMoreRow").hidden && $("cmTopCloseRow").hidden,"v2.4: searching opens the list; 10 rows → no 閉じる: "+n68());
 $("cmSearch").value=""; ev($("cmSearch"),"input");
 // 直したあと、元の位置に戻る
 const scrolls68=[]; const oScroll=w.scrollTo; w.scrollTo=(x,y)=>scrolls68.push(y);
@@ -2298,5 +2302,9 @@ db68.querySelector("#doneClose").click();
 ok(dr68()===0 && !!db68.querySelector("#doneOpen") && /25件/.test(db68.querySelector("#doneOpen").textContent),"v2.4: 閉じる folds the finished list");
 db68.querySelector("#doneOpen").click();
 ok(dr68()===20 && !db68.querySelector("#doneOpen") && db68.querySelector("#doneMore").nextElementSibling===db68.querySelector("#doneClose"),"v2.4: 開く shows 20 again, 閉じる on the right of さらに表示");
+ok(!!db68.querySelector(".dt-head #doneCloseTop"),"v2.5: 閉じる also at the right end of the heading");
+db68.querySelector("#doneCloseTop").click();
+ok(dr68()===0 && !!db68.querySelector("#doneOpen") && !db68.querySelector("#doneCloseTop"),"v2.5: the top 閉じる folds the finished list");
+db68.querySelector("#doneOpen").click();
 w.eval('todoItems=[]'); w.renderTodoList();
 }
