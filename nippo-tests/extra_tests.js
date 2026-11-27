@@ -23,7 +23,7 @@ ok(/\.ct-sum-line\{[^}]*grid-template-columns:var\(--sumw/.test(css2),"CSS grid 
 
 // ---- 16) 「データ」画面 ----
 const navBtns=["navHomeButton","navVehicleButton","navContainerButton","navDataButton"].map(id=>$(id).textContent);
-ok(navBtns.join()==="ホーム,車両,容器,データ","header buttons: "+navBtns.join());
+ok(navBtns.join()==="ホーム,車両・ToDo,容器,データ","header buttons: "+navBtns.join());
 ok(/header\{[^}]*flex-wrap:wrap/.test(css2) && /\.ct-datebox\{[^}]*flex:0 0 100%[^}]*flex-direction:row/.test(css2) && /header \.nav-btn\{[^}]*flex:1 1 0[^}]*white-space:nowrap/.test(css2),"header: 2 rows (date + BCP on top, 4 equal buttons below), no wrapping text");
 ok(/#reportScreen \.footer-actions\{ display:none/.test(css2),"Home: old mail / delete buttons hidden");
 ok(!$("ctCsvButton") && !$("ctMailButton") && !$("ctClearButton") && !$("backupExportButton"),"container tab: no CSV / mail / delete buttons; no backup buttons on Home");
@@ -2241,4 +2241,62 @@ const c67=w.ctVisitCsv([{date:"2026-11-25",number:1,target:"架空商店",attend
 const r67=c67.split(/\r?\n/);
 ok(r67[1].includes("架空商店") && !r67[1].includes("さん"),"no name: no さん in the CSV: "+r67[1]);
 ok(r67[2].includes("山田,さん"),"with a name: さん stays: "+r67[2]);
+}
+
+// ---- 68) v2.4:顧客の管理の並び(追加→コピー→取り込んだリスト→一覧)・30件ずつ・閉じる・直したあと元の位置へ・終了ToDoの閉じる・「車両・ToDo」 ----
+{
+const order68=[...$("custScreen").children].map(e=>e.id||"").filter(x=>["cmAddCard","cmShareCard","cmLists","cmTabs"].includes(x));
+ok(order68.join()==="cmAddCard,cmShareCard,cmLists,cmTabs","v2.4: order is 顧客を追加 → 他の人にコピーする → 取り込んだリスト → list: "+order68.join());
+ok(/header #navVehicleButton\{ flex-grow:1\.35/.test([...d.querySelectorAll("style")].map(x=>x.textContent).join("")),"v2.4: the 車両・ToDo button is a little wider");
+const mBak68=w.localStorage.getItem("customerMaster"), hBak68=w.localStorage.getItem("customerHidden");
+const items68=[]; for(let i=0;i<70;i++) items68.push({n:"架空商店"+String(i).padStart(2,"0"),k:"かくう"+String(i).padStart(2,"0"),c:String(7000+i)});
+w.localStorage.setItem("customerMaster",JSON.stringify({office:"架空",updated:"2026-11-27",items:items68}));
+w.localStorage.setItem("customerHidden","[]"); w.ctCustSettingsPlan({hidden:[]}); w.renderMasterUI();
+$("navDataButton").click(); $("dtCustManage").click();
+const n68=()=>d.querySelectorAll("#cmList .cm-row").length;
+const N68=parseInt($("cmCount").textContent,10);   // 架空の70件+前の確認で足した顧客
+ok(N68>=70 && N68<90 && n68()===30 && !$("cmMore").hidden && $("cmMore").textContent===`さらに表示(残り ${N68-30}件)`,"v2.4: 30 shown first, then さらに表示(残り): "+n68()+" "+$("cmMore").textContent);
+ok(!$("cmMoreRow").hidden && !$("cmClose").hidden && $("cmMoreRow").lastElementChild===$("cmClose"),"v2.4: 閉じる sits on the right of さらに表示");
+$("cmMore").click();
+ok(n68()===60 && $("cmMore").textContent===`さらに表示(残り ${N68-60}件)`,"v2.4: さらに表示 adds 30: "+n68());
+$("cmMore").click();
+ok(n68()===N68 && $("cmMore").hidden && !$("cmMoreRow").hidden,"v2.4: all shown, 閉じる still there");
+$("cmClose").click();
+ok(n68()===0 && $("cmList").hidden && $("cmMoreRow").hidden && !$("cmOpen").hidden && $("cmOpen").textContent===`顧客リストを開く(${N68}件)`,"v2.4: 閉じる folds the whole list, 顧客リストを開く(件数)");
+$("cmOpen").click();
+ok(n68()===30 && !$("cmList").hidden && $("cmOpen").hidden,"v2.4: 開く shows the first 30 again");
+$("cmClose").click(); $("cmSearch").value="架空商店0"; ev($("cmSearch"),"input");
+ok(n68()===10 && $("cmMoreRow").hidden,"v2.4: searching opens the list; 10 rows → no 閉じる: "+n68());
+$("cmSearch").value=""; ev($("cmSearch"),"input");
+// 直したあと、元の位置に戻る
+const scrolls68=[]; const oScroll=w.scrollTo; w.scrollTo=(x,y)=>scrolls68.push(y);
+Object.defineProperty(w,"scrollY",{value:1234,configurable:true});
+const r68=[...d.querySelectorAll("#cmList .cm-row")].find(r=>r.querySelector(".cm-name").textContent==="架空商店05");
+r68.querySelector('button[data-act="medit"]').click();
+Object.defineProperty(w,"scrollY",{value:0,configurable:true});
+$("cmAddCancel").click();
+await new Promise(r=>setTimeout(r,10));
+ok(scrolls68.includes(1234),"v2.4: after やめる, the screen goes back to where 直す was pressed: "+scrolls68.join());
+scrolls68.length=0;
+Object.defineProperty(w,"scrollY",{value:800,configurable:true});
+[...d.querySelectorAll("#cmList .cm-row")].find(r=>r.querySelector(".cm-name").textContent==="架空商店05").querySelector('button[data-act="medit"]').click();
+Object.defineProperty(w,"scrollY",{value:0,configurable:true});
+$("cmAddBtn").click();
+await new Promise(r=>setTimeout(r,10));
+ok(scrolls68.includes(800),"v2.4: after 更新, back to the same place: "+scrolls68.join());
+w.scrollTo=oScroll;
+if(mBak68===null) w.localStorage.removeItem("customerMaster"); else w.localStorage.setItem("customerMaster",mBak68);
+w.localStorage.setItem("customerHidden",hBak68||"[]"); w.ctCustSettingsPlan({hidden:[]}); w.renderMasterUI();
+// 終了したToDoリストの「閉じる」
+const db68=$("doneTodoBox");
+let many68='todoItems=[';
+for(let i=0;i<25;i++) many68+='{id:"z'+i+'",date:"2026-10-08",target:"",content:"件'+i+'",done:true,order:'+(i*10)+',completedAt:"2026-10-09T10:'+String(i).padStart(2,"0")+':00.000Z",createdAt:"2026-10-08T00:00:00Z"},';
+w.eval(many68+']'); w.renderTodoList();
+const dr68=()=>db68.querySelectorAll(".done-item").length;
+ok(dr68()===25 && !db68.querySelector("#doneMore") && !!db68.querySelector("#doneClose"),"v2.4: finished ToDo (all shown by the earlier check): 閉じる is still there");
+db68.querySelector("#doneClose").click();
+ok(dr68()===0 && !!db68.querySelector("#doneOpen") && /25件/.test(db68.querySelector("#doneOpen").textContent),"v2.4: 閉じる folds the finished list");
+db68.querySelector("#doneOpen").click();
+ok(dr68()===20 && !db68.querySelector("#doneOpen") && db68.querySelector("#doneMore").nextElementSibling===db68.querySelector("#doneClose"),"v2.4: 開く shows 20 again, 閉じる on the right of さらに表示");
+w.eval('todoItems=[]'); w.renderTodoList();
 }

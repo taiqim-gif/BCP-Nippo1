@@ -183,6 +183,7 @@ const style = document.createElement("style");
 style.textContent = `
   header{ flex-wrap:wrap; gap:6px; padding:8px 12px; }
   header .nav-btn{ flex:1 1 0; min-width:0; padding:9px 4px; font-size:14px; text-align:center; white-space:nowrap; }
+  header #navVehicleButton{ flex-grow:1.35; }                 /* v2.4:「車両・ToDo」は字が多いので少し広く */
   .nav-btn.active-lav{ background:var(--lavender); color:var(--lavender-ink); border-color:var(--lavender-dark); }
   .ct-datebox{ display:flex; flex:0 0 100%; flex-direction:row; align-items:center; gap:8px; min-width:0; }
   .ct-dleft{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
@@ -646,6 +647,11 @@ style.textContent = `
   .cm-chk{ display:flex; align-items:center; gap:4px; font-size:12px; color:var(--ink-soft); padding:6px 4px; flex:none; white-space:nowrap; cursor:pointer; margin-left:auto; }
   .cm-row.is-hidden .cm-name{ color:var(--ink-soft); text-decoration:line-through; }
   .cm-tools{ display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; align-items:center; }
+  /* v2.4:長いリストの下の「さらに表示」と、その右の「閉じる」 */
+  .ct-more-row{ display:flex; gap:8px; margin-top:10px; align-items:stretch; }
+  .ct-more-row[hidden]{ display:none; }
+  .ct-more-row .btn{ margin-top:0; flex:1 1 auto; width:auto; }
+  .ct-more-row .ct-close-btn{ flex:0 0 auto; padding-left:18px; padding-right:18px; }
   .cm-share-note{ font-size:12px; color:var(--ink-soft); line-height:1.6; margin-bottom:8px; }
   .cm-share-label{ display:block; font-size:12px; color:var(--ink-soft); margin-bottom:6px; }
   .cm-count{ font-size:12px; color:var(--ink-soft); margin-left:auto; }
@@ -2420,8 +2426,8 @@ backupFile.addEventListener("change", async e => {
    ・版を上げるときは、sw.js の CACHE(nippo-cache-v○○)と同じ数字にする
    ・日付は、その版を作った日
 ========================================================= */
-const APP_VERSION = "v2.3";
-const APP_DATE = "2026-11-25";
+const APP_VERSION = "v2.4";
+const APP_DATE = "2026-11-27";
 window.ctAppVersion = function(){ return { version: APP_VERSION, date: APP_DATE }; };
 
 /* =========================================================
@@ -3331,6 +3337,7 @@ doneBox.hidden = true;
 const vehScreen = $("vehicleScreen");
 if(vehScreen) vehScreen.appendChild(doneBox);
 let doneLimit = 20;
+let doneClosed = false;     // v2.4:「閉じる」で終了したToDoリストをたたんだ印
 
 function renderDoneTodos(){
   const box = $("doneTodoBox");
@@ -3347,6 +3354,15 @@ function renderDoneTodos(){
   body.className = "dt-body";
   box.appendChild(head);
   box.appendChild(body);
+  if(doneClosed){                                        // v2.4:たたんでいるときは「開く」だけ
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "btn btn-outline-mint";
+    open.id = "doneOpen";
+    open.textContent = `終了したToDoリストを開く(${done.length}件)`;
+    body.appendChild(open);
+    return;
+  }
   done.slice(0, doneLimit).forEach(t => {
     const md = typeof formatMonthDay === "function" ? formatMonthDay(t.date) : "";
     const suffix = typeof formatDoneSuffix === "function" ? formatDoneSuffix(t.completedAt) : "(済)";
@@ -3363,13 +3379,24 @@ function renderDoneTodos(){
     wrap.appendChild(div);
     body.appendChild(wrap);
   });
-  if(done.length > doneLimit){
-    const more = document.createElement("button");
-    more.type = "button";
-    more.className = "btn btn-outline-mint";
-    more.id = "doneMore";
-    more.textContent = `さらに表示(残り ${done.length - doneLimit}件)`;
-    body.appendChild(more);
+  if(done.length > 20){                                  // v2.4:20件より多いときは、「さらに表示」の右に「閉じる」
+    const row = document.createElement("div");
+    row.className = "ct-more-row";
+    if(done.length > doneLimit){
+      const more = document.createElement("button");
+      more.type = "button";
+      more.className = "btn btn-outline-mint";
+      more.id = "doneMore";
+      more.textContent = `さらに表示(残り ${done.length - doneLimit}件)`;
+      row.appendChild(more);
+    }
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "btn btn-outline-mint ct-close-btn";
+    close.id = "doneClose";
+    close.textContent = "閉じる";
+    row.appendChild(close);
+    body.appendChild(row);
   }
   const hint = document.createElement("div");
   hint.className = "ct-swipe-hint";
@@ -3471,6 +3498,11 @@ doneBox.addEventListener("change", e => {
 });
 doneBox.addEventListener("click", e => {
   if(e.target.closest("#doneMore")){ doneLimit += 20; renderDoneTodos(); }
+  if(e.target.closest("#doneClose")){                                              // v2.4:リスト全体をたたむ
+    doneClosed = true; doneLimit = 20; renderDoneTodos();
+    if(doneBox.scrollIntoView) doneBox.scrollIntoView({ block:"start" });
+  }
+  if(e.target.closest("#doneOpen")){ doneClosed = false; doneLimit = 20; renderDoneTodos(); }
   if(e.target.closest("#doneClearAll")){
     const done = todoItems.filter(t => t && t.done);
     if(done.length === 0) return;
@@ -3653,23 +3685,6 @@ custSection.id = "custScreen";
 custSection.className = "screen";
 custSection.innerHTML = `
   <div class="cm-top"><button type="button" class="btn-mini" id="cmBack">← データ</button><h2>顧客の管理</h2></div>
-  <div class="card" id="cmLists" hidden><div class="dt-title" style="font-size:15px;font-weight:700;margin-bottom:6px;">取り込んだリスト(候補に出すリストを選ぶ)</div><div class="cm-lists"></div></div>
-  <div class="cm-note" id="cmHiddenNote"></div>
-  <div class="ct-seg" id="cmTabs">
-    <button type="button" data-tab="all"></button>
-    <button type="button" data-tab="show"></button>
-    <button type="button" data-tab="hide"></button>
-  </div>
-  <div class="card" style="margin-top:10px;">
-    <input type="text" id="cmSearch" placeholder="顧客名・読み仮名・コードで検索" autocomplete="off">
-    <div class="kana-grid" id="cmKana" style="margin-top:8px;"></div>
-    <div class="cm-tools">
-      <span class="cm-count" id="cmCount"></span>
-    </div>
-    <div class="cm-head"><span>顧客</span><span>非表示にする</span></div>
-    <div id="cmList"></div>
-    <button type="button" class="btn btn-outline-mint" id="cmMore" style="margin-top:10px;" hidden>さらに表示</button>
-  </div>
   <div class="card" id="cmAddCard">
     <div class="dt-title" id="cmAddTitle" style="font-size:15px;font-weight:700;margin-bottom:8px;">顧客を追加</div>
     <div class="cm-tools" style="display:block;">
@@ -3690,10 +3705,34 @@ custSection.innerHTML = `
     <button type="button" class="btn btn-outline-mint" id="cmShareIn" style="margin-top:8px;">顧客の設定を取り込む</button>
     <input type="file" id="cmShareFile" hidden>
   </div>
+  <div class="card" id="cmLists" hidden><div class="dt-title" style="font-size:15px;font-weight:700;margin-bottom:6px;">取り込んだリスト(候補に出すリストを選ぶ)</div><div class="cm-lists"></div></div>
+  <div class="cm-note" id="cmHiddenNote"></div>
+  <div class="ct-seg" id="cmTabs">
+    <button type="button" data-tab="all"></button>
+    <button type="button" data-tab="show"></button>
+    <button type="button" data-tab="hide"></button>
+  </div>
+  <div class="card" style="margin-top:10px;">
+    <input type="text" id="cmSearch" placeholder="顧客名・読み仮名・コードで検索" autocomplete="off">
+    <div class="kana-grid" id="cmKana" style="margin-top:8px;"></div>
+    <div class="cm-tools">
+      <span class="cm-count" id="cmCount"></span>
+    </div>
+    <div class="cm-head"><span>顧客</span><span>非表示にする</span></div>
+    <div id="cmList"></div>
+    <div class="ct-more-row" id="cmMoreRow" hidden>
+      <button type="button" class="btn btn-outline-mint" id="cmMore" hidden>さらに表示</button>
+      <button type="button" class="btn btn-outline-mint ct-close-btn" id="cmClose">閉じる</button>
+    </div>
+    <button type="button" class="btn btn-outline-mint" id="cmOpen" style="margin-top:10px;" hidden>顧客リストを開く</button>
+  </div>
 `;
 document.querySelector("main").appendChild(custSection);
 
-let cmTab = "all", cmKana = null, cmLimit = 100, cmEditId = null;
+const CM_STEP = 30;        // v2.4:顧客リストは30件ずつ出す(「さらに表示」で30件ずつ増やす)
+let cmTab = "all", cmKana = null, cmLimit = CM_STEP, cmEditId = null;
+let cmClosed = false;      // v2.4:「閉じる」で顧客リストをたたんだ印(検索・タブ・かなを触ると開く)
+let cmBackY = null;        // v2.4:「直す」を押したときの画面の位置(直し終わったら、そこへ戻す)
 let cmKanaStep = 0;         // v27:「あ〜わ」を押した段階(ホーム・容器と同じしくみ。外すのは「全件」)
 let cmEditKey = null;       // v26:直している「取り込んだ顧客」の目印(custEdit のキー)
 $("cmLists").addEventListener("change", e => { if(e.target.name === "cmListUse") setListUse(e.target.value); });
@@ -3733,7 +3772,7 @@ function renderCust(){
     b.type = "button";
     b.className = "kana-btn" + (row === cmKana ? " active" : "");
     b.textContent = kanaLabel(row, cmKana, cmKanaStep);
-    b.addEventListener("click", () => { const nx = kanaNext(cmKana, cmKanaStep, row); cmKana = nx.row; cmKanaStep = nx.step; cmLimit = 100; renderCust(); });
+    b.addEventListener("click", () => { const nx = kanaNext(cmKana, cmKanaStep, row); cmKana = nx.row; cmKanaStep = nx.step; cmLimit = CM_STEP; cmClosed = false; renderCust(); });
     grid.appendChild(b);
   });
   const all = document.createElement("button");                                  // v27:絞り込みを外して全件に戻す
@@ -3741,20 +3780,23 @@ function renderCust(){
   all.className = "kana-btn" + (cmKana ? "" : " active");
   all.id = "cmKanaAll";
   all.textContent = "全件";
-  all.addEventListener("click", () => { cmKana = null; cmKanaStep = 0; cmLimit = 100; renderCust(); });
+  all.addEventListener("click", () => { cmKana = null; cmKanaStep = 0; cmLimit = CM_STEP; cmClosed = false; renderCust(); });
   grid.appendChild(all);
 
   const items = cmItems();
   $("cmCount").textContent = `${items.length}件`;
   const list = $("cmList");
   list.innerHTML = "";
+  list.hidden = cmClosed;
+  $("cmOpen").hidden = !cmClosed;
+  $("cmOpen").textContent = `顧客リストを開く(${items.length}件)`;
   if(items.length === 0){
     const e = document.createElement("div");
     e.className = "empty";
     e.textContent = cmTab === "hide" ? "非表示の顧客はありません" : "該当する顧客はありません";
     list.appendChild(e);
   }
-  items.slice(0, cmLimit).forEach(i => {
+  (cmClosed ? [] : items.slice(0, cmLimit)).forEach(i => {
     const key = custKey(i);
     const hidden = custHidden.has(key);
     const row = document.createElement("div");
@@ -3770,16 +3812,26 @@ function renderCust(){
   });
   $("cmMore").hidden = items.length <= cmLimit;
   $("cmMore").textContent = `さらに表示(残り ${Math.max(0, items.length - cmLimit)}件)`;
+  $("cmMoreRow").hidden = cmClosed || items.length <= CM_STEP;          // v2.4:30件より多いときだけ「閉じる」を出す
 }
 
 function cmResetAddForm(){
   cmEditId = null; cmEditKey = null;
+  cmReturnBack();
   $("cmAddName").value = ""; $("cmAddKana").value = ""; $("cmAddCode").value = "";
   $("cmAddCode").disabled = false;
   $("cmAddTitle").textContent = "顧客を追加";
   $("cmAddBtn").textContent = "追加";
   $("cmAddCancel").hidden = true;
   $("cmAddRevert").hidden = true;
+}
+// v2.4:「直す」を押す前の位置を覚えておき、直し終わったら(更新・やめる・戻す)そこへ戻す
+function cmRememberBack(){ if(cmEditId || cmEditKey) return; cmBackY = window.scrollY || window.pageYOffset || 0; }   // 直している途中に別の「直す」を押したときは、最初の位置のまま
+function cmReturnBack(){
+  if(cmBackY === null) return;
+  const y = cmBackY;
+  cmBackY = null;
+  setTimeout(() => window.scrollTo(0, y), 0);                                     // 一覧を作り直してから戻す
 }
 // v26:取り込んだ顧客を、custEdit のキーで探す(直したあとも、取り込んだときの目印で見つける)
 function cmMasterByKey(ek){
@@ -3798,7 +3850,7 @@ function applyCustomers(){
 function refreshCustomers(){ applyCustomers(); renderCust(); }
 
 function goToCust(){
-  cmTab = "all"; cmLimit = 100;
+  cmTab = "all"; cmLimit = CM_STEP; cmClosed = false; cmBackY = null;
   renderCust();
   showScreen("cust");
   updateNav("data");
@@ -3808,11 +3860,18 @@ $("cmTabs").addEventListener("click", e => {
   const b = e.target.closest("button");
   if(!b) return;
   cmTab = b.getAttribute("data-tab");
-  cmLimit = 100;
+  cmLimit = CM_STEP; cmClosed = false;
   renderCust();
 });
-$("cmSearch").addEventListener("input", () => { cmLimit = 100; renderCust(); });
-$("cmMore").addEventListener("click", () => { cmLimit += 100; renderCust(); });
+$("cmSearch").addEventListener("input", () => { cmLimit = CM_STEP; cmClosed = false; renderCust(); });
+$("cmMore").addEventListener("click", () => { cmLimit += CM_STEP; renderCust(); });
+$("cmClose").addEventListener("click", () => {                                    // v2.4:リスト全体をたたむ
+  cmClosed = true; cmLimit = CM_STEP;
+  renderCust();
+  const card = $("cmList").closest(".card");
+  if(card && card.scrollIntoView) card.scrollIntoView({ block:"start" });
+});
+$("cmOpen").addEventListener("click", () => { cmClosed = false; cmLimit = CM_STEP; renderCust(); });
 
 // 「非表示」のチェック：付けるとすぐ非表示、外すとすぐ表示に戻る
 $("cmList").addEventListener("change", e => {
@@ -3837,6 +3896,7 @@ $("cmList").addEventListener("click", e => {
     const ek = decodeURIComponent(btn.getAttribute("data-key"));
     const it = cmMasterByKey(ek);
     if(!it) return;
+    cmRememberBack();
     cmEditId = null; cmEditKey = ek;
     $("cmAddName").value = it.n; $("cmAddKana").value = it.k || ""; $("cmAddCode").value = it.c || "";
     $("cmAddCode").disabled = true;                                                 // 顧客コードは Access とつなぐ番号なので直さない
@@ -3852,6 +3912,7 @@ $("cmList").addEventListener("click", e => {
   const ex = custExtra.find(x => x.id === id);
   if(!ex) return;
   if(btn.getAttribute("data-act") === "edit"){
+    cmRememberBack();
     cmEditId = id; cmEditKey = null;
     $("cmAddCode").disabled = false; $("cmAddRevert").hidden = true;
     $("cmAddName").value = ex.n; $("cmAddKana").value = ex.k || ""; $("cmAddCode").value = ex.c || "";
@@ -4534,6 +4595,7 @@ if(dateEl && dateEl.parentNode){
   setTimeout(() => refreshWeather(false), 800);
 }
 
+$("navVehicleButton").textContent = "車両・ToDo";            // v2.4:ToDoリストが車両タブにあることが分かるように
 const navBtn = document.createElement("button");
 navBtn.className = "nav-btn";
 navBtn.id = "navContainerButton";

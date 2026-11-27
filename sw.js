@@ -5,7 +5,7 @@
    ・電波があるときは最新版を取りに行き、保管内容を更新する
    ※ アプリを大きく作り替えたときは、下の CACHE の v1 → v2 に変える
 ========================================================= */
-const CACHE = "nippo-cache-v2.3";                         // 版を上げたら、container.js の APP_VERSION・APP_DATE も合わせる
+const CACHE = "nippo-cache-v2.4";                         // 版を上げたら、container.js の APP_VERSION・APP_DATE も合わせる
 const FONT_CACHE = "nippo-fonts-v1";                    // Google Fonts（見た目用）を保管する入れ物
 const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
 
